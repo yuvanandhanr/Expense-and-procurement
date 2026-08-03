@@ -1,0 +1,26 @@
+{
+  "name": "Expense & Procurement Backend Dev Container",
+  "dockerComposeFile": ["../docker-compose.yml"],
+  "service": "app",
+  "workspaceFolder": "/app",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/home/appuser/.local/bin/python",
+        "python.formatting.provider": "none",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "explicit",
+          "source.fixAll.eslint": "explicit"
+        }
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff"
+      ]
+    }
+  },
+  "remoteUser": "appuser",
+  "shutdownAction": "stopCompose"
+}
