@@ -71,6 +71,58 @@ class Settings(BaseSettings):
         default="us-east-1",
         description="AWS Region designated for AWS Textract OCR operations"
     )
+    TESSERACT_CMD: str = Field(
+        default=r"C:\Users\DE_004\AppData\Local\Programs\Tesseract-OCR\tesseract.exe",
+        description="Path to the Tesseract OCR executable"
+    )
+
+    # Caching Settings
+    REDIS_URL: str = Field(
+        default="redis://localhost:6379/0",
+        description="Redis connection URL for caching"
+    )
+
+    # SMTP Settings (Email Service)
+    SMTP_HOST: str = Field(
+        default="smtp.mailtrap.io",
+        description="SMTP server host address"
+    )
+    SMTP_PORT: int = Field(
+        default=2525,
+        description="SMTP server connection port"
+    )
+    SMTP_USER: str = Field(
+        default="mock-smtp-user",
+        description="SMTP server username"
+    )
+    SMTP_PASSWORD: str = Field(
+        default="mock-smtp-pass",
+        description="SMTP server password"
+    )
+    SMTP_FROM_EMAIL: str = Field(
+        default="no-reply@enterprise.platform",
+        description="Sender email address for platform notifications"
+    )
+
+    # File Management limits
+    MAX_UPLOAD_SIZE: int = Field(
+        default=10 * 1024 * 1024,  # 10 MB
+        description="Maximum permitted file upload size in bytes"
+    )
+    ALLOWED_MIME_TYPES: str = Field(
+        default="application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,image/jpeg,image/png",
+        description="Comma-separated allowed MIME types for uploads"
+    )
+
+    # Retention policies
+    AUDIT_LOG_RETENTION_DAYS: int = Field(
+        default=365,
+        description="Retention period in days for audit logs"
+    )
+    TEMP_FILE_RETENTION_DAYS: int = Field(
+        default=7,
+        description="Retention period in days for generated reports and temporary files"
+    )
 
 
 # Instantiate settings for global usage

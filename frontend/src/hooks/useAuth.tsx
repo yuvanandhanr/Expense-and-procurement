@@ -1,0 +1,100 @@
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { User } from "../types";
+import { api, setTokens, clearTokens } from "../services/api";
+import toast from "react-hot-toast";
+
+interface AuthContextType {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => void;
+  hasRole: (role: string) => boolean;
+  hasPermission: (permission: string) => boolean;
+}
+
+const AuthContext = createContext<AuthContextType | null>(null);
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load profile from localStorage on start
+  useEffect(() => {
+    const cachedProfile = localStorage.getItem("user_profile");
+    if (cachedProfile) {
+      try {
+        setUser(JSON.parse(cachedProfile));
+      } catch {
+        clearTokens();
+      }
+    }
+    setIsLoading(false);
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const response = await api.post("/auth/login", { email, password });
+      const { access_token, refresh_token, user: userProfile } = response.data;
+      
+      setTokens(access_token, refresh_token);
+      setUser(userProfile);
+      localStorage.setItem("user_profile", JSON.stringify(userProfile));
+      toast.success(`Welcome back, ${userProfile.first_name}!`);
+    } catch (error: any) {
+      const msg = error.response?.data?.detail || "Authentication failed. Please check credentials.";
+      toast.error(msg);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = () => {
+    setUser(null);
+    clearTokens();
+    toast.success("Logged out successfully.");
+    window.location.href = "/login";
+  };
+
+  const hasRole = (roleName: string): boolean => {
+    if (!user) return false;
+    return user.roles.some((role) => role.role_name === roleName && role.status);
+  };
+
+  const hasPermission = (permissionName: string): boolean => {
+    if (!user) return false;
+    // Check permissions across all active roles
+    return user.roles.some((role) => {
+      if (!role.status) return false;
+      // Admin bypass
+      if (role.role_name === "Admin") return true;
+      return role.permissions?.some((perm) => perm.permission_name === permissionName) || false;
+    });
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated: !!user,
+        isLoading,
+        login,
+        logout,
+        hasRole,
+        hasPermission,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};

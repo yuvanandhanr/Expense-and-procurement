@@ -5,6 +5,11 @@ Sets up test clients, test environments, and dependency override fixtures
 for validating the FastAPI application skeleton.
 """
 
+import sys
+from unittest.mock import MagicMock
+# Mock pandas to bypass Windows Application Control blocking pandas DLLs
+sys.modules['pandas'] = MagicMock()
+
 from typing import AsyncGenerator, Generator
 from unittest.mock import AsyncMock
 import pytest

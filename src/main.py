@@ -22,6 +22,35 @@ from src.middleware.exceptions import ExceptionMiddleware
 from src.middleware.logging import LoggingMiddleware
 from src.middleware.request_id import RequestIdMiddleware
 from src.middleware.security import SecurityHeadersMiddleware
+from src.api.auth import router as auth_router
+from src.api.users import router as users_router
+from src.api.roles import router as roles_router
+from src.api.permissions import router as permissions_router
+from src.api.departments import router as departments_router
+from src.api.designations import router as designations_router
+from src.api.cost_centres import router as cost_centres_router
+from src.api.budget_codes import router as budget_codes_router
+from src.api.organization import router as org_router
+from src.api.purchase_requisitions import router as pr_router
+from src.api.approvals import router as approvals_router
+from src.api.comments import router as comments_router
+from src.api.attachments import router as attachments_router
+from src.api.vendors import router as vendors_router
+from src.api.rfq import router as rfq_router
+from src.api.quotations import router as quotations_router
+from src.api.purchase_orders import router as purchase_orders_router
+from src.api.contracts import router as contracts_router
+
+# Phase 6 imports
+from src.api.dashboard import router as dashboard_router
+from src.api.analytics import router as analytics_router
+from src.api.reports import router as reports_router
+from src.api.notifications import router as notifications_router
+from src.api.audit import router as audit_router
+from src.api.search import router as search_router
+from src.api.files import router as files_router
+from src.api.monitoring import router as monitoring_router
+from src.api.settings import router as settings_router
 
 logger = logging.getLogger("api.main")
 
@@ -47,10 +76,51 @@ async def lifespan(app: FastAPI):
         )
         # Avoid crashing startup so the health-check system can report failure properly
 
+    # 2.5 Initialize Cache, Seed Databases, and Start Background Scheduler
+    import asyncio
+    from src.cache.factory import initialize_cache
+    from src.database.session import async_session
+    from src.services.setting_service import SettingService
+    from src.services.email_service import EmailService
+    from src.services.notification_service import NotificationService
+    from src.services.job_service import run_scheduler_loop
+
+    await initialize_cache()
+
+    try:
+        async with async_session() as session:
+            # Seed Settings
+            setting_service = SettingService(session)
+            await setting_service.seed_default_settings()
+
+            # Seed Email Templates
+            email_service = EmailService(session)
+            await email_service.seed_templates()
+
+            # Seed Notification Templates
+            notification_service = NotificationService(session)
+            await notification_service.seed_templates()
+
+            await session.commit()
+        logger.info("Successfully seeded settings, email templates, and notification templates on startup.")
+    except Exception as e:
+        logger.error(f"Error seeding default settings/templates on startup: {e}")
+
+    # Launch background scheduler task
+    scheduler_task = asyncio.create_task(run_scheduler_loop(async_session))
+    app.state.scheduler_task = scheduler_task
+
     yield
 
     # 3. Clean up database connections on application termination
     logger.info("Terminating FastAPI Application. Disposing database engine...")
+    if hasattr(app.state, "scheduler_task"):
+        logger.info("Cancelling background scheduler task...")
+        app.state.scheduler_task.cancel()
+        try:
+            await app.state.scheduler_task
+        except asyncio.CancelledError:
+            pass
     await async_engine.dispose()
     logger.info("Database engine disposed.")
 
@@ -83,6 +153,37 @@ app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=["*"] if settings.ENVIRONMENT != "production" else ["localhost", "127.0.0.1"]
 )
+
+# Include Authentication and Authorization routes
+app.include_router(auth_router, prefix="/api/v1")
+app.include_router(users_router, prefix="/api/v1")
+app.include_router(roles_router, prefix="/api/v1")
+app.include_router(permissions_router, prefix="/api/v1")
+app.include_router(departments_router, prefix="/api/v1/departments")
+app.include_router(designations_router, prefix="/api/v1/designations")
+app.include_router(cost_centres_router, prefix="/api/v1/cost_centres")
+app.include_router(budget_codes_router, prefix="/api/v1/budget_codes")
+app.include_router(org_router, prefix="/api/v1/settings")
+app.include_router(pr_router, prefix="/api/v1")
+app.include_router(approvals_router, prefix="/api/v1")
+app.include_router(comments_router, prefix="/api/v1")
+app.include_router(attachments_router, prefix="/api/v1")
+app.include_router(vendors_router, prefix="/api/v1")
+app.include_router(rfq_router, prefix="/api/v1")
+app.include_router(quotations_router, prefix="/api/v1")
+app.include_router(purchase_orders_router, prefix="/api/v1")
+app.include_router(contracts_router, prefix="/api/v1")
+
+# Mount Phase 6 routers
+app.include_router(dashboard_router, prefix="/api/v1")
+app.include_router(analytics_router, prefix="/api/v1")
+app.include_router(reports_router, prefix="/api/v1")
+app.include_router(notifications_router, prefix="/api/v1")
+app.include_router(audit_router, prefix="/api/v1")
+app.include_router(search_router, prefix="/api/v1")
+app.include_router(files_router, prefix="/api/v1")
+app.include_router(monitoring_router, prefix="/api/v1")
+app.include_router(settings_router, prefix="/api/v1")
 
 
 @app.get("/", tags=["system"])
