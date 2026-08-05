@@ -166,3 +166,16 @@ class PermissionCreate(BaseModel):
     permission_name: str = Field(..., min_length=1, max_length=255)
     module_name: Optional[str] = None
     description: Optional[str] = None
+
+
+class GoogleLoginRequest(BaseModel):
+    credential: str = Field(..., description="Google ID Token credential returned from GSI client")
+
+
+class VendorOTPRequest(BaseModel):
+    email: EmailStr = Field(..., description="Vendor email address to request OTP")
+
+
+class VendorOTPVerify(BaseModel):
+    email: EmailStr = Field(..., description="Vendor email address")
+    otp: str = Field(..., description="6-digit OTP code")

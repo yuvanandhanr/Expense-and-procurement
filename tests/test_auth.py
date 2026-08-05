@@ -1,4 +1,5 @@
 import uuid
+import hashlib
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, AsyncMock, patch
 import jwt
@@ -124,74 +125,176 @@ def authenticate_user(mock_user):
 # --- AUTHENTICATION & LOGIN TESTS ---
 
 @pytest.mark.anyio
+@patch("src.services.auth_service.verify_google_id_token", new_callable=AsyncMock)
 @patch.object(UserRepository, "get_by_email", new_callable=AsyncMock)
 @patch.object(UserRepository, "update", new_callable=AsyncMock)
 @patch.object(SessionRepository, "create", new_callable=AsyncMock)
 @patch.object(RefreshTokenRepository, "create", new_callable=AsyncMock)
-async def test_login_success(
+async def test_google_login_success(
     mock_rt_create,
     mock_session_create,
     mock_user_update,
     mock_get_by_email,
+    mock_verify,
     async_client: AsyncClient,
     override_db,
     mock_user
 ):
+    mock_verify.return_value = {
+        "email": "employee@dataeko.ai",
+        "email_verified": True,
+        "sub": "google12345",
+        "given_name": "John",
+        "family_name": "Doe",
+        "picture": "https://example.com/john.jpg"
+    }
+    mock_user.email = "employee@dataeko.ai"
     mock_get_by_email.return_value = mock_user
 
     response = await async_client.post(
-        "/api/v1/auth/login",
-        json={"email": "employee@example.com", "password": "securepassword"}
+        "/api/v1/auth/google",
+        json={"credential": "valid_token"}
     )
-
     assert response.status_code == status.HTTP_200_OK
-    data = response.json()
-    assert "access_token" in data
-    assert "refresh_token" in data
-    assert data["token_type"] == "bearer"
+    assert "access_token" in response.json()
 
 
 @pytest.mark.anyio
+@patch("src.services.auth_service.verify_google_id_token", new_callable=AsyncMock)
+async def test_google_login_invalid_domain(
+    mock_verify,
+    async_client: AsyncClient,
+    override_db
+):
+    mock_verify.return_value = {
+        "email": "employee@gmail.com",
+        "email_verified": True,
+        "sub": "google12345",
+        "given_name": "John",
+        "family_name": "Doe"
+    }
+    response = await async_client.post(
+        "/api/v1/auth/google",
+        json={"credential": "invalid_domain_token"}
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.json()["detail"] == "Only DataEko employees can login."
+
+
+@pytest.mark.anyio
+@patch("src.services.auth_service.EmailService")
+@patch("src.services.auth_service.OTPRequestRepository")
+async def test_vendor_otp_request_success(
+    mock_otp_repo_class,
+    mock_email_service_class,
+    async_client: AsyncClient,
+    override_db
+):
+    mock_vendor = MagicMock()
+    mock_vendor.status = "Active"
+    mock_vendor.email = "supplier@example.com"
+    
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = mock_vendor
+    override_db.execute = AsyncMock(return_value=mock_result)
+
+    mock_otp_repo_class.return_value.create = AsyncMock()
+    
+    mock_email_instance = mock_email_service_class.return_value
+    mock_email_instance.template_repo.get_by_name = AsyncMock(return_value=MagicMock())
+    mock_email_instance.create_template_if_not_exists = AsyncMock()
+    mock_email_instance.queue_email = AsyncMock(return_value=MagicMock())
+    mock_email_instance.send_email_immediately = AsyncMock(return_value=True)
+
+    response = await async_client.post(
+        "/api/v1/auth/vendor/otp-request",
+        json={"email": "supplier@example.com"}
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.anyio
+@patch("src.services.auth_service.OTPRequestRepository")
 @patch.object(UserRepository, "get_by_email", new_callable=AsyncMock)
-@patch.object(UserRepository, "update", new_callable=AsyncMock)
-async def test_login_invalid_password(
-    mock_user_update,
+@patch.object(UserRepository, "create", new_callable=AsyncMock)
+@patch.object(SessionRepository, "create", new_callable=AsyncMock)
+@patch.object(RefreshTokenRepository, "create", new_callable=AsyncMock)
+async def test_vendor_otp_verify_success(
+    mock_rt_create,
+    mock_session_create,
+    mock_user_create,
     mock_get_by_email,
+    mock_otp_repo_class,
     async_client: AsyncClient,
     override_db,
     mock_user
 ):
-    mock_get_by_email.return_value = mock_user
+    mock_otp = MagicMock()
+    mock_otp.otp_hash = hashlib.sha256("123456".encode("utf-8")).hexdigest()
+    mock_otp.attempts = 0
+    mock_otp.expires_at = datetime.utcnow() + timedelta(minutes=5)
+    mock_otp_repo_class.return_value.get_active_by_email = AsyncMock(return_value=mock_otp)
+    mock_otp_repo_class.return_value.update = AsyncMock()
+
+    mock_vendor = MagicMock()
+    mock_vendor.vendor_id = 10
+    mock_vendor.vendor_code = "VND10"
+    mock_vendor.vendor_name = "Mock Supplier"
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = mock_vendor
+    override_db.execute = AsyncMock(return_value=mock_result)
+
+    mock_get_by_email.return_value = None
+    mock_user_create.return_value = mock_user
 
     response = await async_client.post(
-        "/api/v1/auth/login",
-        json={"email": "employee@example.com", "password": "wrongpassword"}
+        "/api/v1/auth/vendor/otp-verify",
+        json={"email": "supplier@example.com", "otp": "123456"}
     )
-
-    assert response.status_code == status.HTTP_401_UNAUTHORIZED
-    assert response.json()["detail"] == "Invalid email or password"
+    assert response.status_code == status.HTTP_200_OK
+    assert "access_token" in response.json()
 
 
 @pytest.mark.anyio
-@patch.object(UserRepository, "get_by_email", new_callable=AsyncMock)
-@patch.object(UserRepository, "update", new_callable=AsyncMock)
-async def test_login_account_lockout(
-    mock_user_update,
-    mock_get_by_email,
+@patch("src.services.auth_service.OTPRequestRepository")
+async def test_vendor_otp_verify_expired(
+    mock_otp_repo_class,
     async_client: AsyncClient,
-    override_db,
-    mock_user
+    override_db
 ):
-    mock_user.failed_login_attempts = 4
-    mock_get_by_email.return_value = mock_user
+    mock_otp = MagicMock()
+    mock_otp.otp_hash = hashlib.sha256("123456".encode("utf-8")).hexdigest()
+    mock_otp.attempts = 0
+    mock_otp.expires_at = datetime.utcnow() - timedelta(minutes=5)
+    mock_otp_repo_class.return_value.get_active_by_email = AsyncMock(return_value=mock_otp)
 
     response = await async_client.post(
-        "/api/v1/auth/login",
-        json={"email": "employee@example.com", "password": "wrongpassword"}
+        "/api/v1/auth/vendor/otp-verify",
+        json={"email": "supplier@example.com", "otp": "123456"}
     )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.json()["detail"] == "OTP expired or not found"
 
-    assert response.status_code == status.HTTP_401_UNAUTHORIZED
-    assert mock_user.is_locked is True
+
+@pytest.mark.anyio
+@patch("src.services.auth_service.OTPRequestRepository")
+async def test_vendor_otp_verify_retry_limit(
+    mock_otp_repo_class,
+    async_client: AsyncClient,
+    override_db
+):
+    mock_otp = MagicMock()
+    mock_otp.otp_hash = hashlib.sha256("123456".encode("utf-8")).hexdigest()
+    mock_otp.attempts = 5
+    mock_otp.expires_at = datetime.utcnow() + timedelta(minutes=5)
+    mock_otp_repo_class.return_value.get_active_by_email = AsyncMock(return_value=mock_otp)
+
+    response = await async_client.post(
+        "/api/v1/auth/vendor/otp-verify",
+        json={"email": "supplier@example.com", "otp": "123456"}
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.json()["detail"] == "Maximum verification attempts exceeded"
 
 
 # --- LOGOUT & REFRESH TESTS ---

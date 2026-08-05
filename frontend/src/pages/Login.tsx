@@ -2,48 +2,39 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from "../components/ui";
+import { api } from "../services/api";
+import toast from "react-hot-toast";
+
+declare global {
+  interface Window {
+    google: any;
+  }
+}
 
 export const Login: React.FC = () => {
-  const { login } = useAuth();
+  const { googleLogin, vendorLogin } = useAuth();
   const navigate = useNavigate();
   
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
+  // Tab controller: "employee" | "vendor"
+  const [activeTab, setActiveTab] = React.useState<"employee" | "vendor">("employee");
+  
+  // Vendor OTP form state
+  const [vendorEmail, setVendorEmail] = React.useState("");
+  const [otp, setOtp] = React.useState("");
+  const [otpSent, setOtpSent] = React.useState(false);
+  const [sendingOtp, setSendingOtp] = React.useState(false);
+  
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) {
-      setError("Please fill in all fields.");
-      return;
-    }
-    setError("");
+  const handleCredentialResponse = async (response: any) => {
     setIsSubmitting(true);
-
-    try {
-      await login(email, password);
-      navigate("/");
-    } catch (err: any) {
-      console.error(err);
-      setError(err.response?.data?.detail || "Invalid login credentials.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    const ssoEmail = prompt("Enter your Google Account email:", "y.raja@dataeko.ai");
-    if (!ssoEmail) return;
-    if (!ssoEmail.toLowerCase().endsWith("@dataeko.ai")) {
-      setError("Only corporate @dataeko.ai Google accounts are permitted.");
-      return;
-    }
     setError("");
-    setIsSubmitting(true);
     try {
-      await login(ssoEmail, "sso_google_pass");
-      navigate("/");
+      await googleLogin(response.credential);
+      setTimeout(() => {
+        navigate("/");
+      }, 100);
     } catch (err: any) {
       console.error(err);
       setError(err.response?.data?.detail || "Google authentication failed.");
@@ -52,9 +43,77 @@ export const Login: React.FC = () => {
     }
   };
 
+  React.useEffect(() => {
+    const initializeGoogle = () => {
+      if (window.google && activeTab === "employee") {
+        window.google.accounts.id.initialize({
+          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || "542387192661-placeholder.apps.googleusercontent.com",
+          callback: handleCredentialResponse,
+        });
+        window.google.accounts.id.renderButton(
+          document.getElementById("google-signin-btn"),
+          { theme: "filled_blue", size: "large", width: "100%", shape: "rectangular" }
+        );
+      }
+    };
+
+    if (activeTab === "employee") {
+      if (window.google) {
+        initializeGoogle();
+      } else {
+        const interval = setInterval(() => {
+          if (window.google) {
+            initializeGoogle();
+            clearInterval(interval);
+          }
+        }, 500);
+        return () => clearInterval(interval);
+      }
+    }
+  }, [activeTab]);
+
+  const handleRequestOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vendorEmail) {
+      setError("Please enter your registered vendor email address.");
+      return;
+    }
+    setError("");
+    setSendingOtp(true);
+    try {
+      await api.post("/auth/vendor/otp-request", { email: vendorEmail });
+      setOtpSent(true);
+      toast.success("Verification OTP code sent to your email!");
+    } catch (err: any) {
+      setError(err.response?.data?.detail || "Failed to send OTP. Is your email registered?");
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otp) {
+      setError("Please enter the 6-digit OTP code.");
+      return;
+    }
+    setError("");
+    setIsSubmitting(true);
+    try {
+      await vendorLogin(vendorEmail, otp);
+      setTimeout(() => {
+        navigate("/vendor-portal");
+      }, 100);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || "Invalid or expired OTP code.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900 px-4 relative overflow-hidden font-sans">
-      {/* Background visual graphics */}
+    <div className="relative min-h-screen flex items-center justify-center bg-slate-950 overflow-hidden font-sans p-4">
+      {/* Background graphics */}
       <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] rounded-full bg-primary/20 blur-[120px]" />
       <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] rounded-full bg-emerald-500/10 blur-[120px]" />
 
@@ -64,73 +123,131 @@ export const Login: React.FC = () => {
             E
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight text-white mt-4">
-            Sign In
+            Portal Access
           </CardTitle>
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mt-1">
             Enterprise Procurement Suite
           </p>
         </CardHeader>
+        
         <CardContent className="space-y-6 pt-4">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              id="email"
-              type="email"
-              label="Corporate Email Address"
-              placeholder="name@company.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="bg-slate-900 border-slate-800 text-white placeholder:text-slate-500 focus:ring-primary"
-            />
-            <Input
-              id="password"
-              type="password"
-              label="Security Credentials"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="bg-slate-900 border-slate-800 text-white placeholder:text-slate-500 focus:ring-primary"
-            />
-
-            {error && (
-              <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium">
-                {error}
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              className="w-full font-bold text-sm tracking-wider uppercase py-3"
-              disabled={isSubmitting}
+          {/* Tab Selector */}
+          <div className="grid grid-cols-2 p-1 bg-slate-900 border border-slate-800 rounded-lg">
+            <button
+              type="button"
+              onClick={() => { setActiveTab("employee"); setError(""); }}
+              className={`py-2 text-xs font-bold rounded-md transition-all ${
+                activeTab === "employee"
+                  ? "bg-primary text-primary-foreground shadow"
+                  : "text-slate-400 hover:text-white"
+              }`}
             >
-              {isSubmitting ? "Authenticating..." : "Access Platform"}
-            </Button>
-          </form>
-
-          <div className="relative flex py-2 items-center">
-            <div className="flex-grow border-t border-slate-800"></div>
-            <span className="flex-shrink mx-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-              Or Continue With
-            </span>
-            <div className="flex-grow border-t border-slate-800"></div>
+              Employee Login
+            </button>
+            <button
+              type="button"
+              onClick={() => { setActiveTab("vendor"); setError(""); }}
+              className={`py-2 text-xs font-bold rounded-md transition-all ${
+                activeTab === "vendor"
+                  ? "bg-primary text-primary-foreground shadow"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Vendor Login
+            </button>
           </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleGoogleSignIn}
-            className="w-full flex items-center justify-center border-slate-800 hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-wider py-3"
-            disabled={isSubmitting}
-          >
-            <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-            </svg>
-            Sign In with Google
-          </Button>
-          
-          <div className="text-center text-xs text-slate-500 font-semibold uppercase tracking-wider">
+          {activeTab === "employee" ? (
+            <div className="space-y-6">
+              <div className="text-center space-y-2">
+                <h3 className="text-sm font-semibold text-slate-200">Sign in using Google Workspace</h3>
+                <p className="text-xs text-slate-400">Use your corporate @dataeko.ai credentials to authenticate securely.</p>
+              </div>
+
+              {error && (
+                <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium">
+                  {error}
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <div id="google-signin-btn" className="w-full flex justify-center min-h-[40px]"></div>
+                {import.meta.env.DEV && (
+                  <Button
+                    type="button"
+                    className="w-full bg-slate-900 border border-slate-800 text-xs text-slate-300 font-semibold py-2 hover:bg-slate-800 hover:text-white"
+                    onClick={() => handleCredentialResponse({ credential: "mock_google_y.raja@dataeko.ai" })}
+                  >
+                    Mock Google SSO (Dev Only)
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={otpSent ? handleVerifyOtp : handleRequestOtp} className="space-y-4">
+              <div className="text-center space-y-1">
+                <h3 className="text-sm font-semibold text-slate-200">Supplier Partner Access</h3>
+                <p className="text-xs text-slate-400">Enter your registered email to receive a secure login code.</p>
+              </div>
+
+              <Input
+                id="vendorEmail"
+                type="email"
+                label="Registered Vendor Email"
+                placeholder="vendor@company.com"
+                value={vendorEmail}
+                onChange={(e) => setVendorEmail(e.target.value)}
+                disabled={otpSent}
+                className="bg-slate-900 border-slate-800 text-white placeholder:text-slate-500 focus:ring-primary"
+              />
+
+              {otpSent && (
+                <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <Input
+                    id="otp"
+                    type="text"
+                    label="One-Time Verification Code (OTP)"
+                    placeholder="Enter 6-digit OTP code"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    className="bg-slate-900 border-slate-800 text-white placeholder:text-slate-500 focus:ring-primary text-center tracking-[0.5em] font-bold text-lg"
+                  />
+                </div>
+              )}
+
+              {error && (
+                <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium">
+                  {error}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full font-bold text-sm tracking-wider uppercase py-3"
+                disabled={sendingOtp || isSubmitting}
+              >
+                {sendingOtp
+                  ? "Sending Code..."
+                  : isSubmitting
+                  ? "Verifying OTP..."
+                  : otpSent
+                  ? "Verify & Enter Portal"
+                  : "Send OTP Verification"}
+              </Button>
+
+              {otpSent && (
+                <button
+                  type="button"
+                  onClick={() => { setOtpSent(false); setOtp(""); }}
+                  className="w-full text-center text-xs text-slate-400 hover:text-white underline"
+                >
+                  Change Email Address
+                </button>
+              )}
+            </form>
+          )}
+
+          <div className="text-center text-xs text-slate-500 font-semibold uppercase tracking-wider pt-2">
             Restricted System access for authorized personnel only.
           </div>
         </CardContent>
@@ -138,4 +255,5 @@ export const Login: React.FC = () => {
     </div>
   );
 };
+
 export default Login;

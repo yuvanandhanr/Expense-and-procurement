@@ -24,6 +24,7 @@ const AuditLogs = lazy(() => import("../pages/AuditLogs"));
 const SystemHealth = lazy(() => import("../pages/SystemHealth"));
 const Settings = lazy(() => import("../pages/Settings"));
 const GlobalSearch = lazy(() => import("../pages/GlobalSearch"));
+const VendorPortal = lazy(() => import("../pages/VendorPortal"));
 
 // Protected Route Guard
 const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: string; requiredPermission?: string }> = ({
@@ -47,6 +48,15 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: strin
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Cross-role redirect guards
+  if (hasRole("Vendor") && requiredRole !== "Vendor") {
+    return <Navigate to="/vendor-portal" replace />;
+  }
+
+  if (!hasRole("Vendor") && requiredRole === "Vendor") {
+    return <Navigate to="/" replace />;
   }
 
   if (requiredRole && !hasRole(requiredRole)) {
@@ -220,6 +230,14 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute requiredRole="Admin">
               <Settings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/vendor-portal"
+          element={
+            <ProtectedRoute requiredRole="Vendor">
+              <VendorPortal />
             </ProtectedRoute>
           }
         />

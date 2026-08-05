@@ -8,6 +8,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  googleLogin: (credential: string) => Promise<void>;
+  vendorLogin: (email: string, otp: string) => Promise<void>;
   logout: () => void;
   hasRole: (role: string) => boolean;
   hasPermission: (permission: string) => boolean;
@@ -36,14 +38,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const response = await api.post("/auth/login", { email, password });
-      const { access_token, refresh_token, user: userProfile } = response.data;
+      const { access_token, refresh_token } = response.data;
       
       setTokens(access_token, refresh_token);
+
+      // Retrieve full user profile
+      const meResponse = await api.get("/auth/me");
+      const userProfile = meResponse.data;
+      
       setUser(userProfile);
       localStorage.setItem("user_profile", JSON.stringify(userProfile));
       toast.success(`Welcome back, ${userProfile.first_name}!`);
     } catch (error: any) {
       const msg = error.response?.data?.detail || "Authentication failed. Please check credentials.";
+      toast.error(msg);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const googleLogin = async (credential: string) => {
+    setIsLoading(true);
+    try {
+      const response = await api.post("/auth/google", { credential });
+      const { access_token, refresh_token } = response.data;
+      
+      setTokens(access_token, refresh_token);
+
+      // Retrieve full user profile
+      const meResponse = await api.get("/auth/me");
+      const userProfile = meResponse.data;
+      
+      setUser(userProfile);
+      localStorage.setItem("user_profile", JSON.stringify(userProfile));
+      toast.success(`Welcome back, ${userProfile.first_name}!`);
+    } catch (error: any) {
+      const msg = error.response?.data?.detail || "Google Sign-In authentication failed.";
+      toast.error(msg);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const vendorLogin = async (email: string, otp: string) => {
+    setIsLoading(true);
+    try {
+      const response = await api.post("/auth/vendor/otp-verify", { email, otp });
+      const { access_token, refresh_token } = response.data;
+      
+      setTokens(access_token, refresh_token);
+
+      // Retrieve full user profile
+      const meResponse = await api.get("/auth/me");
+      const userProfile = meResponse.data;
+      
+      setUser(userProfile);
+      localStorage.setItem("user_profile", JSON.stringify(userProfile));
+      toast.success(`Welcome back, ${userProfile.first_name || "Supplier"}!`);
+    } catch (error: any) {
+      const msg = error.response?.data?.detail || "Vendor OTP verification failed.";
       toast.error(msg);
       throw error;
     } finally {
@@ -81,6 +136,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: !!user,
         isLoading,
         login,
+        googleLogin,
+        vendorLogin,
         logout,
         hasRole,
         hasPermission,

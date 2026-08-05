@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.auth.dependencies import get_current_user
+from src.auth.dependencies import get_current_user, PermissionChecker
 from src.database.dependency import get_db_session
 from src.models.auth import User
 from src.schemas.auth import (
@@ -11,6 +11,9 @@ from src.schemas.auth import (
     ErrorResponse,
     ForgotPasswordRequest,
     ResetPasswordRequest,
+    GoogleLoginRequest,
+    VendorOTPRequest,
+    VendorOTPVerify,
 )
 from src.services.auth_service import AuthenticationService
 
@@ -40,6 +43,72 @@ async def login(
     user_agent = request.headers.get("user-agent")
     
     return await auth_service.login(body, ip=ip_address, user_agent=user_agent)
+
+
+@router.post(
+    "/google",
+    response_model=TokenResponse,
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid Google credential or domain unauthorized"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def google_login(
+    request: Request,
+    body: GoogleLoginRequest,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Authenticates a user using Google Sign-In ID Token credentials.
+    """
+    auth_service = AuthenticationService(db)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+    
+    return await auth_service.google_login(body.credential, ip=ip_address, user_agent=user_agent)
+
+
+@router.post(
+    "/vendor/otp-request",
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid vendor email"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def request_vendor_otp(
+    body: VendorOTPRequest,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Validates the vendor email address and triggers a 6-digit verification OTP.
+    """
+    auth_service = AuthenticationService(db)
+    await auth_service.request_vendor_otp(body.email)
+    return {"message": "OTP generated and logged successfully."}
+
+
+@router.post(
+    "/vendor/otp-verify",
+    response_model=TokenResponse,
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid/expired OTP"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def verify_vendor_otp(
+    request: Request,
+    body: VendorOTPVerify,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Verifies the 6-digit OTP code and generates authentication tokens for the vendor.
+    """
+    auth_service = AuthenticationService(db)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+    
+    return await auth_service.verify_vendor_otp(body.email, body.otp, ip=ip_address, user_agent=user_agent)
 
 
 @router.post(
@@ -129,3 +198,66 @@ async def reset_password(
     auth_service = AuthenticationService(db)
     await auth_service.reset_password(body.token, body.new_password)
     return {"message": "Password reset successfully"}
+
+
+@router.get(
+    "/active-sessions",
+    dependencies=[Depends(PermissionChecker("admin.settings"))]
+)
+async def get_active_sessions(
+    skip: int = 0,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Returns list of active login sessions.
+    """
+    from sqlalchemy import select
+    from src.models.auth import LoginSession
+    query = select(LoginSession).where(LoginSession.status == "Active").offset(skip).limit(limit)
+    result = await db.execute(query)
+    sessions = result.scalars().all()
+    return [
+        {
+            "session_id": s.session_id,
+            "user_id": s.user_id,
+            "login_time": s.login_time,
+            "ip_address": s.ip_address,
+            "device_name": s.device_name,
+            "browser": s.browser,
+            "status": s.status
+        }
+        for s in sessions
+    ]
+
+
+@router.get(
+    "/login-history",
+    dependencies=[Depends(PermissionChecker("admin.settings"))]
+)
+async def get_login_history(
+    skip: int = 0,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Returns login attempts audit history.
+    """
+    from sqlalchemy import select
+    from src.models.auth import LoginHistory
+    query = select(LoginHistory).order_by(LoginHistory.login_time.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
+    history = result.scalars().all()
+    return [
+        {
+            "history_id": h.history_id,
+            "user_id": h.user_id,
+            "email": h.email,
+            "login_time": h.login_time,
+            "ip_address": h.ip_address,
+            "user_agent": h.user_agent,
+            "status": h.status,
+            "failure_reason": h.failure_reason
+        }
+        for h in history
+    ]

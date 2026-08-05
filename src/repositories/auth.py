@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional
 from sqlalchemy import select
-from src.models.auth import User, Role, Permission, UserRole, LoginSession, LoginHistory, RefreshToken
+from src.models.auth import User, Role, Permission, UserRole, LoginSession, LoginHistory, RefreshToken, VendorUser, OTPRequest
 from src.repositories.base import BaseRepository
 
 
@@ -32,6 +32,14 @@ class UserRepository(BaseRepository[User]):
         Retrieves a user by their Supabase UUID reference.
         """
         query = select(User).where(User.supabase_uid == uid)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def get_by_google_id(self, google_id: str) -> Optional[User]:
+        """
+        Retrieves a user by their Google OAuth sub ID.
+        """
+        query = select(User).where(User.google_id == google_id)
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
@@ -166,6 +174,51 @@ class RefreshTokenRepository(BaseRepository[RefreshToken]):
             RefreshToken.token == token,
             RefreshToken.is_expired == False,
             RefreshToken.revoked_at == None
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
+
+class VendorUserRepository(BaseRepository[VendorUser]):
+    """
+    Data access repository for Vendor User mappings.
+    """
+
+    def __init__(self, session) -> None:
+        super().__init__(VendorUser, session)
+
+    async def get_by_id(self, vendor_user_id: int) -> Optional[VendorUser]:
+        return await self.session.get(VendorUser, vendor_user_id)
+
+    async def get_by_user_id(self, user_id: int) -> Optional[VendorUser]:
+        query = select(VendorUser).where(VendorUser.user_id == user_id)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def get_by_vendor_id(self, vendor_id: int) -> list[VendorUser]:
+        query = select(VendorUser).where(VendorUser.vendor_id == vendor_id)
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+
+class OTPRequestRepository(BaseRepository[OTPRequest]):
+    """
+    Data access repository for OTP Requests.
+    """
+
+    def __init__(self, session) -> None:
+        super().__init__(OTPRequest, session)
+
+    async def get_by_id(self, request_id: int) -> Optional[OTPRequest]:
+        return await self.session.get(OTPRequest, request_id)
+
+    async def get_active_by_email(self, email: str) -> Optional[OTPRequest]:
+        # Return the latest active OTP request for this email
+        query = (
+            select(OTPRequest)
+            .where(OTPRequest.email == email)
+            .order_by(OTPRequest.created_at.desc())
+            .limit(1)
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()

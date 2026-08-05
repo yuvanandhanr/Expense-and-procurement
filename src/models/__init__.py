@@ -7,6 +7,8 @@ from src.models.auth import (
     LoginSession,
     LoginHistory,
     RefreshToken,
+    VendorUser,
+    OTPRequest,
 )
 from src.models.organization import (
     Department,
@@ -131,6 +133,8 @@ __all__ = [
     "LoginSession",
     "LoginHistory",
     "RefreshToken",
+    "VendorUser",
+    "OTPRequest",
     "Department",
     "Designation",
     "CostCenter",

@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from typing import List
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -130,3 +131,77 @@ async def delete_user(
     """
     service = UserService(db)
     await service.delete_user(user_id)
+
+
+@router.post(
+    "/{user_id}/lock",
+    response_model=CurrentUser,
+    dependencies=[Depends(PermissionChecker("admin.settings"))]
+)
+async def lock_user(
+    user_id: int,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Locks an employee account manually.
+    """
+    service = UserService(db)
+    user = await service.get_user(user_id)
+    user.is_locked = True
+    user.locked_until = datetime.utcnow() + timedelta(days=365)
+    await service.user_repo.update(user)
+    return user
+
+
+@router.post(
+    "/{user_id}/unlock",
+    response_model=CurrentUser,
+    dependencies=[Depends(PermissionChecker("admin.settings"))]
+)
+async def unlock_user(
+    user_id: int,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Unlocks an employee account manually.
+    """
+    service = UserService(db)
+    user = await service.get_user(user_id)
+    user.is_locked = False
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    await service.user_repo.update(user)
+    return user
+
+
+@router.post(
+    "/{user_id}/reset-sessions",
+    dependencies=[Depends(PermissionChecker("admin.settings"))]
+)
+async def reset_user_sessions(
+    user_id: int,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Revokes all active login sessions and refresh tokens for a user.
+    """
+    from sqlalchemy import update
+    from src.models.auth import LoginSession, RefreshToken
+    
+    # Revoke sessions
+    session_update = (
+        update(LoginSession)
+        .where(LoginSession.user_id == user_id, LoginSession.status == "Active")
+        .values(status="Revoked", logout_time=datetime.utcnow())
+    )
+    await db.execute(session_update)
+    
+    # Revoke refresh tokens
+    token_update = (
+        update(RefreshToken)
+        .where(RefreshToken.user_id == user_id, RefreshToken.is_expired == False)
+        .values(is_expired=True, revoked_at=datetime.utcnow())
+    )
+    await db.execute(token_update)
+    
+    return {"detail": "All active sessions for this user have been successfully reset."}

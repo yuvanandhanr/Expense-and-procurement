@@ -8,6 +8,7 @@ from src.database.base import Base
 
 if TYPE_CHECKING:
     from src.models.organization import Department, Designation, CostCenter
+    from src.models.vendor import Vendor
 
 
 class User(Base):
@@ -72,6 +73,15 @@ class User(Base):
     )
     last_login: Mapped[Optional[datetime]] = mapped_column(
         DateTime, nullable=True, comment="Last login timestamp"
+    )
+    google_id: Mapped[Optional[str]] = mapped_column(
+        String, unique=True, nullable=True, comment="Google OAuth sub ID"
+    )
+    avatar_url: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, comment="User profile photo URL"
+    )
+    login_provider: Mapped[Optional[str]] = mapped_column(
+        String, default="LOCAL", nullable=True, comment="Auth provider (GOOGLE, LOCAL)"
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=True, comment="Creation timestamp"
@@ -311,3 +321,50 @@ class RefreshToken(Base):
 
     # Relationships
     user: Mapped["User"] = relationship("User")
+
+
+class VendorUser(Base):
+    """
+    SQLAlchemy Model for the public.vendor_users table mapping.
+    """
+    __tablename__ = "vendor_users"
+
+    vendor_user_id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, autoincrement=True, comment="Primary key for vendor user mapping"
+    )
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, comment="FK referencing user"
+    )
+    vendor_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("vendors.vendor_id", ondelete="CASCADE"), nullable=False, comment="FK referencing vendor"
+    )
+
+    user: Mapped["User"] = relationship("User", lazy="joined")
+    vendor: Mapped["Vendor"] = relationship("Vendor", lazy="joined")
+
+
+class OTPRequest(Base):
+    """
+    SQLAlchemy Model for tracking OTP requests and validation attempts for vendors.
+    """
+    __tablename__ = "otp_requests"
+
+    request_id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, autoincrement=True, comment="Primary key for OTP request"
+    )
+    email: Mapped[str] = mapped_column(
+        String(255), nullable=False, comment="Vendor email address requesting OTP"
+    )
+    otp_hash: Mapped[str] = mapped_column(
+        String(255), nullable=False, comment="Securely hashed OTP code"
+    )
+    attempts: Mapped[int] = mapped_column(
+        BigInteger, default=0, nullable=False, comment="Verification retry count"
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, comment="OTP expiration timestamp"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False, comment="Timestamp when OTP was generated"
+    )
+

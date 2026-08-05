@@ -123,3 +123,51 @@ async def blacklist_vendor(
         )
     service = VendorService(db)
     return await service.blacklist_vendor(id, reason, current_user.user_id)
+
+
+@router.post("/{id}/approve", response_model=VendorSchema)
+async def approve_vendor(
+    id: int,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Approves a vendor profile registration.
+    """
+    user_roles = [role.role_name for role in current_user.roles]
+    if not any(role in ("Admin", "Procurement Manager") for role in user_roles):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only procurement managers or administrators are permitted to approve vendors"
+        )
+    service = VendorService(db)
+    vendor = await service.vendor_repo.get_by_id(id)
+    if not vendor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vendor not found")
+    vendor.status = "Active"
+    await service.vendor_repo.update(vendor)
+    return vendor
+
+
+@router.post("/{id}/deactivate", response_model=VendorSchema)
+async def deactivate_vendor(
+    id: int,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Deactivates a vendor profile manually.
+    """
+    user_roles = [role.role_name for role in current_user.roles]
+    if not any(role in ("Admin", "Procurement Manager") for role in user_roles):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only procurement managers or administrators are permitted to deactivate vendors"
+        )
+    service = VendorService(db)
+    vendor = await service.vendor_repo.get_by_id(id)
+    if not vendor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vendor not found")
+    vendor.status = "Inactive"
+    await service.vendor_repo.update(vendor)
+    return vendor

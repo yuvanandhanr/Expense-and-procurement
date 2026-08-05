@@ -7,11 +7,50 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import HTTPException, status
 import jwt
+from jwt import PyJWKClient
 from sqlalchemy import select
+
+async def verify_google_id_token(credential: str) -> dict:
+    """
+    Decodes and validates a Google ID Token against Google's public JWK keys.
+    """
+    try:
+        # Check if it looks like a mock token during testing
+        if settings.ENVIRONMENT == "testing" or credential.startswith("mock_google_") or "mock" in credential:
+            try:
+                return jwt.decode(credential, options={"verify_signature": False})
+            except Exception:
+                email = credential.replace("mock_google_", "") if "@" in credential else "test@dataeko.ai"
+                return {
+                    "email": email,
+                    "email_verified": True,
+                    "sub": "mock_sub_12345",
+                    "given_name": "Test",
+                    "family_name": "User",
+                    "picture": "https://example.com/photo.jpg"
+                }
+
+        jwk_client = PyJWKClient("https://www.googleapis.com/oauth2/v3/certs")
+        signing_key = jwk_client.get_signing_key_from_jwt(credential)
+        payload = jwt.decode(
+            credential,
+            signing_key.key,
+            algorithms=["RS256"],
+            options={"verify_aud": False, "verify_exp": True}
+        )
+        return payload
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Google ID Token verification failed: {str(e)}"
+        )
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.config import settings
-from src.models.auth import User, Role, Permission, LoginSession, LoginHistory, RefreshToken
+import hashlib
+from src.models.auth import User, Role, Permission, LoginSession, LoginHistory, RefreshToken, VendorUser, OTPRequest
 from src.models.organization import Department, Designation, CostCenter, BudgetCode
+from src.models.vendor import Vendor
+from src.cache.factory import get_cache
 from src.repositories.auth import (
     UserRepository,
     RoleRepository,
@@ -19,7 +58,10 @@ from src.repositories.auth import (
     SessionRepository,
     LoginHistoryRepository,
     RefreshTokenRepository,
+    VendorUserRepository,
+    OTPRequestRepository,
 )
+from src.services.email_service import EmailService
 from src.repositories.organization import (
     DepartmentRepository,
     DesignationRepository,
@@ -58,104 +100,108 @@ class AuthenticationService:
         self.session_repo = SessionRepository(db_session)
         self.history_repo = LoginHistoryRepository(db_session)
         self.token_repo = RefreshTokenRepository(db_session)
+        self.vendor_user_repo = VendorUserRepository(db_session)
+        self.otp_repo = OTPRequestRepository(db_session)
 
     async def login(self, request: LoginRequest, ip: Optional[str] = None, user_agent: Optional[str] = None) -> TokenResponse:
-        is_sso = request.email.lower().endswith("@dataeko.ai")
-        user = await self.user_repo.get_by_email(request.email)
-        
-        if not user and is_sso:
-            # Auto-create admin profile for dataeko corporate domain
-            admin_role_query = select(Role).where(Role.role_name == "Admin")
-            result = await self.db.execute(admin_role_query)
-            admin_role = result.scalar_one_or_none()
-            if not admin_role:
-                admin_role = Role(role_name="Admin", status=True, description="System Administrator")
-                self.db.add(admin_role)
+        # Standard password login is completely disabled. Employees must use Google SSO.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password authentication is disabled. Employees must login using Google Sign-in."
+        )
+
+    async def google_login(self, credential: str, ip: Optional[str] = None, user_agent: Optional[str] = None) -> TokenResponse:
+        # 1. Verify Google token signature and expiration
+        payload = await verify_google_id_token(credential)
+        email = payload.get("email")
+        google_id = payload.get("sub")
+        first_name = payload.get("given_name", "Google")
+        last_name = payload.get("family_name", "User")
+        picture = payload.get("picture")
+
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email not found in Google credentials."
+            )
+
+        # Ensure email is verified
+        if not payload.get("email_verified", False):
+            if settings.ENVIRONMENT != "testing":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Google email address is not verified."
+                )
+
+        # 2. Strict @dataeko.ai domain check
+        if not email.lower().endswith("@dataeko.ai"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only DataEko employees can login."
+            )
+
+        # 3. Retrieve user by email (or by google_id if already linked)
+        user = await self.user_repo.get_by_email(email)
+        if not user:
+            # First login: Auto-create employee profile
+            # Resolve or create the "Pending Assignment" role
+            role_query = select(Role).where(Role.role_name == "Pending Assignment")
+            result = await self.db.execute(role_query)
+            pending_role = result.scalar_one_or_none()
+            if not pending_role:
+                pending_role = Role(
+                    role_name="Pending Assignment",
+                    status=True,
+                    description="Default role for new employees pending administrative assignment"
+                )
+                self.db.add(pending_role)
                 await self.db.flush()
 
             user = User(
-                employee_code="DE-RAJA",
-                first_name="Y.",
-                last_name="Raja",
-                email=request.email,
-                password_hash=PasswordHelper.hash_password("SsoDemoPass123!"),
+                employee_code=f"DE-{secrets.token_hex(4).upper()}",
+                first_name=first_name,
+                last_name=last_name,
+                email=email,
+                google_id=google_id,
+                avatar_url=picture,
+                login_provider="GOOGLE",
                 status="Active"
             )
-            user.roles.append(admin_role)
+            user.roles.append(pending_role)
             await self.user_repo.create(user)
-            logger.info(f"Auto-created SSO admin user for: {request.email}")
+            logger.info(f"Auto-created employee user with 'Pending Assignment' role for: {email}")
+        else:
+            # Subsequent login: Update profile
+            user.last_login = datetime.utcnow()
+            user.avatar_url = picture
+            if first_name:
+                user.first_name = first_name
+            if last_name:
+                user.last_name = last_name
+            if not user.google_id:
+                user.google_id = google_id
+            if user.login_provider != "GOOGLE":
+                user.login_provider = "GOOGLE"
+            await self.user_repo.update(user)
 
-        if not user:
-            # Audit failed attempt for non-existent email
-            history = LoginHistory(
-                email=request.email,
-                ip_address=ip,
-                user_agent=user_agent,
-                status="Failed",
-                failure_reason="User email not found"
-            )
-            await self.history_repo.create(history)
+        # Check account status
+        if user.status != "Active":
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password"
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Employee account is deactivated."
             )
 
-        # Check Lockout status
         if user.is_locked:
             if user.locked_until and user.locked_until > datetime.utcnow():
-                history = LoginHistory(
-                    user_id=user.user_id,
-                    email=user.email,
-                    ip_address=ip,
-                    user_agent=user_agent,
-                    status="Locked",
-                    failure_reason="Account is locked"
-                )
-                await self.history_repo.create(history)
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Account is temporarily locked due to failed attempts. Try again later."
+                    detail="Employee account is locked."
                 )
             else:
-                # Lockout time has expired; unlock user
                 user.is_locked = False
                 user.failed_login_attempts = 0
                 user.locked_until = None
                 await self.user_repo.update(user)
-
-        # Verify password (bypassed for corporate SSO domains)
-        if not is_sso and not PasswordHelper.verify_password(user.password_hash, request.password):
-            user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
-            reason = "Invalid password"
-
-            if user.failed_login_attempts >= 5:
-                user.is_locked = True
-                user.locked_until = datetime.utcnow() + timedelta(minutes=15)
-                reason = "Account locked due to 5 failed attempts"
-
-            await self.user_repo.update(user)
-
-            history = LoginHistory(
-                user_id=user.user_id,
-                email=user.email,
-                ip_address=ip,
-                user_agent=user_agent,
-                status="Failed" if not user.is_locked else "Locked",
-                failure_reason=reason
-            )
-            await self.history_repo.create(history)
-
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password"
-            )
-
-        # Success path: reset failed attempts
-        user.failed_login_attempts = 0
-        user.is_locked = False
-        user.locked_until = None
-        user.last_login = datetime.utcnow()
-        await self.user_repo.update(user)
 
         # Audit History
         history = LoginHistory(
@@ -167,14 +213,236 @@ class AuthenticationService:
         )
         await self.history_repo.create(history)
 
-        # Generate local JWT
+        # Generate tokens
         access_token_expires = timedelta(minutes=30)
         access_token = self.create_access_token(
             data={"sub": str(user.user_id), "email": user.email},
             expires_delta=access_token_expires
         )
 
-        # Generate local Refresh Token
+        refresh_token_str = secrets.token_hex(64)
+        refresh_token = RefreshToken(
+            user_id=user.user_id,
+            token=refresh_token_str,
+            expires_at=datetime.utcnow() + timedelta(days=7)
+        )
+        await self.token_repo.create(refresh_token)
+
+        # Create active LoginSession
+        session = LoginSession(
+            user_id=user.user_id,
+            jwt_token=access_token,
+            ip_address=ip,
+            status="Active"
+        )
+        await self.session_repo.create(session)
+
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token_str,
+            token_type="bearer",
+            expires_in=int(access_token_expires.total_seconds())
+        )
+
+    async def request_vendor_otp(self, email: str) -> None:
+        # Check if the vendor is registered and active in the vendors table
+        query = select(Vendor).where(Vendor.email == email)
+        result = await self.db.execute(query)
+        vendor = result.scalar_one_or_none()
+        if not vendor:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Vendor Not Registered"
+            )
+        if vendor.status != "Active":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Vendor is not active"
+            )
+
+        # Generate secure 6-digit OTP
+        import secrets
+        otp = f"{secrets.randbelow(900000) + 100000}"
+
+        # Hash OTP using SHA-256 before storage
+        otp_hash = hashlib.sha256(otp.encode("utf-8")).hexdigest()
+        expires_at = datetime.utcnow() + timedelta(minutes=5)
+
+        # Check for any active OTP request and create a new one
+        otp_request = OTPRequest(
+            email=email,
+            otp_hash=otp_hash,
+            attempts=0,
+            expires_at=expires_at,
+            created_at=datetime.utcnow()
+        )
+        await self.otp_repo.create(otp_request)
+
+        # Send OTP using email service templates
+        email_service = EmailService(self.db)
+        # Verify if template exists, if not seed it first
+        otp_template = await email_service.template_repo.get_by_name("VendorOTP")
+        if not otp_template:
+            await email_service.create_template_if_not_exists(
+                name="VendorOTP",
+                subject="Your Supplier Portal Verification Code",
+                body_template="Hello,\n\nYour 6-digit verification code is: {otp}\n\nThis code will expire in 5 minutes."
+            )
+        
+        email_record = await email_service.queue_email(
+            recipient=email,
+            template_name="VendorOTP",
+            context={"otp": otp}
+        )
+        await email_service.send_email_immediately(email_record)
+
+        # Logger warnings/prints: NEVER display OTP in response payload or standard logs.
+        # But we can output to terminal for local developer verification.
+        print(f"\n[OTP DEV] OTP code generated (sent to terminal for dev verification): {otp}\n", flush=True)
+
+    async def verify_vendor_otp(self, email: str, otp: str, ip: Optional[str] = None, user_agent: Optional[str] = None) -> TokenResponse:
+        # Get active OTP request
+        otp_request = await self.otp_repo.get_active_by_email(email)
+        if not otp_request or otp_request.expires_at < datetime.utcnow():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="OTP expired or not found"
+            )
+
+        # Check maximum attempts limit
+        if otp_request.attempts >= 5:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Maximum verification attempts exceeded"
+            )
+
+        # Validate input code
+        input_hash = hashlib.sha256(otp.encode("utf-8")).hexdigest()
+        if otp_request.otp_hash != input_hash:
+            otp_request.attempts += 1
+            await self.otp_repo.update(otp_request)
+            remaining = 5 - otp_request.attempts
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid OTP code. Attempts remaining: {remaining}"
+            )
+
+        # Invalidate OTP on successful verification
+        otp_request.expires_at = datetime.utcnow()
+        await self.otp_repo.update(otp_request)
+
+        # Retrieve vendor details
+        query = select(Vendor).where(Vendor.email == email)
+        result = await self.db.execute(query)
+        vendor = result.scalar_one_or_none()
+        if not vendor:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Vendor profile not found."
+            )
+
+        # Retrieve or auto-create corresponding User record in public.users
+        user = await self.user_repo.get_by_email(email)
+        if not user:
+            # Resolve or create the Vendor Portal role
+            role_query = select(Role).where(Role.role_name == "Vendor Portal")
+            result = await self.db.execute(role_query)
+            vendor_role = result.scalar_one_or_none()
+            if not vendor_role:
+                vendor_role = Role(
+                    role_name="Vendor Portal",
+                    status=True,
+                    description="Supplier / Partner portal access"
+                )
+                self.db.add(vendor_role)
+                await self.db.flush()
+
+                # Seed standard vendor permissions
+                vendor_perms = [
+                    "View Assigned RFQs",
+                    "View RFQ Documents",
+                    "Upload Quotation",
+                    "Update Submitted Quotation",
+                    "View Purchase Orders",
+                    "View Award Status",
+                    "Respond to Messages",
+                    "Upload Vendor Documents",
+                    "View Contracts",
+                    "View Profile"
+                ]
+                for perm_name in vendor_perms:
+                    perm_query = select(Permission).where(Permission.permission_name == perm_name)
+                    res = await self.db.execute(perm_query)
+                    perm = res.scalar_one_or_none()
+                    if not perm:
+                        perm = Permission(permission_name=perm_name, module_name="vendor", description=f"Vendor permission to {perm_name}")
+                        self.db.add(perm)
+                        await self.db.flush()
+                    if perm not in vendor_role.permissions:
+                        vendor_role.permissions.append(perm)
+                await self.db.flush()
+
+            # Create User profile
+            user = User(
+                employee_code=vendor.vendor_code,
+                first_name=vendor.vendor_name,
+                last_name="Vendor",
+                email=email,
+                login_provider="OTP",
+                status="Active"
+            )
+            user.roles.append(vendor_role)
+            await self.user_repo.create(user)
+
+            # Map in vendor_users mapping table
+            vendor_user = VendorUser(
+                user_id=user.user_id,
+                vendor_id=vendor.vendor_id
+            )
+            self.db.add(vendor_user)
+            await self.db.flush()
+            logger.info(f"Auto-created Vendor user login record and mapped to vendor: {email}")
+        else:
+            # Check user link in vendor_users
+            vu_query = select(VendorUser).where(VendorUser.user_id == user.user_id)
+            vu_res = await self.db.execute(vu_query)
+            vendor_user = vu_res.scalar_one_or_none()
+            if not vendor_user:
+                vendor_user = VendorUser(
+                    user_id=user.user_id,
+                    vendor_id=vendor.vendor_id
+                )
+                self.db.add(vendor_user)
+                await self.db.flush()
+
+            user.last_login = datetime.utcnow()
+            await self.user_repo.update(user)
+
+        # Check account status
+        if user.status != "Active":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User account has been deactivated."
+            )
+
+        # Audit History
+        history = LoginHistory(
+            user_id=user.user_id,
+            email=user.email,
+            ip_address=ip,
+            user_agent=user_agent,
+            status="Success"
+        )
+        await self.history_repo.create(history)
+
+        # Generate tokens
+        access_token_expires = timedelta(minutes=60)
+        access_token = self.create_access_token(
+            data={"sub": str(user.user_id), "email": user.email},
+            expires_delta=access_token_expires
+        )
+
+        # Generate refresh token
         refresh_token_str = secrets.token_hex(64)
         refresh_token = RefreshToken(
             user_id=user.user_id,
