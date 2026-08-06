@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { Contract } from "../types";
 import { Card, CardHeader, CardTitle, CardContent, Badge, Skeleton } from "../components/ui";
+import { formatDate } from "../utils/helpers";
 
 export const Contracts: React.FC = () => {
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -56,8 +57,8 @@ export const Contracts: React.FC = () => {
                     <tr key={c.contract_id} className="hover:bg-accent/20">
                       <td className="p-4 font-bold text-xs tracking-wider text-primary">{c.contract_number}</td>
                       <td className="p-4 font-semibold">{c.title}</td>
-                      <td className="p-4 text-xs text-muted-foreground">{new Date(c.start_date).toLocaleDateString()}</td>
-                      <td className="p-4 text-xs text-muted-foreground">{new Date(c.end_date).toLocaleDateString()}</td>
+                      <td className="p-4 text-xs text-muted-foreground">{formatDate(c.start_date)}</td>
+                      <td className="p-4 text-xs text-muted-foreground">{formatDate(c.end_date)}</td>
                       <td className="p-4 font-bold">${c.total_value?.toLocaleString()}</td>
                       <td className="p-4">
                         <Badge variant={c.status === "Active" ? "success" : "neutral"}>

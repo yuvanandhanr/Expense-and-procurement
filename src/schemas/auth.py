@@ -73,8 +73,13 @@ class CurrentUser(BaseModel):
     designation_id: Optional[int] = None
     department_id: Optional[int] = None
     cost_center_id: Optional[int] = None
+    budget_code_id: Optional[int] = None
+    manager_id: Optional[int] = None
+    business_unit: Optional[str] = None
+    location: Optional[str] = None
     employment_type: str = "Full-Time"
     status: str = "Active"
+    is_locked: Optional[bool] = None
     last_login: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
@@ -127,6 +132,10 @@ class UserCreate(BaseModel):
     password: str = Field(..., min_length=8, description="Raw initial password")
     department_id: Optional[int] = None
     cost_center_id: Optional[int] = None
+    budget_code_id: Optional[int] = None
+    manager_id: Optional[int] = None
+    business_unit: Optional[str] = None
+    location: Optional[str] = None
     designation_id: Optional[int] = None
     designation: Optional[str] = None
     employment_type: Optional[str] = "Full-Time"
@@ -141,10 +150,15 @@ class UserUpdate(BaseModel):
     password: Optional[str] = Field(None, min_length=8, description="New password if resetting")
     department_id: Optional[int] = None
     cost_center_id: Optional[int] = None
+    budget_code_id: Optional[int] = None
+    manager_id: Optional[int] = None
+    business_unit: Optional[str] = None
+    location: Optional[str] = None
     designation_id: Optional[int] = None
     designation: Optional[str] = None
     employment_type: Optional[str] = None
     status: Optional[str] = None
+    is_locked: Optional[bool] = None
     role_ids: Optional[List[int]] = None
 
 

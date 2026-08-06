@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { api } from "../services/api";
 import { SearchResult } from "../types";
-import { Card, CardHeader, CardTitle, CardContent, Input, Button, Badge, Skeleton } from "../components/ui";
+import { Card, CardHeader, CardTitle, CardContent, Skeleton, Badge, Input, Button } from "../components/ui";
+import { formatDate } from "../utils/helpers";
 import { Search } from "lucide-react";
 
 export const GlobalSearch: React.FC = () => {
@@ -92,7 +93,7 @@ export const GlobalSearch: React.FC = () => {
                       </CardTitle>
                     </div>
                     <span className="text-[10px] text-muted-foreground font-semibold uppercase">
-                      Updated: {new Date(res.updated_at).toLocaleDateString()}
+                      Updated: {formatDate(res.updated_at)}
                     </span>
                   </CardHeader>
                   <CardContent className="py-2 text-xs text-muted-foreground/90 font-medium border-t border-border/30">

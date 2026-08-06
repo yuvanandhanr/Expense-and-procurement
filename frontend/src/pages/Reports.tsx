@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { Report } from "../types";
 import { Button, Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Input } from "../components/ui";
+import { formatDate } from "../utils/helpers";
 import toast from "react-hot-toast";
 
 export const Reports: React.FC = () => {
@@ -150,7 +151,7 @@ export const Reports: React.FC = () => {
                           </Badge>
                         </td>
                         <td className="p-4 text-xs text-muted-foreground">
-                          {new Date(rep.created_at).toLocaleDateString()}
+                          {formatDate(rep.created_at)}
                         </td>
                         <td className="p-4">
                           {rep.status === "Completed" && (

@@ -72,7 +72,7 @@ export interface PurchaseRequisition {
   department_id: number;
   cost_centre_id?: number;
   budget_code_id?: number;
-  estimated_cost: number;
+  total_estimated_amount: number;
   currency: string;
   priority: string;
   status: string;

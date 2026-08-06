@@ -174,6 +174,8 @@ app.include_router(quotations_router, prefix="/api/v1")
 app.include_router(purchase_orders_router, prefix="/api/v1")
 app.include_router(contracts_router, prefix="/api/v1")
 
+from src.api.invoices import router as invoices_router
+
 # Mount Phase 6 routers
 app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(analytics_router, prefix="/api/v1")
@@ -184,6 +186,7 @@ app.include_router(search_router, prefix="/api/v1")
 app.include_router(files_router, prefix="/api/v1")
 app.include_router(monitoring_router, prefix="/api/v1")
 app.include_router(settings_router, prefix="/api/v1")
+app.include_router(invoices_router, prefix="/api/v1")
 
 
 @app.get("/", tags=["system"])

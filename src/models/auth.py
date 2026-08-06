@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.database.base import Base
 
 if TYPE_CHECKING:
-    from src.models.organization import Department, Designation, CostCenter
+    from src.models.organization import Department, Designation, CostCenter, BudgetCode
     from src.models.vendor import Vendor
 
 
@@ -46,6 +46,15 @@ class User(Base):
     )
     cost_center_id: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("cost_centres.cost_center_id"), nullable=True, comment="Foreign key referencing cost center"
+    )
+    budget_code_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("budget_codes.budget_code_id"), nullable=True, comment="Foreign key referencing budget code"
+    )
+    business_unit: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, comment="Assigned business unit"
+    )
+    location: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, comment="Assigned location"
     )
     manager_id: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("users.user_id"), nullable=True, comment="Foreign key referencing user's manager"
@@ -107,6 +116,9 @@ class User(Base):
     )
     cost_center: Mapped[Optional["CostCenter"]] = relationship(
         "CostCenter", back_populates="users", foreign_keys="[User.cost_center_id]"
+    )
+    budget_code: Mapped[Optional["BudgetCode"]] = relationship(
+        "BudgetCode", foreign_keys="[User.budget_code_id]"
     )
     designation_rel: Mapped[Optional["Designation"]] = relationship(
         "Designation", back_populates="users", foreign_keys="[User.designation_id]"

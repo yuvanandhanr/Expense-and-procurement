@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { GRN } from "../types";
 import { Card, CardHeader, CardTitle, CardContent, Badge, Skeleton } from "../components/ui";
+import { formatDate } from "../utils/helpers";
 
 export const GRNs: React.FC = () => {
   const [grns, setGrns] = useState<GRN[]>([]);
@@ -54,7 +55,7 @@ export const GRNs: React.FC = () => {
                     <tr key={g.grn_id} className="hover:bg-accent/20">
                       <td className="p-4 font-bold text-xs tracking-wider text-primary">{g.grn_number}</td>
                       <td className="p-4">#PO-{g.po_id}</td>
-                      <td className="p-4 text-xs text-muted-foreground">{new Date(g.received_date).toLocaleDateString()}</td>
+                      <td className="p-4 text-xs text-muted-foreground">{formatDate(g.received_date)}</td>
                       <td className="p-4">
                         <Badge variant={g.status === "Approved" ? "success" : "neutral"}>
                           {g.status}

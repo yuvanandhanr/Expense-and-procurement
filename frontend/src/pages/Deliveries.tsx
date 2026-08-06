@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { Delivery } from "../types";
 import { Card, CardHeader, CardTitle, CardContent, Badge, Skeleton } from "../components/ui";
+import { formatDate } from "../utils/helpers";
 
 export const Deliveries: React.FC = () => {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
@@ -54,7 +55,7 @@ export const Deliveries: React.FC = () => {
                     <tr key={d.delivery_id} className="hover:bg-accent/20">
                       <td className="p-4 font-bold text-xs tracking-wider text-primary">{d.delivery_number}</td>
                       <td className="p-4">#PO-{d.po_id}</td>
-                      <td className="p-4 text-xs text-muted-foreground">{new Date(d.delivered_date).toLocaleDateString()}</td>
+                      <td className="p-4 text-xs text-muted-foreground">{formatDate(d.delivered_date)}</td>
                       <td className="p-4">
                         <Badge variant={d.status === "Delivered" ? "success" : "neutral"}>
                           {d.status}

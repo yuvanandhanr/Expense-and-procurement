@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { useAuth } from "../hooks/useAuth";
 import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Skeleton, Dialog, Input } from "../components/ui";
+import { formatDate } from "../utils/helpers";
 import toast from "react-hot-toast";
 
 export const VendorPortal: React.FC = () => {
@@ -122,7 +123,7 @@ export const VendorPortal: React.FC = () => {
                       </div>
                       <h4 className="text-sm font-bold text-foreground/90 mt-1">{rfq.title}</h4>
                       <span className="text-[10px] text-muted-foreground block mt-0.5">
-                        Deadline: {new Date(rfq.submission_deadline).toLocaleDateString()}
+                        Deadline: {formatDate(rfq.submission_deadline)}
                       </span>
                     </div>
                     <Button size="sm" onClick={() => handleOpenBid(rfq)}>

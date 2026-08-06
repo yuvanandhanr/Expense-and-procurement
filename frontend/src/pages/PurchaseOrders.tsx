@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { PurchaseOrder } from "../types";
 import { Card, CardHeader, CardTitle, CardContent, Badge, Skeleton } from "../components/ui";
+import { formatDate } from "../utils/helpers";
 
 export const PurchaseOrders: React.FC = () => {
   const [pos, setPos] = useState<PurchaseOrder[]>([]);
@@ -61,7 +62,7 @@ export const PurchaseOrders: React.FC = () => {
                           {p.status}
                         </Badge>
                       </td>
-                      <td className="p-4 text-xs text-muted-foreground">{new Date(p.created_at).toLocaleDateString()}</td>
+                      <td className="p-4 text-xs text-muted-foreground">{formatDate(p.created_at)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -57,7 +57,8 @@ class DashboardService:
             data["widgets"]["pending_approvals"] = await self._get_pending_approvals_count()
             data["widgets"]["department_spend"] = await self._get_department_spend()
             data["widgets"]["budget_utilization"] = await self._get_budget_utilization()
-            data["widgets"]["invoice_status"] = await self._get_invoice_status_counts()
+            data["widgets"]["employee_reimbursements"] = await self._get_reimbursements_summary()
+            data["widgets"]["vendor_invoices"] = await self._get_vendor_invoices_summary()
             data["widgets"]["payment_status"] = await self._get_payment_status_counts()
             data["widgets"]["top_vendors"] = await self._get_top_vendors()
 
@@ -75,9 +76,13 @@ class DashboardService:
         if role_upper == "MANAGER":
             data["widgets"]["pending_approvals"] = await self._get_pending_approvals_count(manager_id=user_id)
             data["widgets"]["department_spend"] = await self._get_department_spend(manager_id=user_id)
+            data["widgets"]["employee_reimbursements"] = await self._get_reimbursements_summary()
+            data["widgets"]["vendor_invoices"] = await self._get_vendor_invoices_summary()
 
         if role_upper == "EMPLOYEE":
             data["widgets"]["my_purchase_requests"] = await self._get_employee_pr_summary(user_id)
+            data["widgets"]["my_reimbursements"] = await self._get_reimbursements_summary(employee_id=user_id)
+            data["widgets"]["my_monthly_trend"] = await self._get_employee_monthly_trend(employee_id=user_id)
 
         # Cache data for 5 minutes
         await self.cache.set(cache_key, data, expire_seconds=300)
@@ -161,19 +166,19 @@ class DashboardService:
 
     async def _get_department_spend(self, manager_id: Optional[int] = None) -> List[Dict[str, Any]]:
         query = select(
-            Department.name,
+            Department.department_name,
             func.sum(PurchaseRequisition.total_estimated_amount).label("total_spend")
         ).join(
             PurchaseRequisition, Department.department_id == PurchaseRequisition.department_id
         ).where(
             PurchaseRequisition.status.in_(["Approved", "Closed"])
-        ).group_by(Department.name)
+        ).group_by(Department.department_name)
         
         result = await self.db.execute(query)
         spend = []
         for row in result.all():
             spend.append({
-                "department": row.name,
+                "department": row.department_name,
                 "spend": float(row.total_spend or 0.0)
             })
         return spend
@@ -181,21 +186,21 @@ class DashboardService:
     async def _get_budget_utilization(self) -> List[Dict[str, Any]]:
         # Map budget code and utilization metrics
         query = select(
-            BudgetCode.code,
-            BudgetCode.name,
-            BudgetCode.allocated_amount,
-            BudgetCode.available_amount
+            BudgetCode.budget_code,
+            BudgetCode.description,
+            BudgetCode.annual_budget,
+            BudgetCode.available_budget
         )
         result = await self.db.execute(query)
         budgets = []
         for row in result.all():
-            allocated = float(row.allocated_amount or 0.0)
-            available = float(row.available_amount or 0.0)
+            allocated = float(row.annual_budget or 0.0)
+            available = float(row.available_budget or 0.0)
             utilized = allocated - available
             percentage = (utilized / allocated * 100) if allocated > 0 else 0.0
             budgets.append({
-                "budget_code": row.code,
-                "name": row.name,
+                "budget_code": row.budget_code,
+                "name": row.description,
                 "allocated": allocated,
                 "utilized": utilized,
                 "available": available,
@@ -203,18 +208,53 @@ class DashboardService:
             })
         return budgets
 
-    async def _get_invoice_status_counts(self) -> Dict[str, int]:
+    async def _get_reimbursements_summary(self, employee_id: Optional[int] = None) -> Dict[str, Any]:
         query = select(
-            VendorInvoice.status,
-            func.count(VendorInvoice.invoice_id)
-        ).group_by(VendorInvoice.status)
+            func.count(VendorInvoice.invoice_id),
+            func.sum(VendorInvoice.grand_total)
+        ).where(VendorInvoice.employee_id.isnot(None))
+        
+        if employee_id:
+            query = query.where(VendorInvoice.employee_id == employee_id)
+            
         result = await self.db.execute(query)
-        return {row[0]: row[1] for row in result.all()}
+        row = result.first()
+        return {
+            "count": row[0] or 0,
+            "amount": float(row[1] or 0.0)
+        }
+
+    async def _get_vendor_invoices_summary(self) -> Dict[str, Any]:
+        query = select(
+            func.count(VendorInvoice.invoice_id),
+            func.sum(VendorInvoice.grand_total)
+        ).where(VendorInvoice.employee_id.is_(None))
+        
+        result = await self.db.execute(query)
+        row = result.first()
+        return {
+            "count": row[0] or 0,
+            "amount": float(row[1] or 0.0)
+        }
+        
+    async def _get_employee_monthly_trend(self, employee_id: int) -> List[Dict[str, Any]]:
+        query = select(
+            func.to_char(VendorInvoice.invoice_date, 'YYYY-MM').label("month"),
+            func.sum(VendorInvoice.grand_total).label("total_spend")
+        ).where(
+            VendorInvoice.employee_id == employee_id,
+            VendorInvoice.status.in_(["Approved", "Paid"])
+        ).group_by("month").order_by("month")
+        try:
+            result = await self.db.execute(query)
+            return [{"month": row.month, "spend": float(row.total_spend or 0.0)} for row in result.all()]
+        except Exception:
+            return []
 
     async def _get_payment_status_counts(self) -> Dict[str, int]:
         query = select(
             PaymentRequest.status,
-            func.count(PaymentRequest.payment_id)
+            func.count(PaymentRequest.payment_request_id)
         ).group_by(PaymentRequest.status)
         result = await self.db.execute(query)
         return {row[0]: row[1] for row in result.all()}

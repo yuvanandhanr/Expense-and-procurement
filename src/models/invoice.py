@@ -22,6 +22,8 @@ class VendorInvoice(Base):
     discount: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0.00"))
     grand_total: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
     status: Mapped[Optional[str]] = mapped_column(String(50), default="Draft") # Draft, Submitted, Validated, Approved, Rejected, Paid, Cancelled
+    employee_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
+    cause: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -33,6 +35,7 @@ class VendorInvoice(Base):
     vendor: Mapped["Vendor"] = relationship("Vendor")
     po: Mapped[Optional["PurchaseOrder"]] = relationship("PurchaseOrder")
     grn: Mapped[Optional["GoodsReceipt"]] = relationship("GoodsReceipt")
+    employee: Mapped[Optional["User"]] = relationship("User")
     items: Mapped[List["InvoiceItem"]] = relationship("InvoiceItem", back_populates="invoice", cascade="all, delete-orphan")
     documents: Mapped[List["InvoiceDocument"]] = relationship("InvoiceDocument", back_populates="invoice", cascade="all, delete-orphan")
     approvals: Mapped[List["InvoiceApproval"]] = relationship("InvoiceApproval", back_populates="invoice", cascade="all, delete-orphan")

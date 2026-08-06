@@ -28,6 +28,7 @@ import {
   HardDrive,
   CreditCard,
   CheckCircle,
+  UserCog,
 } from "lucide-react";
 
 export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -111,6 +112,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         { label: "Analytics & Trends", path: "/analytics", icon: TrendingUp, show: hasRole("CEO") || hasRole("CFO") || hasRole("Finance") || hasRole("Procurement") },
         { label: "Reports Export", path: "/reports", icon: FileSpreadsheet, show: true },
         { label: "Audit Timeline", path: "/audit-logs", icon: ShieldCheck, show: hasRole("CEO") || hasRole("CFO") || hasRole("Finance") || hasRole("Admin") },
+        { label: "User Management", path: "/users", icon: UserCog, show: hasRole("Admin") },
         { label: "System Health", path: "/monitoring", icon: Activity, show: hasRole("Admin") || hasRole("CEO") },
         { label: "Settings", path: "/settings", icon: Settings, show: hasRole("Admin") || hasRole("CEO") },
       ],

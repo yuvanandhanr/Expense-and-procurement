@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../services/api";
 import { Card, CardHeader, CardTitle, CardContent, Skeleton, Badge } from "../components/ui";
+import { formatDate } from "../utils/helpers";
 import {
   DollarSign,
   FileCheck,
@@ -9,8 +10,34 @@ import {
   TrendingDown,
   Percent,
   Clock,
+  Clock,
   ClipboardList,
+  CreditCard,
+  Building,
 } from "lucide-react";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { Bar } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 interface DashboardData {
   role: string;
@@ -150,52 +177,133 @@ export const Dashboard: React.FC = () => {
             </CardContent>
           </Card>
         )}
+
+        {widgets.employee_reimbursements && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Employee Reimbursements</span>
+              <CreditCard className="w-4 h-4 text-purple-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">${widgets.employee_reimbursements.amount?.toLocaleString() || "0"}</div>
+              <p className="text-[10px] text-muted-foreground font-semibold mt-1">
+                Across {widgets.employee_reimbursements.count || 0} claims
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {widgets.vendor_invoices && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Vendor Invoices</span>
+              <Building className="w-4 h-4 text-orange-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">${widgets.vendor_invoices.amount?.toLocaleString() || "0"}</div>
+              <p className="text-[10px] text-muted-foreground font-semibold mt-1">
+                Across {widgets.vendor_invoices.count || 0} bills
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {widgets.my_reimbursements && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Reimbursed</span>
+              <FileCheck className="w-4 h-4 text-indigo-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">${widgets.my_reimbursements.amount?.toLocaleString() || "0"}</div>
+              <p className="text-[10px] text-muted-foreground font-semibold mt-1">
+                {widgets.my_reimbursements.count || 0} total approved claims
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Main Dashboard Panel */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Recent Activity Feed */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Recent Bounded Workflow Activity</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {widgets.recent_activities && widgets.recent_activities.length > 0 ? (
-              <div className="flow-root">
-                <ul className="-mb-8">
-                  {widgets.recent_activities.map((activity: any, idx: number) => (
-                    <li key={idx}>
-                      <div className="relative pb-8">
-                        {idx !== widgets.recent_activities.length - 1 && (
-                          <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-border" aria-hidden="true" />
-                        )}
-                        <div className="relative flex space-x-3">
-                          <div>
-                            <span className="h-8 w-8 rounded-full bg-accent border border-border flex items-center justify-center">
-                              <span className="text-[10px] font-bold">{idx + 1}</span>
-                            </span>
-                          </div>
-                          <div className="flex-1 min-w-0 pt-1.5 flex justify-between space-x-4">
+        {/* Left Column: Charts & Feeds */}
+        <div className="lg:col-span-2 space-y-6">
+          
+          {widgets.my_monthly_trend && widgets.my_monthly_trend.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>My Spending Trend</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[250px] w-full">
+                  <Bar
+                    data={{
+                      labels: widgets.my_monthly_trend.map((d: any) => d.month),
+                      datasets: [
+                        {
+                          label: 'Reimbursed Amount ($)',
+                          data: widgets.my_monthly_trend.map((d: any) => d.spend),
+                          backgroundColor: 'rgba(99, 102, 241, 0.5)',
+                          borderColor: 'rgba(99, 102, 241, 1)',
+                          borderWidth: 1,
+                        },
+                      ],
+                    }}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      scales: {
+                        y: { beginAtZero: true }
+                      }
+                    }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Bounded Workflow Activity</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {widgets.recent_activities && widgets.recent_activities.length > 0 ? (
+                <div className="flow-root">
+                  <ul className="-mb-8">
+                    {widgets.recent_activities.map((activity: any, idx: number) => (
+                      <li key={idx}>
+                        <div className="relative pb-8">
+                          {idx !== widgets.recent_activities.length - 1 && (
+                            <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-border" aria-hidden="true" />
+                          )}
+                          <div className="relative flex space-x-3">
                             <div>
-                              <p className="text-xs font-semibold text-foreground/90">{activity.description}</p>
+                              <span className="h-8 w-8 rounded-full bg-accent border border-border flex items-center justify-center">
+                                <span className="text-[10px] font-bold">{idx + 1}</span>
+                              </span>
                             </div>
-                            <div className="text-right text-[10px] font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
-                              {new Date(activity.timestamp).toLocaleDateString()}
+                            <div className="flex-1 min-w-0 pt-1.5 flex justify-between space-x-4">
+                              <div>
+                                <p className="text-xs font-semibold text-foreground/90">{activity.description}</p>
+                              </div>
+                              <div className="text-right text-[10px] font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                                {formatDate(activity.timestamp)}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : (
-              <div className="p-12 text-center text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-                No recent activity recorded.
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div className="p-12 text-center text-xs text-muted-foreground font-semibold uppercase tracking-wider">
+                  No recent activity recorded.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Right Column: Actions Quick Links */}
         <Card>

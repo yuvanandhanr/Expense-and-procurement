@@ -6,9 +6,6 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
   timeout: 30000, // 30s timeout
 });
 
@@ -78,7 +75,12 @@ api.interceptors.response.use(
 
     // Handle token refresh on 401 Unauthorized
     if (status === 401 && !originalRequest._retry) {
-      if (originalRequest.url?.includes("/auth/login") || originalRequest.url?.includes("/auth/refresh")) {
+      if (
+        originalRequest.url?.includes("/auth/login") ||
+        originalRequest.url?.includes("/auth/google") ||
+        originalRequest.url?.includes("/auth/vendor/otp") ||
+        originalRequest.url?.includes("/auth/refresh")
+      ) {
         clearTokens();
         return Promise.reject(error);
       }

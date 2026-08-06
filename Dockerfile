@@ -29,6 +29,13 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PATH=/home/appuser/.local/bin:$PATH
 
+# Install system dependencies for OCR
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    libtesseract-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Create non-root system user for security compliance
 RUN groupadd -g 10001 appuser && \
     useradd -u 10001 -g appuser -d /home/appuser -m appuser

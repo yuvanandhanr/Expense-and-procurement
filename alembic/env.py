@@ -26,7 +26,8 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Retrieve and set database connection URL dynamically from global settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+escaped_url = settings.DATABASE_URL.replace("%", "%%")
+config.set_main_option("sqlalchemy.url", escaped_url)
 
 
 def run_migrations_offline() -> None:

@@ -170,17 +170,55 @@ export const Login: React.FC = () => {
                 </div>
               )}
 
-              <div className="space-y-3">
-                <div id="google-signin-btn" className="w-full flex justify-center min-h-[40px]"></div>
-                {import.meta.env.DEV && (
+              <div className="space-y-2">
+                <div id="google-signin-btn" className="w-full flex justify-center min-h-[40px] pb-2"></div>
+                
+                <div className="text-center">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Test Environments</span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2">
                   <Button
                     type="button"
-                    className="w-full bg-slate-900 border border-slate-800 text-xs text-slate-300 font-semibold py-2 hover:bg-slate-800 hover:text-white"
+                    variant="outline"
+                    className="w-full text-xs font-semibold py-2 bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
                     onClick={() => handleCredentialResponse({ credential: "mock_google_y.raja@dataeko.ai" })}
                   >
-                    Mock Google SSO (Dev Only)
+                    Admin
                   </Button>
-                )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full text-xs font-semibold py-2 bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+                    onClick={() => handleCredentialResponse({ credential: "mock_google_cfo@dataeko.ai" })}
+                  >
+                    CFO
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full text-xs font-semibold py-2 bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+                    onClick={() => handleCredentialResponse({ credential: "mock_google_finance@dataeko.ai" })}
+                  >
+                    Finance Mgr
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full text-xs font-semibold py-2 bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+                    onClick={() => handleCredentialResponse({ credential: "mock_google_manager@dataeko.ai" })}
+                  >
+                    Manager
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full text-xs font-semibold py-2 bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white col-span-2"
+                    onClick={() => handleCredentialResponse({ credential: "mock_google_employee@dataeko.ai" })}
+                  >
+                    Employee
+                  </Button>
+                </div>
               </div>
             </div>
           ) : (

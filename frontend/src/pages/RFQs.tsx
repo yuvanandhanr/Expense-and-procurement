@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { RFQ } from "../types";
-import { Card, CardHeader, CardTitle, CardContent, Badge, Skeleton } from "../components/ui";
+import { Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Button } from "../components/ui";
+import { formatDate } from "../utils/helpers";
 
 export const RFQs: React.FC = () => {
   const [rfqs, setRfqs] = useState<RFQ[]>([]);
@@ -54,7 +55,7 @@ export const RFQs: React.FC = () => {
                     <tr key={r.rfq_id} className="hover:bg-accent/20">
                       <td className="p-4 font-bold text-xs tracking-wider text-primary">{r.rfq_number}</td>
                       <td className="p-4 font-semibold">{r.title}</td>
-                      <td className="p-4 text-xs text-muted-foreground">{new Date(r.submission_deadline).toLocaleDateString()}</td>
+                      <td className="p-4 text-xs text-muted-foreground">{formatDate(r.submission_deadline)}</td>
                       <td className="p-4">
                         <Badge variant={r.status === "Closed" ? "neutral" : "success"}>
                           {r.status}

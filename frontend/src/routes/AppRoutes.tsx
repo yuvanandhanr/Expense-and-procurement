@@ -25,6 +25,7 @@ const SystemHealth = lazy(() => import("../pages/SystemHealth"));
 const Settings = lazy(() => import("../pages/Settings"));
 const GlobalSearch = lazy(() => import("../pages/GlobalSearch"));
 const VendorPortal = lazy(() => import("../pages/VendorPortal"));
+const Users = lazy(() => import("../pages/Users"));
 
 // Protected Route Guard
 const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: string; requiredPermission?: string }> = ({
@@ -214,6 +215,14 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute requiredRole="Admin">
               <AuditLogs />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/users"
+          element={
+            <ProtectedRoute requiredRole="Admin">
+              <Users />
             </ProtectedRoute>
           }
         />

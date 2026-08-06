@@ -3,6 +3,7 @@ import { api } from "../services/api";
 import { PurchaseRequisition } from "../types";
 import { Button, Input, Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Dialog } from "../components/ui";
 import toast from "react-hot-toast";
+import { formatDate, getErrorMessage } from "../utils/helpers";
 
 export const PurchaseRequisitions: React.FC = () => {
   const [prs, setPrs] = useState<PurchaseRequisition[]>([]);
@@ -20,7 +21,7 @@ export const PurchaseRequisitions: React.FC = () => {
   const fetchPRs = async () => {
     setLoading(true);
     try {
-      const response = await api.get("/purchase_requisitions");
+      const response = await api.get("/pr");
       setPrs(response.data);
     } catch (err) {
       console.error("Failed to load PRs:", err);
@@ -42,13 +43,19 @@ export const PurchaseRequisitions: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      await api.post("/purchase_requisitions", {
+      await api.post("/pr", {
         title,
-        estimated_cost: parseFloat(estimatedCost),
+        justification: description || "No justification provided",
         priority,
-        description,
-        department_id: 1, // Defaulting for simplicity
-        currency: "USD"
+        department_id: 1,
+        items: [
+          {
+            category: "Standard",
+            item_name: title,
+            quantity: 1,
+            unit_price: parseFloat(estimatedCost)
+          }
+        ]
       });
       toast.success("Purchase Requisition created successfully!");
       setIsCreateOpen(false);
@@ -59,7 +66,7 @@ export const PurchaseRequisitions: React.FC = () => {
       setDescription("");
       fetchPRs();
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || "Failed to create PR.");
+      toast.error(getErrorMessage(err, "Failed to create PR."));
     } finally {
       setIsSubmitting(false);
     }
@@ -139,14 +146,14 @@ export const PurchaseRequisitions: React.FC = () => {
                     <tr key={pr.pr_id} className="hover:bg-accent/20 transition-colors">
                       <td className="p-4 font-bold text-xs tracking-wider text-primary">{pr.pr_number}</td>
                       <td className="p-4 font-semibold">{pr.title}</td>
-                      <td className="p-4 font-bold">${pr.estimated_cost?.toLocaleString()}</td>
+                      <td className="p-4 font-bold">${pr.total_estimated_amount?.toLocaleString()}</td>
                       <td className="p-4">
                         <Badge variant={pr.priority === "High" ? "error" : pr.priority === "Medium" ? "warning" : "neutral"}>
                           {pr.priority}
                         </Badge>
                       </td>
                       <td className="p-4">{getStatusBadge(pr.status)}</td>
-                      <td className="p-4 text-xs text-muted-foreground">{new Date(pr.created_at).toLocaleDateString()}</td>
+                      <td className="p-4 text-xs text-muted-foreground">{formatDate(pr.created_at)}</td>
                     </tr>
                   ))}
                 </tbody>
