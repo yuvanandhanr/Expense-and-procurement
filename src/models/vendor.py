@@ -24,6 +24,8 @@ class Vendor(Base):
     preferred_vendor: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
     status: Mapped[Optional[str]] = mapped_column(String(50), default="Active")
     blacklist_status: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    mfa_secret: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    mfa_enabled: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
     payment_terms: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     delivery_terms: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     bank_details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

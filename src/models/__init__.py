@@ -101,6 +101,11 @@ from src.models.payments import (
 from src.models.procurement import (
     ProcurementClosure,
 )
+from src.models.expense import (
+    ExpenseReport,
+    Receipt,
+    ExpenseApproval,
+)
 from src.models.platform_services import (
     NotificationTemplate,
     Notification,
@@ -210,4 +215,7 @@ __all__ = [
     "EmailTemplate",
     "EmailQueue",
     "CacheMetadata",
+    "ExpenseReport",
+    "Receipt",
+    "ExpenseApproval",
 ]

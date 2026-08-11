@@ -40,6 +40,8 @@ from src.api.rfq import router as rfq_router
 from src.api.quotations import router as quotations_router
 from src.api.purchase_orders import router as purchase_orders_router
 from src.api.contracts import router as contracts_router
+from src.api.assets import router as assets_router
+from src.api.deliveries import router as deliveries_router
 
 # Phase 6 imports
 from src.api.dashboard import router as dashboard_router
@@ -173,8 +175,11 @@ app.include_router(rfq_router, prefix="/api/v1")
 app.include_router(quotations_router, prefix="/api/v1")
 app.include_router(purchase_orders_router, prefix="/api/v1")
 app.include_router(contracts_router, prefix="/api/v1")
+app.include_router(assets_router, prefix="/api/v1")
+app.include_router(deliveries_router, prefix="/api/v1")
 
 from src.api.invoices import router as invoices_router
+from src.api.expenses import router as expenses_router
 
 # Mount Phase 6 routers
 app.include_router(dashboard_router, prefix="/api/v1")
@@ -187,6 +192,7 @@ app.include_router(files_router, prefix="/api/v1")
 app.include_router(monitoring_router, prefix="/api/v1")
 app.include_router(settings_router, prefix="/api/v1")
 app.include_router(invoices_router, prefix="/api/v1")
+app.include_router(expenses_router, prefix="/api/v1")
 
 
 @app.get("/", tags=["system"])

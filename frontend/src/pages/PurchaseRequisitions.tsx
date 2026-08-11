@@ -4,12 +4,16 @@ import { PurchaseRequisition } from "../types";
 import { Button, Input, Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Dialog } from "../components/ui";
 import toast from "react-hot-toast";
 import { formatDate, getErrorMessage } from "../utils/helpers";
+import { useAuth } from "../hooks/useAuth";
 
 export const PurchaseRequisitions: React.FC = () => {
+  const { user } = useAuth();
   const [prs, setPrs] = useState<PurchaseRequisition[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("All");
+  const [selectedPr, setSelectedPr] = useState<PurchaseRequisition | null>(null);
+  const [comment, setComment] = useState("");
 
   // Form states
   const [title, setTitle] = useState("");
@@ -43,7 +47,7 @@ export const PurchaseRequisitions: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      await api.post("/pr", {
+      const res = await api.post("/pr", {
         title,
         justification: description || "No justification provided",
         priority,
@@ -57,7 +61,13 @@ export const PurchaseRequisitions: React.FC = () => {
           }
         ]
       });
-      toast.success("Purchase Requisition created successfully!");
+      
+      // Auto-submit the PR to trigger the workflow
+      if (res.data && res.data.pr_id) {
+        await api.post(`/pr/${res.data.pr_id}/submit`);
+      }
+      
+      toast.success("Purchase Requisition created and submitted successfully!");
       setIsCreateOpen(false);
       // Reset form
       setTitle("");
@@ -72,10 +82,38 @@ export const PurchaseRequisitions: React.FC = () => {
     }
   };
 
+  const handleAction = async (action: "approve" | "reject") => {
+    if (!selectedPr) return;
+    setIsSubmitting(true);
+    try {
+      await api.post(`/pr/${selectedPr.pr_id}/${action}`, {
+        comments: comment,
+      });
+      toast.success(`Purchase Requisition successfully ${action}d!`);
+      setSelectedPr(null);
+      setComment("");
+      fetchPRs();
+    } catch (err: any) {
+      toast.error(getErrorMessage(err, "Failed to process workflow action."));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmit = async (prId: number) => {
+    try {
+      await api.post(`/pr/${prId}/submit`);
+      toast.success("Purchase Requisition submitted successfully!");
+      fetchPRs();
+    } catch (err: any) {
+      toast.error(getErrorMessage(err, "Failed to submit PR."));
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const s = status.toLowerCase();
     if (s === "approved" || s === "completed") return <Badge variant="success">{status}</Badge>;
-    if (s === "pending" || s === "under_review" || s === "submitted") return <Badge variant="warning">{status}</Badge>;
+    if (s === "pending" || s === "under review" || s === "submitted" || s.includes("pending")) return <Badge variant="warning">{status}</Badge>;
     if (s === "rejected" || s === "cancelled") return <Badge variant="error">{status}</Badge>;
     return <Badge variant="neutral">{status}</Badge>;
   };
@@ -134,17 +172,20 @@ export const PurchaseRequisitions: React.FC = () => {
                 <thead>
                   <tr className="border-b border-border bg-accent/40 text-xs font-bold text-muted-foreground uppercase tracking-wider">
                     <th className="p-4">PR Number</th>
+                    <th className="p-4">Requestor Name</th>
                     <th className="p-4">Title</th>
                     <th className="p-4">Estimated Cost</th>
                     <th className="p-4">Priority</th>
                     <th className="p-4">Status</th>
                     <th className="p-4">Date Created</th>
+                    <th className="p-4">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border text-sm">
                   {filteredPrs.map((pr) => (
                     <tr key={pr.pr_id} className="hover:bg-accent/20 transition-colors">
                       <td className="p-4 font-bold text-xs tracking-wider text-primary">{pr.pr_number}</td>
+                      <td className="p-4">{pr.requestor_name || "Unknown"}</td>
                       <td className="p-4 font-semibold">{pr.title}</td>
                       <td className="p-4 font-bold">${pr.total_estimated_amount?.toLocaleString()}</td>
                       <td className="p-4">
@@ -154,6 +195,18 @@ export const PurchaseRequisitions: React.FC = () => {
                       </td>
                       <td className="p-4">{getStatusBadge(pr.status)}</td>
                       <td className="p-4 text-xs text-muted-foreground">{formatDate(pr.created_at)}</td>
+                      <td className="p-4">
+                        {pr.status === "Draft" && (
+                          <Button size="sm" variant="outline" onClick={() => handleSubmit(pr.pr_id)}>
+                            Submit
+                          </Button>
+                        )}
+                        {(["Pending", "Under Review", "Submitted", "Pending Manager Approval", "Pending Finance Approval", "Pending CFO Approval"].includes(pr.status)) && (
+                          <Button size="sm" onClick={() => setSelectedPr(pr)}>
+                            Review
+                          </Button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -212,6 +265,46 @@ export const PurchaseRequisitions: React.FC = () => {
           </div>
         </form>
       </Dialog>
+
+      {/* Review Dialog */}
+      {selectedPr && (
+        <Dialog isOpen={true} onClose={() => setSelectedPr(null)} title={`Review PR #${selectedPr.pr_number}`}>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 bg-muted/40 p-3 rounded-lg border border-border text-xs">
+              <div>
+                <span className="block text-muted-foreground font-semibold uppercase">Requisition Title</span>
+                <span className="font-bold text-sm uppercase tracking-wider text-foreground">{selectedPr.title}</span>
+              </div>
+              <div>
+                <span className="block text-muted-foreground font-semibold uppercase">Estimated Cost</span>
+                <span className="font-bold text-sm tracking-wider text-foreground">${selectedPr.total_estimated_amount?.toLocaleString()}</span>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">Comments / Decision Notes</label>
+              <textarea
+                placeholder="Include details explaining your decision (required if rejecting)"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring min-h-[80px]"
+              />
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4 border-t border-border">
+              <Button variant="outline" onClick={() => setSelectedPr(null)}>
+                Close
+              </Button>
+              <Button variant="danger" disabled={isSubmitting} onClick={() => handleAction("reject")}>
+                Reject
+              </Button>
+              <Button disabled={isSubmitting} onClick={() => handleAction("approve")}>
+                Approve
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
     </div>
   );
 };

@@ -14,6 +14,7 @@ from alembic import context
 # Import application configuration and declarative Base metadata
 from src.core.config import settings
 from src.database.base import Base
+import src.models # Load all models for metadata
 
 # retrieve Alembic configuration object
 config = context.config

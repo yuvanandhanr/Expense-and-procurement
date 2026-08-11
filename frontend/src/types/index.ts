@@ -67,8 +67,11 @@ export interface PRItem {
 export interface PurchaseRequisition {
   pr_id: number;
   pr_number: string;
+  requestor_id?: number;
+  requestor_name?: string;
   title: string;
   description?: string;
+  justification: string;
   department_id: number;
   cost_centre_id?: number;
   budget_code_id?: number;
@@ -219,13 +222,16 @@ export interface Asset {
   purchase_date: string;
   location?: string;
   status: string;
+  assigned_to_id?: number;
+  assigned_to_name?: string;
 }
 
 export interface Invoice {
   invoice_id: number;
   invoice_number: string;
-  po_id: number;
   vendor_id: number;
+  vendor_name?: string;
+  po_id?: number;
   invoice_date: string;
   due_date: string;
   amount: number;
@@ -282,4 +288,36 @@ export interface SearchResult {
   content: string;
   meta_data?: string;
   updated_at: string;
+}
+
+export interface Receipt {
+  receipt_id: number;
+  expense_report_id: number;
+  merchant_name?: string;
+  receipt_date?: string;
+  category?: string;
+  ocr_amount: number;
+  verified_amount: number;
+  tax: number;
+  currency: string;
+  ocr_confidence?: number;
+  image_path: string;
+  file_name: string;
+  created_at: string;
+}
+
+export interface ExpenseReport {
+  expense_report_id: number;
+  employee_id: number;
+  purpose: string;
+  justification?: string;
+  department_id?: number;
+  cost_center_id?: number;
+  project_code?: string;
+  status: string;
+  currency: string;
+  total_amount: number;
+  created_at: string;
+  updated_at: string;
+  receipts?: Receipt[];
 }

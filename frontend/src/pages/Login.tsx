@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from "../components/ui";
 import { api } from "../services/api";
 import toast from "react-hot-toast";
+import { QRCodeSVG } from 'qrcode.react';
 
 declare global {
   interface Window {
@@ -22,6 +23,8 @@ export const Login: React.FC = () => {
   const [vendorEmail, setVendorEmail] = React.useState("");
   const [otp, setOtp] = React.useState("");
   const [otpSent, setOtpSent] = React.useState(false);
+  const [isMfaRequired, setIsMfaRequired] = React.useState(false);
+  const [mfaSetupData, setMfaSetupData] = React.useState<{secret: string, uri: string} | null>(null);
   const [sendingOtp, setSendingOtp] = React.useState(false);
   
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -81,9 +84,16 @@ export const Login: React.FC = () => {
     setError("");
     setSendingOtp(true);
     try {
-      await api.post("/auth/vendor/otp-request", { email: vendorEmail });
+      const res = await api.post("/auth/vendor/otp-request", { email: vendorEmail });
       setOtpSent(true);
-      toast.success("Verification OTP code sent to your email!");
+      if (res.data?.mfa_required) {
+        setIsMfaRequired(true);
+        setMfaSetupData(null);
+        toast.success("Please enter your Authenticator App code.");
+      } else if (res.data?.mfa_setup_required) {
+        setIsMfaRequired(true);
+        setMfaSetupData({ secret: res.data.secret, uri: res.data.uri });
+      }
     } catch (err: any) {
       setError(err.response?.data?.detail || "Failed to send OTP. Is your email registered?");
     } finally {
@@ -101,11 +111,12 @@ export const Login: React.FC = () => {
     setIsSubmitting(true);
     try {
       await vendorLogin(vendorEmail, otp);
+      toast.success("Login successful!");
       setTimeout(() => {
         navigate("/vendor-portal");
       }, 100);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Invalid or expired OTP code.");
+      setError(err.response?.data?.detail || "Invalid Authenticator code.");
     } finally {
       setIsSubmitting(false);
     }
@@ -190,6 +201,14 @@ export const Login: React.FC = () => {
                     type="button"
                     variant="outline"
                     className="w-full text-xs font-semibold py-2 bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+                    onClick={() => handleCredentialResponse({ credential: "mock_google_ceo@dataeko.ai" })}
+                  >
+                    CEO
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full text-xs font-semibold py-2 bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
                     onClick={() => handleCredentialResponse({ credential: "mock_google_cfo@dataeko.ai" })}
                   >
                     CFO
@@ -205,7 +224,7 @@ export const Login: React.FC = () => {
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full text-xs font-semibold py-2 bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+                    className="w-full text-xs font-semibold py-2 bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white col-span-2"
                     onClick={() => handleCredentialResponse({ credential: "mock_google_manager@dataeko.ai" })}
                   >
                     Manager
@@ -225,8 +244,28 @@ export const Login: React.FC = () => {
             <form onSubmit={otpSent ? handleVerifyOtp : handleRequestOtp} className="space-y-4">
               <div className="text-center space-y-1">
                 <h3 className="text-sm font-semibold text-slate-200">Supplier Partner Access</h3>
-                <p className="text-xs text-slate-400">Enter your registered email to receive a secure login code.</p>
+                <p className="text-xs text-slate-400">
+                  {mfaSetupData
+                    ? "Set up your Authenticator App to secure your account."
+                    : isMfaRequired 
+                    ? "Enter the code from your Authenticator App." 
+                    : "Enter your registered email to login."}
+                </p>
               </div>
+
+              {mfaSetupData && (
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center animate-in fade-in zoom-in duration-300">
+                  <p className="text-xs text-slate-300 mb-4">
+                    1. Scan this QR code using an Authenticator app (like Google Authenticator or Authy).
+                  </p>
+                  <div className="flex justify-center bg-white p-3 rounded-xl mx-auto w-fit mb-4">
+                    <QRCodeSVG value={mfaSetupData.uri} size={130} />
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    2. Then enter the 6-digit code below to log in.
+                  </p>
+                </div>
+              )}
 
               <Input
                 id="vendorEmail"
@@ -244,8 +283,8 @@ export const Login: React.FC = () => {
                   <Input
                     id="otp"
                     type="text"
-                    label="One-Time Verification Code (OTP)"
-                    placeholder="Enter 6-digit OTP code"
+                    label={isMfaRequired ? "Authenticator Code" : "One-Time Verification Code (OTP)"}
+                    placeholder="Enter 6-digit code"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
                     className="bg-slate-900 border-slate-800 text-white placeholder:text-slate-500 focus:ring-primary text-center tracking-[0.5em] font-bold text-lg"
@@ -265,18 +304,18 @@ export const Login: React.FC = () => {
                 disabled={sendingOtp || isSubmitting}
               >
                 {sendingOtp
-                  ? "Sending Code..."
+                  ? "Checking Email..."
                   : isSubmitting
-                  ? "Verifying OTP..."
+                  ? "Verifying..."
                   : otpSent
-                  ? "Verify & Enter Portal"
-                  : "Send OTP Verification"}
+                  ? "Verify & Login"
+                  : "Continue"}
               </Button>
 
               {otpSent && (
                 <button
                   type="button"
-                  onClick={() => { setOtpSent(false); setOtp(""); }}
+                  onClick={() => { setOtpSent(false); setOtp(""); setMfaSetupData(null); }}
                   className="w-full text-center text-xs text-slate-400 hover:text-white underline"
                 >
                   Change Email Address

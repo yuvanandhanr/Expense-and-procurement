@@ -67,6 +67,7 @@ class PRSchema(PRBase):
     pr_id: int
     pr_number: str
     requestor_id: Optional[int] = None
+    requestor_name: Optional[str] = None
     status: str
     total_estimated_amount: Decimal
     technical_spec_signoff: Optional[bool] = None

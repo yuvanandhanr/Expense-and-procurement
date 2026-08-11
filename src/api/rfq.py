@@ -128,7 +128,7 @@ async def get_comparison(
 ):
     # Quote evaluation restricted to Procurement Officer, Procurement Manager, or Admin
     user_roles = [role.role_name for role in current_user.roles]
-    if not any(role in ("Admin", "Procurement Officer", "Procurement Manager") for role in user_roles):
+    if not any(role in ("Admin", "Procurement Officer", "Procurement Manager", "Finance Manager", "CFO") for role in user_roles):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only procurement officers or managers are permitted to evaluate quotations"
@@ -144,12 +144,12 @@ async def select_vendor(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
-    # Vendor Selection Approval is restricted to Procurement Manager or Admin
+    # Vendor Selection Approval is restricted to Finance Manager, CFO, Procurement Manager, or Admin
     user_roles = [role.role_name for role in current_user.roles]
-    if not any(role in ("Admin", "Procurement Manager") for role in user_roles):
+    if not any(role in ("Admin", "Procurement Manager", "Finance Manager", "Finance", "CFO") for role in user_roles):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only procurement managers or administrators are permitted to approve vendor selections"
+            detail="Only finance, CFO, procurement managers, or administrators are permitted to approve vendor selections"
         )
     service = RFQService(db)
     return await service.select_vendor(

@@ -46,7 +46,7 @@ interface DashboardData {
 }
 
 export const Dashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -311,20 +311,24 @@ export const Dashboard: React.FC = () => {
             <CardTitle>Enterprise Controls</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <a
-              href="/prs"
-              className="flex items-center justify-between p-3 rounded-lg border border-border bg-accent/20 hover:bg-accent hover:scale-[1.01] transition-all font-semibold text-xs uppercase tracking-wider"
-            >
-              <span>Submit Purchase Requisition</span>
-              <span>&rarr;</span>
-            </a>
-            <a
-              href="/reports"
-              className="flex items-center justify-between p-3 rounded-lg border border-border bg-accent/20 hover:bg-accent hover:scale-[1.01] transition-all font-semibold text-xs uppercase tracking-wider"
-            >
-              <span>Export Spend Reports</span>
-              <span>&rarr;</span>
-            </a>
+            {!hasRole("Vendor") && (
+              <a
+                href="/prs"
+                className="flex items-center justify-between p-3 rounded-lg border border-border bg-accent/20 hover:bg-accent hover:scale-[1.01] transition-all font-semibold text-xs uppercase tracking-wider"
+              >
+                <span>Submit Purchase Requisition</span>
+                <span>&rarr;</span>
+              </a>
+            )}
+            {(hasRole("Finance") || hasRole("CFO") || hasRole("CEO") || hasRole("Admin")) && (
+              <a
+                href="/reports"
+                className="flex items-center justify-between p-3 rounded-lg border border-border bg-accent/20 hover:bg-accent hover:scale-[1.01] transition-all font-semibold text-xs uppercase tracking-wider"
+              >
+                <span>Export Spend Reports</span>
+                <span>&rarr;</span>
+              </a>
+            )}
             <a
               href="/search"
               className="flex items-center justify-between p-3 rounded-lg border border-border bg-accent/20 hover:bg-accent hover:scale-[1.01] transition-all font-semibold text-xs uppercase tracking-wider"

@@ -1,0 +1,67 @@
+from typing import Optional, List
+from datetime import datetime, date
+from decimal import Decimal
+from sqlalchemy import BigInteger, String, Numeric, DateTime, Date, ForeignKey, Text, JSON, Boolean
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from src.database.base import Base
+
+
+class ExpenseReport(Base):
+    __tablename__ = "expense_reports"
+
+    expense_report_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    employee_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"))
+    purpose: Mapped[str] = mapped_column(String(255), nullable=False)
+    justification: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    department_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("departments.department_id", ondelete="SET NULL"), nullable=True)
+    cost_center_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("cost_centres.cost_center_id", ondelete="SET NULL"), nullable=True)
+    project_code: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    status: Mapped[str] = mapped_column(String(50), default="Draft") # Draft, Submitted, Pending Approval, Approved, Rejected, Reimbursed
+    currency: Mapped[str] = mapped_column(String(10), default="USD")
+    total_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0.00"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    employee: Mapped["User"] = relationship("User", foreign_keys=[employee_id])
+    department: Mapped[Optional["Department"]] = relationship("Department")
+    cost_center: Mapped[Optional["CostCenter"]] = relationship("CostCenter")
+    receipts: Mapped[List["Receipt"]] = relationship("Receipt", back_populates="expense_report", cascade="all, delete-orphan")
+    approvals: Mapped[List["ExpenseApproval"]] = relationship("ExpenseApproval", back_populates="expense_report", cascade="all, delete-orphan")
+
+
+class Receipt(Base):
+    __tablename__ = "receipts"
+
+    receipt_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    expense_report_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("expense_reports.expense_report_id", ondelete="CASCADE"))
+    merchant_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    receipt_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True) # Travel, Meals, Office Supplies, etc.
+    ocr_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0.00"))
+    verified_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0.00"))
+    tax: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0.00"))
+    currency: Mapped[str] = mapped_column(String(10), default="USD")
+    image_path: Mapped[str] = mapped_column(String(512), nullable=False)
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    ocr_confidence: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True) # 0.00 to 100.00
+    ocr_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Relationship
+    expense_report: Mapped["ExpenseReport"] = relationship("ExpenseReport", back_populates="receipts")
+
+
+class ExpenseApproval(Base):
+    __tablename__ = "expense_approvals"
+
+    approval_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    expense_report_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("expense_reports.expense_report_id", ondelete="CASCADE"))
+    approver_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
+    status: Mapped[str] = mapped_column(String(50), nullable=False) # Pending, Approved, Rejected
+    comments: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    actioned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    expense_report: Mapped["ExpenseReport"] = relationship("ExpenseReport", back_populates="approvals")
+    approver: Mapped[Optional["User"]] = relationship("User")

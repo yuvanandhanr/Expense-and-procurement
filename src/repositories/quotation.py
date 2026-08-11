@@ -39,6 +39,18 @@ class QuotationRepository(BaseRepository[VendorQuotation]):
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
+    async def list_by_vendor(self, vendor_id: int) -> List[VendorQuotation]:
+        query = (
+            select(self.model)
+            .where(self.model.vendor_id == vendor_id)
+            .options(
+                selectinload(self.model.items),
+                selectinload(self.model.vendor)
+            )
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
 
 class QuotationItemRepository(BaseRepository[QuotationItem]):
     def __init__(self, session: AsyncSession) -> None:

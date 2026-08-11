@@ -27,6 +27,17 @@ class PORepository(BaseRepository[PurchaseOrder]):
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
+    async def list_by_vendor(self, vendor_id: int) -> List[PurchaseOrder]:
+        query = (
+            select(self.model)
+            .where(self.model.vendor_id == vendor_id)
+            .options(
+                selectinload(self.model.items),
+                selectinload(self.model.approvals)
+            )
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
 
 class POItemRepository(BaseRepository[PurchaseOrderItem]):
     def __init__(self, session: AsyncSession) -> None:

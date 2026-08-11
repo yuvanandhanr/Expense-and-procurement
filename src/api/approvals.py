@@ -23,9 +23,18 @@ router = APIRouter(prefix="/pr", tags=["Approvals"])
 def verify_approver_role(step: ApprovalStep, current_user: User) -> None:
     """
     Enforces that the user has the required role (or Admin status) to approve/action the step.
+    If a specific approver_id is assigned, strictly enforce it.
     """
     user_roles = [role.role_name for role in current_user.roles]
     if "Admin" in user_roles:
+        return
+
+    if step.approver_id is not None:
+        if current_user.user_id != step.approver_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not the designated approver for this step."
+            )
         return
 
     user_role_ids = [role.role_id for role in current_user.roles]

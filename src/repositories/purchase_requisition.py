@@ -37,7 +37,10 @@ class PRRepository(BaseRepository[PurchaseRequisition]):
         query = (
             select(self.model)
             .where(self.model.requestor_id == requestor_id)
-            .options(selectinload(self.model.items))
+            .options(
+                selectinload(self.model.items),
+                selectinload(self.model.requestor)
+            )
         )
         result = await self.session.execute(query)
         return list(result.scalars().all())
@@ -49,7 +52,23 @@ class PRRepository(BaseRepository[PurchaseRequisition]):
         query = (
             select(self.model)
             .where(self.model.department_id == department_id)
-            .options(selectinload(self.model.items))
+            .options(
+                selectinload(self.model.items),
+                selectinload(self.model.requestor)
+            )
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def list_all(self, skip: int = 0, limit: int = 100) -> List[PurchaseRequisition]:
+        query = (
+            select(self.model)
+            .options(
+                selectinload(self.model.items),
+                selectinload(self.model.requestor)
+            )
+            .offset(skip)
+            .limit(limit)
         )
         result = await self.session.execute(query)
         return list(result.scalars().all())

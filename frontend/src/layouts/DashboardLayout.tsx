@@ -72,7 +72,15 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   // Define sidebar items with role/permission filters
-  const sidebarItems = [
+  const sidebarItems = hasRole("Vendor") ? [
+    {
+      title: "Vendor Operations",
+      items: [
+        { label: "Vendor Portal", path: "/vendor-portal", icon: LayoutDashboard, show: true },
+        { label: "Invoices", path: "/invoices", icon: CreditCard, show: true },
+      ]
+    }
+  ] : [
     {
       title: "Overview",
       items: [
@@ -83,6 +91,8 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     {
       title: "Expense Operations",
       items: [
+        { label: "My Assets", path: "/my-assets", icon: HardDrive, show: true },
+        { label: "Employee Expenses", path: "/expenses", icon: FileText, show: true },
         { label: "Purchase Requisitions", path: "/prs", icon: FileText, show: true },
         { label: "Approvals Inbox", path: "/approvals", icon: CheckSquare, show: hasRole("Manager") || hasRole("Finance") || hasRole("CFO") || hasRole("CEO") },
       ],
@@ -90,18 +100,19 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     {
       title: "Procurement Cycle",
       items: [
+        { label: "Cycle Dashboard", path: "/procurement-dashboard", icon: LayoutDashboard, show: hasRole("Finance") || hasRole("CFO") || hasRole("Manager") || hasRole("Admin") || hasRole("CEO") },
         { label: "Vendors & Scores", path: "/vendors", icon: Users, show: hasPermission("manage_vendors") || hasRole("Procurement") || hasRole("CFO") },
         { label: "RFQs & Invitations", path: "/rfqs", icon: Briefcase, show: hasPermission("manage_rfq") || hasRole("Procurement") },
         { label: "Quotations Inbox", path: "/quotations", icon: Layers, show: hasPermission("manage_rfq") || hasRole("Procurement") },
         { label: "Purchase Orders", path: "/pos", icon: Package, show: true },
-        { label: "Contracts", path: "/contracts", icon: FileSpreadsheet, show: true },
+        { label: "Contracts", path: "/contracts", icon: FileSpreadsheet, show: hasRole("Finance") || hasRole("CFO") || hasRole("Procurement") || hasRole("Admin") || hasRole("CEO") },
       ],
     },
     {
       title: "Execution & Match",
       items: [
         { label: "Deliveries", path: "/deliveries", icon: Activity, show: true },
-        { label: "Goods Receipt (GRNs)", path: "/grns", icon: CheckCircle, show: true },
+        { label: "Goods Receipt (GRNs)", path: "/grns", icon: CheckCircle, show: hasRole("Manager") || hasRole("Finance") || hasRole("CFO") || hasRole("Procurement") || hasRole("Admin") || hasRole("CEO") },
         { label: "Assets Registry", path: "/assets", icon: HardDrive, show: true },
         { label: "Invoices", path: "/invoices", icon: CreditCard, show: true },
       ],

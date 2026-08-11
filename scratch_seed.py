@@ -20,6 +20,7 @@ async def seed():
         "mock_google_manager@dataeko.ai": "Manager",
         "mock_google_finance@dataeko.ai": "Finance Manager",
         "mock_google_employee@dataeko.ai": "Employee",
+        "mock_google_ceo@dataeko.ai": "CEO",
     }
 
     async with async_session() as session:
@@ -55,7 +56,14 @@ async def seed():
                 # Add role if missing
                 if role not in user.roles:
                     user.roles.append(role)
-                    
+            
+            # If the user is CEO, also give them the Admin role
+            if role_name == "CEO":
+                admin_result = await session.execute(select(Role).where(Role.role_name == "Admin"))
+                admin_role = admin_result.scalar_one_or_none()
+                if admin_role and admin_role not in user.roles:
+                    user.roles.append(admin_role)
+
         await session.commit()
         print("Mock users seeded.")
 

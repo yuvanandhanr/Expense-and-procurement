@@ -11,7 +11,7 @@ export const PurchaseOrders: React.FC = () => {
   useEffect(() => {
     const fetchPOs = async () => {
       try {
-        const response = await api.get("/purchase_orders");
+        const response = await api.get("/purchase-orders");
         setPos(response.data);
       } catch (err) {
         console.error("Failed to load POs:", err);

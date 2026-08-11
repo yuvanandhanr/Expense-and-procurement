@@ -9,6 +9,7 @@ from fastapi import HTTPException, status
 import jwt
 from jwt import PyJWKClient
 from sqlalchemy import select
+import pyotp
 
 async def verify_google_id_token(credential: str) -> dict:
     """
@@ -245,96 +246,42 @@ class AuthenticationService:
             expires_in=int(access_token_expires.total_seconds())
         )
 
-    async def request_vendor_otp(self, email: str) -> None:
-        # Check if the vendor is registered and active in the vendors table
+    async def request_vendor_otp(self, email: str) -> dict:
         query = select(Vendor).where(Vendor.email == email)
         result = await self.db.execute(query)
         vendor = result.scalar_one_or_none()
         if not vendor:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Vendor Not Registered"
+                detail="Vendor profile not found. Please contact procurement."
             )
+
         if vendor.status != "Active":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Vendor is not active"
             )
 
-        # Generate secure 6-digit OTP
-        import secrets
-        otp = f"{secrets.randbelow(900000) + 100000}"
-
-        # Hash OTP using SHA-256 before storage
-        otp_hash = hashlib.sha256(otp.encode("utf-8")).hexdigest()
-        expires_at = datetime.utcnow() + timedelta(minutes=5)
-
-        # Check for any active OTP request and create a new one
-        otp_request = OTPRequest(
-            email=email,
-            otp_hash=otp_hash,
-            attempts=0,
-            expires_at=expires_at,
-            created_at=datetime.utcnow()
-        )
-        await self.otp_repo.create(otp_request)
-
-        # Send OTP using email service templates
-        email_service = EmailService(self.db)
-        # Verify if template exists, if not seed it first
-        otp_template = await email_service.template_repo.get_by_name("VendorOTP")
-        if not otp_template:
-            await email_service.create_template_if_not_exists(
-                name="VendorOTP",
-                subject="Your Supplier Portal Verification Code",
-                body_template="Hello,\n\nYour 6-digit verification code is: {otp}\n\nThis code will expire in 5 minutes."
-            )
+        if vendor.mfa_enabled:
+            return {"mfa_required": True}
+            
+        # MFA is not enabled. Setup MFA inline.
+        # Generate new secret if not already generated
+        if not vendor.mfa_secret:
+            secret = pyotp.random_base32()
+            vendor.mfa_secret = secret
+            await self.db.flush()
+            
+        totp = pyotp.TOTP(vendor.mfa_secret)
+        uri = totp.provisioning_uri(name=email, issuer_name="DataEko Supplier Portal")
         
-        email_record = await email_service.queue_email(
-            recipient=email,
-            template_name="VendorOTP",
-            context={"otp": otp}
-        )
-        await email_service.send_email_immediately(email_record)
-
-        # Logger warnings/prints: NEVER display OTP in response payload or standard logs.
-        # But we can output to terminal for local developer verification.
-        try:
-            print(f"\n[OTP DEV] OTP code generated (sent to terminal for dev verification): {otp}\n", flush=True)
-        except OSError:
-            pass
+        return {
+            "mfa_setup_required": True,
+            "secret": vendor.mfa_secret,
+            "uri": uri
+        }
 
     async def verify_vendor_otp(self, email: str, otp: str, ip: Optional[str] = None, user_agent: Optional[str] = None) -> TokenResponse:
-        # Get active OTP request
-        otp_request = await self.otp_repo.get_active_by_email(email)
-        if not otp_request or otp_request.expires_at < datetime.utcnow():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="OTP expired or not found"
-            )
-
-        # Check maximum attempts limit
-        if otp_request.attempts >= 5:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Maximum verification attempts exceeded"
-            )
-
-        # Validate input code
-        input_hash = hashlib.sha256(otp.encode("utf-8")).hexdigest()
-        if otp_request.otp_hash != input_hash:
-            otp_request.attempts += 1
-            await self.otp_repo.update(otp_request)
-            remaining = 5 - otp_request.attempts
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid OTP code. Attempts remaining: {remaining}"
-            )
-
-        # Invalidate OTP on successful verification
-        otp_request.expires_at = datetime.utcnow()
-        await self.otp_repo.update(otp_request)
-
         # Retrieve vendor details
         query = select(Vendor).where(Vendor.email == email)
         result = await self.db.execute(query)
@@ -344,6 +291,20 @@ class AuthenticationService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Vendor profile not found."
             )
+
+        if not vendor.mfa_secret:
+            raise HTTPException(status_code=500, detail="MFA secret not found for vendor.")
+            
+        totp = pyotp.TOTP(vendor.mfa_secret)
+        if not totp.verify(otp):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid Authenticator code."
+            )
+            
+        if not vendor.mfa_enabled:
+            vendor.mfa_enabled = True
+            await self.db.flush()
 
         # Retrieve or auto-create corresponding User record in public.users
         user = await self.user_repo.get_by_email(email)
@@ -483,6 +444,44 @@ class AuthenticationService:
         to_encode.update({"exp": expire})
         encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET, algorithm="HS256")
         return encoded_jwt
+
+    async def setup_vendor_mfa(self, email: str) -> dict:
+        query = select(Vendor).where(Vendor.email == email)
+        result = await self.db.execute(query)
+        vendor = result.scalar_one_or_none()
+        if not vendor:
+            raise HTTPException(status_code=404, detail="Vendor profile not found.")
+        
+        # Generate new secret
+        secret = pyotp.random_base32()
+        
+        # We need to save it temporarily, we can save it to the DB directly since MFA is not enabled until verified
+        vendor.mfa_secret = secret
+        await self.db.flush()
+        
+        # Generate provisioning URI
+        totp = pyotp.TOTP(secret)
+        uri = totp.provisioning_uri(name=email, issuer_name="DataEko Supplier Portal")
+        
+        return {"secret": secret, "uri": uri}
+
+    async def enable_vendor_mfa(self, email: str, otp: str) -> dict:
+        query = select(Vendor).where(Vendor.email == email)
+        result = await self.db.execute(query)
+        vendor = result.scalar_one_or_none()
+        if not vendor:
+            raise HTTPException(status_code=404, detail="Vendor profile not found.")
+            
+        if not vendor.mfa_secret:
+            raise HTTPException(status_code=400, detail="MFA setup has not been initiated.")
+            
+        totp = pyotp.TOTP(vendor.mfa_secret)
+        if not totp.verify(otp):
+            raise HTTPException(status_code=400, detail="Invalid Authenticator code.")
+            
+        vendor.mfa_enabled = True
+        await self.db.flush()
+        return {"message": "MFA enabled successfully."}
 
     async def logout(self, token: str) -> None:
         session = await self.session_repo.get_active_session_by_token(token)

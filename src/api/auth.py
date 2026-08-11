@@ -15,7 +15,15 @@ from src.schemas.auth import (
     VendorOTPRequest,
     VendorOTPVerify,
 )
+from pydantic import BaseModel
 from src.services.auth_service import AuthenticationService
+
+class MFASetupResponse(BaseModel):
+    secret: str
+    uri: str
+
+class MFAEnableRequest(BaseModel):
+    otp: str
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -109,6 +117,37 @@ async def verify_vendor_otp(
     user_agent = request.headers.get("user-agent")
     
     return await auth_service.verify_vendor_otp(body.email, body.otp, ip=ip_address, user_agent=user_agent)
+
+@router.post(
+    "/vendor/mfa/setup",
+    response_model=MFASetupResponse,
+    dependencies=[Depends(get_current_user)]
+)
+async def setup_vendor_mfa(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Generates a new TOTP secret and provisioning URI for the vendor.
+    """
+    auth_service = AuthenticationService(db)
+    return await auth_service.setup_vendor_mfa(current_user.email)
+
+@router.post(
+    "/vendor/mfa/enable",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(get_current_user)]
+)
+async def enable_vendor_mfa(
+    body: MFAEnableRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Verifies the first TOTP code and enables MFA for the vendor.
+    """
+    auth_service = AuthenticationService(db)
+    return await auth_service.enable_vendor_mfa(current_user.email, body.otp)
 
 
 @router.post(

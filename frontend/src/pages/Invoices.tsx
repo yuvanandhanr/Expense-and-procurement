@@ -20,6 +20,11 @@ export const Invoices: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [viewingDoc, setViewingDoc] = useState<string | null>(null);
+  
+  // Upload modal state
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
+  const [serialNumber, setSerialNumber] = useState("");
 
   const isManager = user?.roles?.some(r => ["Manager", "Finance Manager", "CFO", "Admin"].includes(r.role_name)) || false;
 
@@ -39,19 +44,32 @@ export const Invoices: React.FC = () => {
     fetchInvoices();
   }, []);
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
+  const handleFilesSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files.length > 0) {
+      setSelectedFiles(event.target.files);
+      setIsUploadOpen(true);
+    }
+  };
+
+  const handleUploadSubmit = async () => {
+    if (!selectedFiles || selectedFiles.length === 0) return;
 
     const formData = new FormData();
-    Array.from(files).forEach((file) => {
+    Array.from(selectedFiles).forEach((file) => {
       formData.append("files", file);
     });
+    
+    if (serialNumber) {
+      formData.append("asset_serial_number", serialNumber);
+    }
 
     setUploading(true);
     try {
       await api.post("/invoices/upload-batch", formData);
-      toast.success(`${files.length} invoice(s) uploaded and processed successfully!`);
+      toast.success(`${selectedFiles.length} invoice(s) uploaded and processed successfully!`);
+      setIsUploadOpen(false);
+      setSelectedFiles(null);
+      setSerialNumber("");
       fetchInvoices();
     } catch (err) {
       console.error("Failed to upload invoices:", err);
@@ -104,12 +122,10 @@ export const Invoices: React.FC = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            {!isManager ? "Reimbursements" : "Vendor Invoices & Reimbursements"}
+            Vendor Invoices
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
-            {!isManager 
-              ? "Track your employee expense reimbursements." 
-              : "Review incoming vendor billings and employee reimbursements."}
+            Review and manage incoming vendor billings.
           </p>
         </div>
         <div>
@@ -119,7 +135,7 @@ export const Invoices: React.FC = () => {
             multiple
             className="hidden" 
             ref={fileInputRef} 
-            onChange={handleFileUpload} 
+            onChange={handleFilesSelected} 
           />
           <button 
             onClick={() => fileInputRef.current?.click()}
@@ -147,7 +163,7 @@ export const Invoices: React.FC = () => {
                 <thead>
                   <tr className="border-b border-border bg-accent/40 text-xs font-bold text-muted-foreground uppercase">
                     <th className="p-4">Invoice Number</th>
-                    <th className="p-4">Employee ID</th>
+                    <th className="p-4">Vendor Name</th>
                     <th className="p-4">Cause / Description</th>
                     <th className="p-4">Amount</th>
                     <th className="p-4">Invoice Date</th>
@@ -159,7 +175,7 @@ export const Invoices: React.FC = () => {
                   {invoices.map((inv: any) => (
                     <tr key={inv.invoice_id} className="hover:bg-accent/20 transition-colors">
                       <td className="p-4 font-bold text-xs tracking-wider text-primary">{inv.invoice_number}</td>
-                      <td className="p-4 text-xs font-medium text-muted-foreground">{inv.employee_id || "System"}</td>
+                      <td className="p-4 font-semibold text-xs text-muted-foreground">{inv.vendor_name || "Unknown"}</td>
                       <td className="p-4 text-xs font-medium truncate max-w-[200px]" title={inv.cause}>{inv.cause || "N/A"}</td>
                       <td className="p-4 font-bold">${inv.grand_total?.toLocaleString() || inv.amount?.toLocaleString() || '0.00'}</td>
                       <td className="p-4 text-xs text-muted-foreground">{formatDate(inv.invoice_date)}</td>
@@ -240,6 +256,37 @@ export const Invoices: React.FC = () => {
               window.URL.revokeObjectURL(viewingDoc);
               setViewingDoc(null);
             }}>Close</Button>
+          </div>
+        </Dialog>
+      )}
+
+      {/* Upload Invoice Dialog */}
+      {isUploadOpen && (
+        <Dialog isOpen={true} onClose={() => { setIsUploadOpen(false); setSelectedFiles(null); }} title="Upload Invoice Details">
+          <div className="space-y-4">
+            <div className="bg-muted/40 p-3 rounded-lg border border-border text-xs">
+              <span className="block font-semibold text-muted-foreground uppercase">Selected Files</span>
+              <span className="font-bold text-sm text-foreground/90">{selectedFiles ? selectedFiles.length : 0} file(s) selected</span>
+            </div>
+            
+            <Input
+              id="serial_number"
+              type="text"
+              label="Asset Serial Number / Unique ID (Optional)"
+              placeholder="e.g. SN-12345678"
+              value={serialNumber}
+              onChange={(e) => setSerialNumber(e.target.value)}
+            />
+            <p className="text-[10px] text-muted-foreground">If this invoice is for an asset (e.g. IT Equipment, Hardware), enter the product serial number here to register it automatically upon approval.</p>
+
+            <div className="flex justify-end space-x-2 pt-4 border-t border-border">
+              <Button variant="outline" type="button" onClick={() => { setIsUploadOpen(false); setSelectedFiles(null); }}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={handleUploadSubmit} disabled={uploading}>
+                {uploading ? "Uploading..." : "Submit Upload"}
+              </Button>
+            </div>
           </div>
         </Dialog>
       )}

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, BackgroundTasks, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List, Optional
@@ -39,7 +39,8 @@ async def get_invoices(
     stmt = select(VendorInvoice).options(
         selectinload(VendorInvoice.items),
         selectinload(VendorInvoice.documents),
-        selectinload(VendorInvoice.approvals)
+        selectinload(VendorInvoice.approvals),
+        selectinload(VendorInvoice.vendor)
     ).order_by(VendorInvoice.created_at.desc())
     
     # RBAC: Strict data isolation
@@ -68,8 +69,8 @@ async def get_invoices(
             stmt = stmt.where(VendorInvoice.invoice_id == -1) # return none
             
     elif not is_manager_or_admin:
-        # Employees see only their own reimbursements/invoices
-        stmt = stmt.where(VendorInvoice.employee_id == current_user.user_id)
+        # Regular employees should not see Vendor Invoices unless they are in procurement
+        stmt = stmt.where(VendorInvoice.invoice_id == -1) # return none
         
     result = await session.execute(stmt)
     return result.scalars().all()
@@ -77,6 +78,7 @@ async def get_invoices(
 @router.post("/upload-batch", response_model=List[InvoiceSchema])
 async def upload_invoice_batch(
     files: List[UploadFile] = File(...),
+    asset_serial_number: Optional[str] = Form(None),
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
@@ -106,11 +108,11 @@ async def upload_invoice_batch(
         invoice = VendorInvoice(
             invoice_number=invoice_number,
             vendor_id=1,
-            employee_id=current_user.user_id,
             cause=cause,
             invoice_date=invoice_date,
             subtotal=grand_total,
             grand_total=grand_total,
+            asset_serial_number=asset_serial_number,
             status="Pending Approval"
         )
         
@@ -157,7 +159,8 @@ async def upload_invoice_batch(
         stmt = select(VendorInvoice).options(
             selectinload(VendorInvoice.items),
             selectinload(VendorInvoice.documents),
-            selectinload(VendorInvoice.approvals)
+            selectinload(VendorInvoice.approvals),
+            selectinload(VendorInvoice.vendor)
         ).where(VendorInvoice.invoice_id == invoice.invoice_id)
         
         result = await session.execute(stmt)
@@ -234,7 +237,8 @@ async def upload_invoice(
     stmt = select(VendorInvoice).options(
         selectinload(VendorInvoice.items),
         selectinload(VendorInvoice.documents),
-        selectinload(VendorInvoice.approvals)
+        selectinload(VendorInvoice.approvals),
+        selectinload(VendorInvoice.vendor)
     ).where(VendorInvoice.invoice_id == invoice.invoice_id)
     
     result = await session.execute(stmt)
@@ -254,7 +258,8 @@ async def update_invoice(
     stmt = select(VendorInvoice).options(
         selectinload(VendorInvoice.items),
         selectinload(VendorInvoice.documents),
-        selectinload(VendorInvoice.approvals)
+        selectinload(VendorInvoice.approvals),
+        selectinload(VendorInvoice.vendor)
     ).where(VendorInvoice.invoice_id == invoice_id)
     
     result = await session.execute(stmt)
@@ -263,7 +268,7 @@ async def update_invoice(
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
         
-    if invoice.employee_id != current_user.user_id and not any(r.role_name in ["Admin", "Manager", "Finance Manager", "CFO"] for r in current_user.roles):
+    if not any(r.role_name in ["Admin", "Manager", "Finance Manager", "CFO", "Vendor Portal"] for r in current_user.roles):
         raise HTTPException(status_code=403, detail="Not authorized to update this invoice")
         
     if data.cause is not None:
@@ -312,7 +317,8 @@ async def approve_reject_invoice(
     stmt = select(VendorInvoice).options(
         selectinload(VendorInvoice.items),
         selectinload(VendorInvoice.documents),
-        selectinload(VendorInvoice.approvals)
+        selectinload(VendorInvoice.approvals),
+        selectinload(VendorInvoice.vendor)
     ).where(VendorInvoice.invoice_id == invoice_id)
     
     result = await session.execute(stmt)
@@ -331,6 +337,52 @@ async def approve_reject_invoice(
             approval.comments = f"{new_status} by {current_user.first_name}"
             
     await session.commit()
+    
+    if action == "approve" and invoice.asset_serial_number:
+        # Check if cause implies it's an asset
+        asset_keywords = ["hardware", "equipment", "asset", "it", "laptop", "server", "chair", "materials", "cloud"]
+        cause_lower = (invoice.cause or "").lower()
+        
+        # We always create a GRN for approved invoices
+        from src.models.grn import GoodsReceipt, GoodsReceiptItem
+        import uuid
+        
+        new_grn = GoodsReceipt(
+            grn_number=f"GRN-{uuid.uuid4().hex[:8].upper()}",
+            po_id=invoice.po_id,
+            vendor_id=invoice.vendor_id,
+            received_by=current_user.user_id,
+            status="Completed",
+            notes="Auto-generated from Approved Invoice"
+        )
+        session.add(new_grn)
+        await session.flush()
+        
+        # Link invoice to new GRN
+        invoice.grn_id = new_grn.grn_id
+        
+        # Find requestor id
+        requestor_id = None
+        if invoice.po and invoice.po.pr:
+            requestor_id = invoice.po.pr.requestor_id
+        
+        # If it is an asset, register it
+        if any(keyword in cause_lower for keyword in asset_keywords) or invoice.asset_serial_number:
+            from src.models.assets import Asset
+            
+            new_asset = Asset(
+                asset_number=f"AST-{uuid.uuid4().hex[:8].upper()}",
+                asset_tag=f"TAG-{uuid.uuid4().hex[:8].upper()}",
+                vendor_id=invoice.vendor_id,
+                po_id=invoice.po_id,
+                serial_number=invoice.asset_serial_number,
+                assigned_employee_id=requestor_id,
+                status="Assigned" if requestor_id else "Available",
+                department_id=invoice.po.pr.department_id if (invoice.po and invoice.po.pr) else None
+            )
+            session.add(new_asset)
+            
+        await session.commit()
     
     # Reload to return fresh object
     result = await session.execute(stmt)

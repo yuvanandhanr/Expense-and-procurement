@@ -10,6 +10,7 @@ export const VendorPortal: React.FC = () => {
   
   const [rfqs, setRfqs] = useState<any[]>([]);
   const [quotations, setQuotations] = useState<any[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Submit Quotation states
@@ -21,13 +22,15 @@ export const VendorPortal: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [rfqRes, quoteRes] = await Promise.all([
+      const [rfqRes, quoteRes, poRes] = await Promise.all([
         api.get("/rfqs"),
         api.get("/quotations"),
+        api.get("/purchase-orders"),
       ]);
       // For demonstration, open RFQs are shown to the vendor
       setRfqs(rfqRes.data);
       setQuotations(quoteRes.data);
+      setPurchaseOrders(poRes.data);
     } catch (err) {
       console.error("Failed to load vendor portal data:", err);
     } finally {
@@ -86,7 +89,7 @@ export const VendorPortal: React.FC = () => {
               Active Vendor Code: <span className="font-mono text-primary font-bold">{user?.employee_code}</span>
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-center gap-3">
             <Badge variant="success">Active Status</Badge>
             <div className="bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-center min-w-[100px]">
               <span className="block text-[10px] text-slate-500 font-bold uppercase tracking-wider">Rating Index</span>
@@ -183,6 +186,51 @@ export const VendorPortal: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Bottom: Purchase Orders */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Assigned Purchase Orders</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-6 space-y-4">
+              <Skeleton className="h-8 w-full" />
+            </div>
+          ) : purchaseOrders.length === 0 ? (
+            <div className="p-12 text-center text-xs text-muted-foreground font-semibold uppercase tracking-wider">
+              No active Purchase Orders at the moment.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-border bg-accent/40 text-[10px] font-bold text-muted-foreground uppercase">
+                    <th className="p-4">PO Number</th>
+                    <th className="p-4">RFQ Ref</th>
+                    <th className="p-4">Amount</th>
+                    <th className="p-4">Date</th>
+                    <th className="p-4">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {purchaseOrders.map((po) => (
+                    <tr key={po.po_id} className="hover:bg-accent/10">
+                      <td className="p-4 font-mono font-bold text-xs">{po.po_number}</td>
+                      <td className="p-4 font-mono text-xs">{po.rfq_id ? `#RFQ-${po.rfq_id}` : "N/A"}</td>
+                      <td className="p-4 font-bold text-primary">${po.grand_total?.toLocaleString()}</td>
+                      <td className="p-4 text-xs">{formatDate(po.created_at)}</td>
+                      <td className="p-4">
+                        <Badge variant="success">{po.status}</Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Bid Submission Dialog */}
       {selectedRfq && (

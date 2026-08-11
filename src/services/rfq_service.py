@@ -237,4 +237,34 @@ class RFQService:
         quote.status = "Selected"
         await self.quote_repo.update(quote)
 
+        # Auto-generate Purchase Order
+        from src.services.po_service import POService
+        from src.schemas.purchase_order import POCreate, POItemCreate
+        po_service = POService(self.db)
+        
+        po_items = []
+        for item in quote.items:
+            po_items.append(POItemCreate(
+                item_name=item.rfq_item.item_name if item.rfq_item else "Item",
+                specification=item.rfq_item.specification if item.rfq_item else None,
+                quantity=item.rfq_item.quantity if item.rfq_item else 1,
+                unit_price=item.unit_price
+            ))
+            
+        pr_dept_id = None
+        if rfq.pr_id:
+            pr = await self.pr_repo.get_by_id(rfq.pr_id)
+            if pr:
+                pr_dept_id = pr.department_id
+
+        po_data = POCreate(
+            vendor_id=selected_vendor_id,
+            rfq_id=rfq_id,
+            pr_id=rfq.pr_id,
+            department_id=pr_dept_id,
+            currency=quote.currency,
+            items=po_items
+        )
+        await po_service.create_po(po_data, user_id)
+
         return await self.comparison_repo.get_by_id(comp.comparison_id)

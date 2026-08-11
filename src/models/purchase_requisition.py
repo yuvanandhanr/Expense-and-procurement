@@ -98,6 +98,12 @@ class PurchaseRequisition(Base):
         "BudgetReservation", back_populates="purchase_requisition", cascade="all, delete-orphan"
     )
 
+    @property
+    def requestor_name(self) -> str:
+        if self.requestor:
+            return f"{self.requestor.first_name or ''} {self.requestor.last_name or ''}".strip() or "Unknown"
+        return "Unknown"
+
 
 class PRItem(Base):
     __tablename__ = "pr_items"

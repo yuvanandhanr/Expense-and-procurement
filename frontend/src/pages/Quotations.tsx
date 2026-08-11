@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
-import { Quotation } from "../types";
-import { Card, CardHeader, CardTitle, CardContent, Badge, Skeleton } from "../components/ui";
+import { useAuth } from "../hooks/useAuth";
+import { Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Button } from "../components/ui";
+import toast from "react-hot-toast";
 
 export const Quotations: React.FC = () => {
+  const { user } = useAuth();
   const [quotes, setQuotes] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -20,6 +22,25 @@ export const Quotations: React.FC = () => {
     };
     fetchQuotes();
   }, []);
+
+  const handleApprove = async (quote: any) => {
+    try {
+      await api.post(`/rfq/${quote.rfq_id}/select-vendor`, {
+        selected_vendor_id: quote.vendor_id,
+        selected_quotation_id: quote.quotation_id,
+        reason: "Approved by Finance"
+      });
+      toast.success("Quotation approved and Purchase Order auto-generated!");
+      // Refetch
+      const response = await api.get("/quotations");
+      setQuotes(response.data);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to approve quotation.");
+    }
+  };
+
+  const isFinanceManager = user?.roles?.some(r => ["Finance Manager", "CFO", "Admin"].includes(r.role_name)) || false;
 
   return (
     <div className="space-y-6">
@@ -48,6 +69,7 @@ export const Quotations: React.FC = () => {
                     <th className="p-4">Total Price</th>
                     <th className="p-4">Timeline (Days)</th>
                     <th className="p-4">Matching Status</th>
+                    <th className="p-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -58,9 +80,14 @@ export const Quotations: React.FC = () => {
                       <td className="p-4 font-bold">${q.total_price?.toLocaleString()}</td>
                       <td className="p-4">{q.delivery_timeline_days} days</td>
                       <td className="p-4">
-                        <Badge variant={q.is_selected ? "success" : "neutral"}>
-                          {q.is_selected ? "Selected" : "Under Review"}
+                        <Badge variant={q.is_selected || q.status === "Selected" ? "success" : "neutral"}>
+                          {q.is_selected || q.status === "Selected" ? "Selected" : "Under Review"}
                         </Badge>
+                      </td>
+                      <td className="p-4 text-right">
+                        {isFinanceManager && (!q.is_selected && q.status !== "Selected") && (
+                          <Button size="sm" onClick={() => handleApprove(q)}>Approve & Gen PO</Button>
+                        )}
                       </td>
                     </tr>
                   ))}

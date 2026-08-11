@@ -18,16 +18,27 @@ class InvoiceRepository(BaseRepository[VendorInvoice]):
                 selectinload(self.model.items),
                 selectinload(self.model.documents),
                 selectinload(self.model.approvals),
-                selectinload(self.model.po)
+                selectinload(self.model.po),
+                selectinload(self.model.vendor)
             )
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
     async def get_by_vendor_and_number(self, vendor_id: int, invoice_number: str) -> Optional[VendorInvoice]:
-        query = select(self.model).where(self.model.vendor_id == vendor_id, self.model.invoice_number == invoice_number)
+        query = select(self.model).where(self.model.vendor_id == vendor_id, self.model.invoice_number == invoice_number).options(selectinload(self.model.vendor))
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
+
+    async def list_all(self, skip: int = 0, limit: int = 100) -> List[VendorInvoice]:
+        query = (
+            select(self.model)
+            .options(selectinload(self.model.vendor))
+            .offset(skip)
+            .limit(limit)
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
 
 
 class InvoiceItemRepository(BaseRepository[InvoiceItem]):

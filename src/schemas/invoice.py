@@ -68,6 +68,7 @@ class InvoiceSchema(BaseModel):
     invoice_id: int
     invoice_number: str
     vendor_id: int
+    vendor_name: Optional[str] = None
     employee_id: Optional[int] = None
     po_id: Optional[int] = None
     grn_id: Optional[int] = None

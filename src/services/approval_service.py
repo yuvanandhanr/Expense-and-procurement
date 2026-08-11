@@ -35,6 +35,8 @@ class ApprovalService:
         self.approval_history_repo = ApprovalHistoryRepository(db)
         self.comment_repo = CommentRepository(db)
         self.budget_service = BudgetService(db)
+        from src.services.notification_service import NotificationService
+        self.notification_service = NotificationService(db)
 
     async def get_cfo_role_id(self) -> int:
         """
@@ -64,17 +66,25 @@ class ApprovalService:
 
         steps_to_create = []
         
+        # Get requestor's manager_id
+        from src.models.auth import User
+        query_user = select(User).where(User.user_id == pr.requestor_id)
+        result_user = await self.db.execute(query_user)
+        requestor = result_user.scalar_one_or_none()
+        manager_id = requestor.manager_id if requestor else None
+        
         # If rules exist, parse them. Otherwise generate default Manager -> Finance steps.
         if rules:
             for idx, rule in enumerate(rules, start=1):
+                app_id = manager_id if idx == 1 else None
                 steps_to_create.append({
                     "step_number": idx,
                     "approver_role_id": rule.role_id,
-                    "approver_id": None
+                    "approver_id": app_id
                 })
         else:
             # Default fallback: Level 1 Manager, Level 2 Finance
-            steps_to_create.append({"step_number": 1, "approver_role_id": 2, "approver_id": None}) # Manager
+            steps_to_create.append({"step_number": 1, "approver_role_id": 2, "approver_id": manager_id}) # Manager
             steps_to_create.append({"step_number": 2, "approver_role_id": 3, "approver_id": None}) # Finance
 
         # High-value threshold check (> $50,000 automatically requires CFO approval)
@@ -110,7 +120,7 @@ class ApprovalService:
 
         # Update initial PR status
         first_step_role_id = steps_to_create[0]["approver_role_id"]
-        pr.status = self._get_status_from_role_id(first_step_role_id)
+        pr.status = await self._get_status_from_role_id(first_step_role_id)
         await self.pr_repo.update(pr)
 
         # Log to workflow history
@@ -124,6 +134,14 @@ class ApprovalService:
             created_at=datetime.utcnow()
         )
         await self.workflow_history_repo.create(w_hist)
+
+        # Notify Reporting Manager
+        if manager_id:
+            await self.notification_service.send_notification(
+                user_id=manager_id,
+                template_name="ApprovalRequestAlert",
+                context={"pr_number": pr.pr_number, "justification": pr.justification}
+            )
 
         return workflow
 
@@ -149,6 +167,28 @@ class ApprovalService:
 
         active_step = await self.get_active_step(pr_id)
 
+        # Self-approval prevention
+        if user_id == pr.requestor_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Users cannot approve their own requests."
+            )
+
+        # Duplicate approval prevention
+        existing_approval_query = select(ApprovalHistory).where(
+            ApprovalHistory.step_id.in_(
+                select(ApprovalStep.step_id).where(ApprovalStep.workflow_id == active_step.workflow_id)
+            ),
+            ApprovalHistory.performed_by == user_id,
+            ApprovalHistory.action == "Approve"
+        )
+        result_existing = await self.db.execute(existing_approval_query)
+        if result_existing.scalars().first():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Duplicate approval: You have already approved a step in this workflow."
+            )
+
         # Update active step
         active_step.status = "Approved"
         active_step.approver_id = user_id
@@ -173,7 +213,7 @@ class ApprovalService:
 
         if next_step:
             # Advance to next step role status
-            pr.status = self._get_status_from_role_id(next_step.approver_role_id)
+            pr.status = await self._get_status_from_role_id(next_step.approver_role_id)
             await self.pr_repo.update(pr)
             
             w_hist = WorkflowHistory(
@@ -186,6 +226,17 @@ class ApprovalService:
                 created_at=datetime.utcnow()
             )
             await self.workflow_history_repo.create(w_hist)
+            
+            # Notify next approvers
+            from src.models.auth import User, Role
+            query_next = select(User).join(User.roles).where(Role.role_id == next_step.approver_role_id)
+            next_users = (await self.db.execute(query_next)).scalars().all()
+            for nu in next_users:
+                await self.notification_service.send_notification(
+                    user_id=nu.user_id,
+                    template_name="ApprovalRequestAlert",
+                    context={"pr_number": pr.pr_number, "justification": pr.justification}
+                )
         else:
             # Workflow completed successfully
             workflow.status = "Approved"
@@ -208,8 +259,42 @@ class ApprovalService:
                 created_at=datetime.utcnow()
             )
             await self.workflow_history_repo.create(w_hist)
+            
+            # Notify Procurement Team
+            # Auto-generate RFQ and invite active vendors
+            from src.services.rfq_service import RFQService
+            from src.schemas.rfq import RFQCreate, RFQItemCreate
+            from src.models.vendor import Vendor
+            from datetime import timedelta
+            
+            # Fetch all active vendors
+            query_vendors = select(Vendor.vendor_id).where(Vendor.status == "Active", Vendor.blacklist_status == False)
+            active_vendor_ids = (await self.db.execute(query_vendors)).scalars().all()
+            
+            # Create RFQ payload
+            rfq_items = []
+            for item in pr.items:
+                rfq_items.append(RFQItemCreate(
+                    pr_item_id=item.pr_item_id,
+                    item_name=item.item_name,
+                    specification=item.specification,
+                    quantity=item.quantity
+                ))
+            
+            rfq_payload = RFQCreate(
+                title=f"RFQ for PR: {pr.title}",
+                description=pr.justification,
+                pr_id=pr.pr_id,
+                submission_deadline=datetime.utcnow() + timedelta(days=7),
+                invited_vendor_ids=list(active_vendor_ids),
+                items=rfq_items
+            )
+            
+            rfq_service = RFQService(self.db)
+            rfq = await rfq_service.create_rfq(rfq_payload, user_id)
+            await rfq_service.publish_rfq(rfq.rfq_id)
 
-        return pr
+        return await self.pr_repo.get_by_id(pr_id)
 
     async def reject_step(self, pr_id: int, user_id: int, comments: str) -> PurchaseRequisition:
         pr = await self.pr_repo.get_by_id(pr_id)
@@ -258,6 +343,14 @@ class ApprovalService:
             created_at=datetime.utcnow()
         )
         await self.workflow_history_repo.create(w_hist)
+        
+        # Notify Employee
+        if pr.requestor_id:
+            await self.notification_service.send_notification(
+                user_id=pr.requestor_id,
+                template_name="ApprovalCompletedAlert",
+                context={"pr_number": pr.pr_number, "status": "Rejected"}
+            )
 
         return pr
 
@@ -308,6 +401,14 @@ class ApprovalService:
             created_at=datetime.utcnow()
         )
         await self.workflow_history_repo.create(w_hist)
+
+        # Notify Employee
+        if pr.requestor_id:
+            await self.notification_service.send_notification(
+                user_id=pr.requestor_id,
+                template_name="ApprovalCompletedAlert",
+                context={"pr_number": pr.pr_number, "status": "Returned for Modification"}
+            )
 
         return pr
 
@@ -371,14 +472,15 @@ class ApprovalService:
 
         return await self.pr_repo.get_by_id(pr_id)
 
-    def _get_status_from_role_id(self, role_id: int) -> str:
+    async def _get_status_from_role_id(self, role_id: int) -> str:
         """
-        Maps a role ID to its corresponding pending review status.
+        Maps a role ID to its corresponding pending review status dynamically.
         """
-        if role_id == 2:
-            return "Pending Manager Approval"
-        elif role_id == 3:
-            return "Pending Finance Approval"
-        elif role_id == 4:
-            return "Pending CFO Approval"
+        from src.models.auth import Role
+        query = select(Role).where(Role.role_id == role_id)
+        result = await self.db.execute(query)
+        role = result.scalar_one_or_none()
+        
+        if role:
+            return f"Pending {role.role_name} Approval"
         return "Under Review"

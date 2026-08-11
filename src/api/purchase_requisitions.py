@@ -15,21 +15,27 @@ def check_pr_access(pr, current_user: User) -> None:
     Validates user authorization access to a Purchase Requisition.
     - Admin: Full Access.
     - Manager: Department requisitions.
+    - Procurement: Only approved PRs.
     - Employee/Others: Own requisitions only.
     """
-    # Check Admin role
+    # Check full access roles
     user_roles = [role.role_name for role in current_user.roles]
-    if "Admin" in user_roles:
+    if any(role in user_roles for role in ["Admin", "CFO", "Finance Manager", "Finance", "Manager"]):
         return
 
-    # Check Manager role
-    if "Manager" in user_roles:
-        if pr.department_id == current_user.department_id:
+    # Check Procurement role
+    if "Procurement" in user_roles:
+        if pr.status in ("Approved", "Assigned to Procurement", "Procurement In Progress", "Completed"):
             return
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Managers are restricted to accessing department requisitions only"
+            detail="Procurement can only access fully approved requisitions."
         )
+
+    # Check Manager role
+    if "Manager" in user_roles and current_user.department_id:
+        if pr.department_id == current_user.department_id:
+            return
 
     # Fallback to Requestor check
     if pr.requestor_id != current_user.user_id:
@@ -57,10 +63,8 @@ async def list_prs(
     service = PRService(db)
     user_roles = [role.role_name for role in current_user.roles]
 
-    if "Admin" in user_roles:
+    if any(role in user_roles for role in ["Admin", "CFO", "Finance Manager", "Finance", "Manager"]):
         return await service.pr_repo.list_all()
-    elif "Manager" in user_roles and current_user.department_id:
-        return await service.pr_repo.list_by_department(current_user.department_id)
     else:
         return await service.pr_repo.list_by_requestor(current_user.user_id)
 

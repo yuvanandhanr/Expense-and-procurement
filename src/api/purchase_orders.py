@@ -12,7 +12,7 @@ router = APIRouter(prefix="/purchase-orders", tags=["Purchase Orders"])
 
 def enforce_po_access(current_user: User) -> None:
     user_roles = [role.role_name for role in current_user.roles]
-    allowed = ("Admin", "Procurement Officer", "Procurement Manager", "Finance", "CFO")
+    allowed = ("Admin", "Procurement Officer", "Procurement Manager", "Finance", "CFO", "Vendor Portal")
     if not any(role in allowed for role in user_roles):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -45,6 +45,19 @@ async def list_pos(
 ):
     enforce_po_access(current_user)
     service = POService(db)
+    user_roles = [role.role_name for role in current_user.roles]
+    
+    if "Vendor Portal" in user_roles and not any(role in ("Admin", "Procurement Officer", "Procurement Manager", "Finance", "CFO") for role in user_roles):
+        from sqlalchemy import select
+        from src.models.vendor import Vendor
+        stmt = select(Vendor.vendor_id).where(Vendor.email == current_user.email)
+        result = await db.execute(stmt)
+        vendor_id = result.scalar_one_or_none()
+        if vendor_id:
+            # list_by_vendor needs to exist in po_repo
+            return await service.po_repo.list_by_vendor(vendor_id)
+        return []
+
     return await service.po_repo.list_all()
 
 
@@ -59,6 +72,17 @@ async def get_po(
     po = await service.po_repo.get_by_id(id)
     if not po:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Purchase Order not found")
+        
+    user_roles = [role.role_name for role in current_user.roles]
+    if "Vendor Portal" in user_roles and not any(role in ("Admin", "Procurement Officer", "Procurement Manager", "Finance", "CFO") for role in user_roles):
+        from sqlalchemy import select
+        from src.models.vendor import Vendor
+        stmt = select(Vendor.vendor_id).where(Vendor.email == current_user.email)
+        result = await db.execute(stmt)
+        vendor_id = result.scalar_one_or_none()
+        if po.vendor_id != vendor_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only access your own Purchase Orders")
+            
     return po
 
 

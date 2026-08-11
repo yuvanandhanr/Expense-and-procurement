@@ -18,6 +18,7 @@ const Deliveries = lazy(() => import("../pages/Deliveries"));
 const GRNs = lazy(() => import("../pages/GRNs"));
 const Assets = lazy(() => import("../pages/Assets"));
 const Invoices = lazy(() => import("../pages/Invoices"));
+const Expenses = lazy(() => import("../pages/Expenses"));
 const Analytics = lazy(() => import("../pages/Analytics"));
 const Reports = lazy(() => import("../pages/Reports"));
 const AuditLogs = lazy(() => import("../pages/AuditLogs"));
@@ -26,11 +27,14 @@ const Settings = lazy(() => import("../pages/Settings"));
 const GlobalSearch = lazy(() => import("../pages/GlobalSearch"));
 const VendorPortal = lazy(() => import("../pages/VendorPortal"));
 const Users = lazy(() => import("../pages/Users"));
+const ProcurementDashboard = lazy(() => import("../pages/ProcurementDashboard"));
+const MyAssets = lazy(() => import("../pages/MyAssets"));
 
 // Protected Route Guard
-const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: string; requiredPermission?: string }> = ({
+const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: string; allowedRoles?: string[]; requiredPermission?: string }> = ({
   children,
   requiredRole,
+  allowedRoles,
   requiredPermission,
 }) => {
   const { isAuthenticated, isLoading, hasRole, hasPermission } = useAuth();
@@ -62,6 +66,13 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: strin
 
   if (requiredRole && !hasRole(requiredRole)) {
     return <Navigate to="/" replace />;
+  }
+
+  if (allowedRoles && allowedRoles.length > 0) {
+    const hasAnyAllowedRole = allowedRoles.some(role => hasRole(role));
+    if (!hasAnyAllowedRole) {
+      return <Navigate to="/" replace />;
+    }
   }
 
   if (requiredPermission && !hasPermission(requiredPermission)) {
@@ -157,7 +168,7 @@ export const AppRoutes: React.FC = () => {
         <Route
           path="/contracts"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={["Finance", "CFO", "Procurement", "CEO", "Admin"]}>
               <Contracts />
             </ProtectedRoute>
           }
@@ -173,7 +184,7 @@ export const AppRoutes: React.FC = () => {
         <Route
           path="/grns"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={["Manager", "Finance", "CFO", "Procurement", "CEO", "Admin"]}>
               <GRNs />
             </ProtectedRoute>
           }
@@ -187,10 +198,26 @@ export const AppRoutes: React.FC = () => {
           }
         />
         <Route
+          path="/my-assets"
+          element={
+            <ProtectedRoute>
+              <MyAssets />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/invoices"
           element={
             <ProtectedRoute>
               <Invoices />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/expenses"
+          element={
+            <ProtectedRoute>
+              <Expenses />
             </ProtectedRoute>
           }
         />
@@ -247,6 +274,14 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute requiredRole="Vendor">
               <VendorPortal />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/procurement-dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["Finance", "CFO", "Manager", "CEO", "Admin"]}>
+              <ProcurementDashboard />
             </ProtectedRoute>
           }
         />
