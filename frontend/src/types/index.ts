@@ -102,7 +102,13 @@ export interface ApprovalWorkflow {
   current_step_sequence: number;
   status: string;
   created_at: string;
+  requestor_id?: number;
+  requestor_name?: string;
+  title?: string;
+  justification?: string;
+  past_approvers?: string[];
   steps?: ApprovalStep[];
+  can_approve?: boolean;
 }
 
 export interface Vendor {
@@ -137,17 +143,28 @@ export interface RFQ {
   items?: RFQItem[];
 }
 
+export interface QuotationItem {
+  quotation_item_id?: number;
+  quotation_id?: number;
+  rfq_item_id: number;
+  unit_price: number;
+  tax_amount?: number;
+  discount_amount?: number;
+  total_price?: number;
+}
+
 export interface Quotation {
   quotation_id: number;
   rfq_id: number;
   vendor_id: number;
   quotation_number: string;
-  total_price: number;
+  total_amount: number;
   currency: string;
-  delivery_timeline_days: number;
+  lead_time_days?: number;
   status: string;
-  is_selected: boolean;
+  is_selected?: boolean;
   submitted_at: string;
+  items?: QuotationItem[];
 }
 
 export interface POItem {

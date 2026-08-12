@@ -56,11 +56,11 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: strin
   }
 
   // Cross-role redirect guards
-  if (hasRole("Vendor") && requiredRole !== "Vendor") {
+  if ((hasRole("Vendor Portal") || hasRole("Vendor")) && requiredRole !== "Vendor") {
     return <Navigate to="/vendor-portal" replace />;
   }
 
-  if (!hasRole("Vendor") && requiredRole === "Vendor") {
+  if (!(hasRole("Vendor Portal") || hasRole("Vendor")) && requiredRole === "Vendor") {
     return <Navigate to="/" replace />;
   }
 

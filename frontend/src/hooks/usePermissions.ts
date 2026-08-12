@@ -4,7 +4,7 @@ export const usePermissions = () => {
   const { user, hasRole, hasPermission, isAuthenticated } = useAuth();
 
   return {
-    isVendor: hasRole("Vendor"),
+    isVendor: hasRole("Vendor Portal") || hasRole("Vendor"),
     isAdmin: hasRole("Admin"),
     isManager: hasRole("Manager"),
     isFinance: hasRole("Finance"),

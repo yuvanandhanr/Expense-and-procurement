@@ -3,11 +3,13 @@ import { api } from "../services/api";
 import { useAuth } from "../hooks/useAuth";
 import { Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Button } from "../components/ui";
 import toast from "react-hot-toast";
+import { Quotation } from "../types";
 
 export const Quotations: React.FC = () => {
   const { user } = useAuth();
   const [quotes, setQuotes] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedQuoteId, setExpandedQuoteId] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchQuotes = async () => {
@@ -74,22 +76,61 @@ export const Quotations: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {quotes.map((q) => (
-                    <tr key={q.quotation_id} className="hover:bg-accent/20">
-                      <td className="p-4 font-bold text-xs tracking-wider text-primary">#QT-{q.quotation_id}</td>
-                      <td className="p-4">#RFQ-{q.rfq_id}</td>
-                      <td className="p-4 font-bold">${q.total_price?.toLocaleString()}</td>
-                      <td className="p-4">{q.delivery_timeline_days} days</td>
-                      <td className="p-4">
-                        <Badge variant={q.is_selected || q.status === "Selected" ? "success" : "neutral"}>
-                          {q.is_selected || q.status === "Selected" ? "Selected" : "Under Review"}
-                        </Badge>
-                      </td>
-                      <td className="p-4 text-right">
-                        {isFinanceManager && (!q.is_selected && q.status !== "Selected") && (
-                          <Button size="sm" onClick={() => handleApprove(q)}>Approve & Gen PO</Button>
-                        )}
-                      </td>
-                    </tr>
+                    <React.Fragment key={q.quotation_id}>
+                      <tr className="hover:bg-accent/20">
+                        <td className="p-4 font-bold text-xs tracking-wider text-primary">
+                          <button
+                            type="button"
+                            className="mr-2 text-muted-foreground hover:text-foreground font-mono"
+                            onClick={() => setExpandedQuoteId(expandedQuoteId === q.quotation_id ? null : q.quotation_id)}
+                          >
+                            {expandedQuoteId === q.quotation_id ? "▼" : "▶"}
+                          </button>
+                          #QT-{q.quotation_id}
+                        </td>
+                        <td className="p-4">#RFQ-{q.rfq_id}</td>
+                        <td className="p-4 font-bold">${q.total_amount?.toLocaleString()}</td>
+                        <td className="p-4">{q.lead_time_days} days</td>
+                        <td className="p-4">
+                          <Badge variant={q.is_selected || q.status === "Selected" ? "success" : "neutral"}>
+                            {q.is_selected || q.status === "Selected" ? "Selected" : "Under Review"}
+                          </Badge>
+                        </td>
+                        <td className="p-4 text-right">
+                          {isFinanceManager && (!q.is_selected && q.status !== "Selected") && (
+                            <Button size="sm" onClick={() => handleApprove(q)}>Approve & Gen PO</Button>
+                          )}
+                        </td>
+                      </tr>
+                      {expandedQuoteId === q.quotation_id && q.items && q.items.length > 0 && (
+                        <tr className="bg-accent/5">
+                          <td colSpan={6} className="p-4">
+                            <div className="bg-background rounded-lg border border-border overflow-hidden">
+                              <table className="w-full text-left text-xs border-collapse">
+                                <thead>
+                                  <tr className="bg-accent/30 text-muted-foreground uppercase border-b border-border">
+                                    <th className="p-2 pl-4">Item Ref</th>
+                                    <th className="p-2">Unit Price</th>
+                                    <th className="p-2">Tax</th>
+                                    <th className="p-2 font-bold text-primary">Total Price</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                  {q.items.map((item) => (
+                                    <tr key={item.quotation_item_id} className="hover:bg-accent/10">
+                                      <td className="p-2 pl-4 font-mono text-muted-foreground">#Item-{item.rfq_item_id}</td>
+                                      <td className="p-2">${Number(item.unit_price).toFixed(2)}</td>
+                                      <td className="p-2">${Number(item.tax_amount || 0).toFixed(2)}</td>
+                                      <td className="p-2 font-bold text-primary">${Number(item.total_price || 0).toFixed(2)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>

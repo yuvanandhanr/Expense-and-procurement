@@ -115,6 +115,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const hasRole = (roleName: string): boolean => {
     if (!user) return false;
+    // Treat "Finance" and "Finance Manager" interchangeably for frontend access checks
+    if (roleName === "Finance" && user.roles.some((role) => role.role_name === "Finance Manager" && role.status)) return true;
+    if (roleName === "Finance Manager" && user.roles.some((role) => role.role_name === "Finance" && role.status)) return true;
     return user.roles.some((role) => role.role_name === roleName && role.status);
   };
 

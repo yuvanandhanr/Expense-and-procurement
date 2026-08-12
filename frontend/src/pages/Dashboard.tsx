@@ -10,7 +10,6 @@ import {
   TrendingDown,
   Percent,
   Clock,
-  Clock,
   ClipboardList,
   CreditCard,
   Building,
@@ -311,7 +310,7 @@ export const Dashboard: React.FC = () => {
             <CardTitle>Enterprise Controls</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {!hasRole("Vendor") && (
+            {!hasRole("Vendor Portal") && !hasRole("Vendor") && (
               <a
                 href="/prs"
                 className="flex items-center justify-between p-3 rounded-lg border border-border bg-accent/20 hover:bg-accent hover:scale-[1.01] transition-all font-semibold text-xs uppercase tracking-wider"

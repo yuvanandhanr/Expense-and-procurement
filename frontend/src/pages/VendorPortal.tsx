@@ -15,8 +15,8 @@ export const VendorPortal: React.FC = () => {
   
   // Submit Quotation states
   const [selectedRfq, setSelectedRfq] = useState<any | null>(null);
-  const [price, setPrice] = useState("");
   const [timeline, setTimeline] = useState("");
+  const [itemPrices, setItemPrices] = useState<Record<number, { unit_price: string, tax_amount: string }>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchData = async () => {
@@ -44,23 +44,47 @@ export const VendorPortal: React.FC = () => {
 
   const handleOpenBid = (rfq: any) => {
     setSelectedRfq(rfq);
-    setPrice("");
     setTimeline("");
+    const initialPrices: Record<number, { unit_price: string, tax_amount: string }> = {};
+    if (rfq.items) {
+      rfq.items.forEach((item: any) => {
+        initialPrices[item.rfq_item_id] = { unit_price: "", tax_amount: "0" };
+      });
+    }
+    setItemPrices(initialPrices);
   };
 
   const handleSubmitBid = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!price || !timeline) {
-      toast.error("Please enter a price proposal and delivery timeline.");
+    if (!timeline) {
+      toast.error("Please enter a delivery timeline.");
       return;
     }
+    
+    const itemsPayload: any[] = [];
+    if (selectedRfq.items) {
+      for (const item of selectedRfq.items) {
+        const pricing = itemPrices[item.rfq_item_id];
+        if (!pricing || !pricing.unit_price) {
+          toast.error(`Please enter a unit price for ${item.item_name}`);
+          return;
+        }
+        itemsPayload.push({
+          rfq_item_id: item.rfq_item_id,
+          unit_price: parseFloat(pricing.unit_price),
+          tax_amount: parseFloat(pricing.tax_amount || "0"),
+          discount_amount: 0
+        });
+      }
+    }
+
     setIsSubmitting(true);
     try {
       await api.post("/quotations", {
         rfq_id: selectedRfq.rfq_id,
-        total_price: parseFloat(price),
-        delivery_timeline_days: parseInt(timeline),
-        is_selected: false,
+        vendor_id: 0, 
+        lead_time_days: parseInt(timeline),
+        items: itemsPayload
       });
       toast.success("Quotation submitted successfully!");
       setSelectedRfq(null);
@@ -170,8 +194,8 @@ export const VendorPortal: React.FC = () => {
                       <tr key={q.quotation_id} className="hover:bg-accent/10">
                         <td className="p-4 font-mono font-bold text-xs">#QT-{q.quotation_id}</td>
                         <td className="p-4 font-mono text-xs">#RFQ-{q.rfq_id}</td>
-                        <td className="p-4 font-bold text-primary">${q.total_price?.toLocaleString()}</td>
-                        <td className="p-4 text-xs">{q.delivery_timeline_days} days</td>
+                        <td className="p-4 font-bold text-primary">${q.total_amount?.toLocaleString()}</td>
+                        <td className="p-4 text-xs">{q.lead_time_days} days</td>
                         <td className="p-4">
                           <Badge variant={q.is_selected ? "success" : "neutral"}>
                             {q.is_selected ? "Accepted" : "Under Evaluation"}
@@ -241,14 +265,76 @@ export const VendorPortal: React.FC = () => {
               <span className="font-bold text-sm text-foreground/90">{selectedRfq.title}</span>
             </div>
 
-            <Input
-              id="price"
-              type="number"
-              label="Price Proposal ($)"
-              placeholder="e.g. 5200"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-            />
+            {selectedRfq.items && selectedRfq.items.length > 0 && (
+              <div className="bg-background rounded-lg border border-border mt-4">
+                <table className="w-full text-left text-sm border-collapse">
+                  <thead>
+                    <tr className="border-b border-border bg-accent/40 text-[10px] font-bold text-muted-foreground uppercase">
+                      <th className="p-3">Item Name</th>
+                      <th className="p-3">Qty</th>
+                      <th className="p-3">Unit Price ($)</th>
+                      <th className="p-3">Tax ($)</th>
+                      <th className="p-3">Total ($)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {selectedRfq.items.map((item: any) => {
+                      const pricing = itemPrices[item.rfq_item_id] || { unit_price: "0", tax_amount: "0" };
+                      const unit = parseFloat(pricing.unit_price || "0");
+                      const tax = parseFloat(pricing.tax_amount || "0");
+                      const lineTotal = (unit * item.quantity) + tax;
+                      
+                      return (
+                        <tr key={item.rfq_item_id}>
+                          <td className="p-3">
+                            <div className="font-semibold text-xs text-foreground/90">{item.item_name}</div>
+                            {item.specification && <div className="text-[10px] text-muted-foreground">{item.specification}</div>}
+                          </td>
+                          <td className="p-3 font-mono text-xs">{item.quantity}</td>
+                          <td className="p-3">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              className="w-24 px-2 py-1 text-xs border border-border rounded bg-background"
+                              value={pricing.unit_price}
+                              onChange={(e) => setItemPrices({
+                                ...itemPrices,
+                                [item.rfq_item_id]: { ...pricing, unit_price: e.target.value }
+                              })}
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              className="w-20 px-2 py-1 text-xs border border-border rounded bg-background"
+                              value={pricing.tax_amount}
+                              onChange={(e) => setItemPrices({
+                                ...itemPrices,
+                                [item.rfq_item_id]: { ...pricing, tax_amount: e.target.value }
+                              })}
+                            />
+                          </td>
+                          <td className="p-3 font-bold text-primary text-xs">
+                            ${lineTotal.toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <div className="p-3 bg-muted/20 flex justify-end font-bold text-sm">
+                  Grand Total: $<span className="text-primary ml-1">
+                    {selectedRfq.items.reduce((acc: number, item: any) => {
+                      const pricing = itemPrices[item.rfq_item_id] || { unit_price: "0", tax_amount: "0" };
+                      return acc + (parseFloat(pricing.unit_price || "0") * item.quantity) + parseFloat(pricing.tax_amount || "0");
+                    }, 0).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
 
             <Input
               id="timeline"

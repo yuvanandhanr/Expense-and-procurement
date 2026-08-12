@@ -82,14 +82,19 @@ export const PurchaseRequisitions: React.FC = () => {
     }
   };
 
-  const handleAction = async (action: "approve" | "reject") => {
+  const handleAction = async (action: "approve" | "reject" | "cancel") => {
     if (!selectedPr) return;
     setIsSubmitting(true);
     try {
-      await api.post(`/pr/${selectedPr.pr_id}/${action}`, {
-        comments: comment,
-      });
-      toast.success(`Purchase Requisition successfully ${action}d!`);
+      if (action === "cancel") {
+        await api.post(`/pr/${selectedPr.pr_id}/cancel`);
+        toast.success(`Purchase Requisition successfully cancelled!`);
+      } else {
+        await api.post(`/pr/${selectedPr.pr_id}/${action}`, {
+          comments: comment,
+        });
+        toast.success(`Purchase Requisition successfully ${action}d!`);
+      }
       setSelectedPr(null);
       setComment("");
       fetchPRs();
@@ -295,12 +300,20 @@ export const PurchaseRequisitions: React.FC = () => {
               <Button variant="outline" onClick={() => setSelectedPr(null)}>
                 Close
               </Button>
-              <Button variant="danger" disabled={isSubmitting} onClick={() => handleAction("reject")}>
-                Reject
-              </Button>
-              <Button disabled={isSubmitting} onClick={() => handleAction("approve")}>
-                Approve
-              </Button>
+              {selectedPr.requestor_id === user?.user_id || selectedPr.requested_by === user?.user_id ? (
+                <Button variant="danger" disabled={isSubmitting} onClick={() => handleAction("cancel")}>
+                  Cancel Request
+                </Button>
+              ) : (
+                <>
+                  <Button variant="danger" disabled={isSubmitting} onClick={() => handleAction("reject")}>
+                    Reject
+                  </Button>
+                  <Button disabled={isSubmitting} onClick={() => handleAction("approve")}>
+                    Approve
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </Dialog>
