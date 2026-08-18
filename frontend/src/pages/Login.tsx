@@ -123,34 +123,30 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-slate-950 overflow-hidden font-sans p-4">
-      {/* Background graphics */}
-      <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] rounded-full bg-primary/20 blur-[120px]" />
-      <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] rounded-full bg-emerald-500/10 blur-[120px]" />
-
-      <Card className="w-full max-w-md relative z-10 glass-panel border border-slate-800 bg-slate-950/80 shadow-2xl p-4">
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden p-4">
+      <Card className="w-full max-w-md relative z-10 glass-panel shadow-2xl p-4">
         <CardHeader className="text-center pb-2 border-b-0">
-          <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-bold text-2xl mx-auto shadow-lg shadow-primary/20">
+          <div className="w-[48px] h-[48px] rounded-[16px] gradient-accent flex items-center justify-center text-white font-bold text-2xl mx-auto shadow-lg shadow-violet/20">
             E
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight text-white mt-4">
+          <CardTitle className="text-2xl font-bold font-display tracking-tight mt-4">
             Portal Access
           </CardTitle>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mt-1">
+          <p className="text-[10.5px] font-semibold text-muted-foreground uppercase tracking-[1.6px] mt-1">
             Enterprise Procurement Suite
           </p>
         </CardHeader>
         
         <CardContent className="space-y-6 pt-4">
           {/* Tab Selector */}
-          <div className="grid grid-cols-2 p-1 bg-slate-900 border border-slate-800 rounded-lg">
+          <div className="grid grid-cols-2 p-1 bg-card-2 border border-border rounded-lg">
             <button
               type="button"
               onClick={() => { setActiveTab("employee"); setError(""); }}
               className={`py-2 text-xs font-bold rounded-md transition-all ${
                 activeTab === "employee"
-                  ? "bg-primary text-primary-foreground shadow"
-                  : "text-slate-400 hover:text-white"
+                  ? "gradient-accent text-white shadow"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               Employee Login
@@ -160,8 +156,8 @@ export const Login: React.FC = () => {
               onClick={() => { setActiveTab("vendor"); setError(""); }}
               className={`py-2 text-xs font-bold rounded-md transition-all ${
                 activeTab === "vendor"
-                  ? "bg-primary text-primary-foreground shadow"
-                  : "text-slate-400 hover:text-white"
+                  ? "gradient-accent text-white shadow"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               Vendor Login
@@ -171,8 +167,8 @@ export const Login: React.FC = () => {
           {activeTab === "employee" ? (
             <div className="space-y-6">
               <div className="text-center space-y-2">
-                <h3 className="text-sm font-semibold text-slate-200">Sign in using Google Workspace</h3>
-                <p className="text-xs text-slate-400">Use your corporate @dataeko.ai credentials to authenticate securely.</p>
+                <h3 className="text-sm font-semibold text-foreground">Sign in using Google Workspace</h3>
+                <p className="text-xs text-muted-foreground">Use your corporate @dataeko.ai credentials to authenticate securely.</p>
               </div>
 
               {error && (
@@ -185,14 +181,14 @@ export const Login: React.FC = () => {
                 <div id="google-signin-btn" className="w-full flex justify-center min-h-[40px] pb-2"></div>
                 
                 <div className="text-center">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Test Environments</span>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Test Environments</span>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-2">
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full text-xs font-semibold py-2 bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+                    className="w-full text-xs font-semibold py-2"
                     onClick={() => handleCredentialResponse({ credential: "mock_google_y.raja@dataeko.ai" })}
                   >
                     Admin
@@ -200,7 +196,7 @@ export const Login: React.FC = () => {
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full text-xs font-semibold py-2 bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+                    className="w-full text-xs font-semibold py-2"
                     onClick={() => handleCredentialResponse({ credential: "mock_google_ceo@dataeko.ai" })}
                   >
                     CEO
@@ -208,7 +204,7 @@ export const Login: React.FC = () => {
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full text-xs font-semibold py-2 bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+                    className="w-full text-xs font-semibold py-2"
                     onClick={() => handleCredentialResponse({ credential: "mock_google_cfo@dataeko.ai" })}
                   >
                     CFO
@@ -216,7 +212,7 @@ export const Login: React.FC = () => {
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full text-xs font-semibold py-2 bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+                    className="w-full text-xs font-semibold py-2"
                     onClick={() => handleCredentialResponse({ credential: "mock_google_finance@dataeko.ai" })}
                   >
                     Finance Mgr
@@ -224,7 +220,7 @@ export const Login: React.FC = () => {
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full text-xs font-semibold py-2 bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white col-span-2"
+                    className="w-full text-xs font-semibold py-2 col-span-2"
                     onClick={() => handleCredentialResponse({ credential: "mock_google_manager@dataeko.ai" })}
                   >
                     Manager
@@ -232,7 +228,7 @@ export const Login: React.FC = () => {
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full text-xs font-semibold py-2 bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white col-span-2"
+                    className="w-full text-xs font-semibold py-2 col-span-2"
                     onClick={() => handleCredentialResponse({ credential: "mock_google_employee@dataeko.ai" })}
                   >
                     Employee
@@ -243,8 +239,8 @@ export const Login: React.FC = () => {
           ) : (
             <form onSubmit={otpSent ? handleVerifyOtp : handleRequestOtp} className="space-y-4">
               <div className="text-center space-y-1">
-                <h3 className="text-sm font-semibold text-slate-200">Supplier Partner Access</h3>
-                <p className="text-xs text-slate-400">
+                <h3 className="text-sm font-semibold text-foreground">Supplier Partner Access</h3>
+                <p className="text-xs text-muted-foreground">
                   {mfaSetupData
                     ? "Set up your Authenticator App to secure your account."
                     : isMfaRequired 
@@ -275,7 +271,7 @@ export const Login: React.FC = () => {
                 value={vendorEmail}
                 onChange={(e) => setVendorEmail(e.target.value)}
                 disabled={otpSent}
-                className="bg-slate-900 border-slate-800 text-white placeholder:text-slate-500 focus:ring-primary"
+                className="bg-card-2 border-border text-foreground placeholder:text-muted-foreground"
               />
 
               {otpSent && (
@@ -287,7 +283,7 @@ export const Login: React.FC = () => {
                     placeholder="Enter 6-digit code"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
-                    className="bg-slate-900 border-slate-800 text-white placeholder:text-slate-500 focus:ring-primary text-center tracking-[0.5em] font-bold text-lg"
+                    className="bg-card-2 border-border text-foreground placeholder:text-muted-foreground text-center tracking-[0.5em] font-bold text-lg font-mono"
                   />
                 </div>
               )}
@@ -324,7 +320,7 @@ export const Login: React.FC = () => {
             </form>
           )}
 
-          <div className="text-center text-xs text-slate-500 font-semibold uppercase tracking-wider pt-2">
+          <div className="text-center text-[10px] text-muted-foreground font-semibold uppercase tracking-[1.6px] pt-2">
             Restricted System access for authorized personnel only.
           </div>
         </CardContent>

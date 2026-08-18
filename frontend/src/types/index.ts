@@ -107,6 +107,7 @@ export interface ApprovalWorkflow {
   title?: string;
   justification?: string;
   past_approvers?: string[];
+  pending_approvers?: string[];
   steps?: ApprovalStep[];
   can_approve?: boolean;
 }

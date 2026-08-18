@@ -10,6 +10,19 @@ class QuotationRepository(BaseRepository[VendorQuotation]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(VendorQuotation, session)
 
+    async def list_all(self, skip: int = 0, limit: int = 100) -> List[VendorQuotation]:
+        query = (
+            select(self.model)
+            .options(
+                selectinload(self.model.items),
+                selectinload(self.model.vendor)
+            )
+            .offset(skip)
+            .limit(limit)
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
     async def get_by_id(self, entity_id: int) -> Optional[VendorQuotation]:
         query = (
             select(self.model)

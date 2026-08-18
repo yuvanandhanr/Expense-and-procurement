@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { Vendor } from "../types";
-import { Card, CardHeader, CardTitle, CardContent, Badge, Skeleton } from "../components/ui";
+import {Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, EmptyState} from "../components/ui";
 
 export const Vendors: React.FC = () => {
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -36,9 +36,7 @@ export const Vendors: React.FC = () => {
               <Skeleton className="h-8 w-full" />
             </div>
           ) : vendors.length === 0 ? (
-            <div className="p-12 text-center text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-              No vendors registered.
-            </div>
+            <EmptyState title="No vendors registered." description="Data will appear here once available." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm border-collapse">

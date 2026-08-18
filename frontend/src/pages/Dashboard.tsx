@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../services/api";
-import { Card, CardHeader, CardTitle, CardContent, Skeleton, Badge } from "../components/ui";
+import { Card, CardHeader, CardTitle, CardContent, Skeleton, Badge, HeroTimestamp, EmptyState } from "../components/ui";
 import { formatDate } from "../utils/helpers";
 import {
   DollarSign,
@@ -13,6 +13,7 @@ import {
   ClipboardList,
   CreditCard,
   Building,
+  Activity,
 } from "lucide-react";
 import {
   Chart as ChartJS,
@@ -95,68 +96,73 @@ export const Dashboard: React.FC = () => {
             Tailored dashboard view for role: <Badge variant="info" className="ml-1">{role}</Badge>
           </p>
         </div>
-        <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-          As of {data?.timestamp ? new Date(data.timestamp).toLocaleString() : new Date().toLocaleString()}
-        </div>
+        <HeroTimestamp staticDate={data?.timestamp} />
       </div>
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {widgets.spend_metrics && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Year Spend</span>
-              <DollarSign className="w-4 h-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${widgets.spend_metrics.total_spend?.toLocaleString() || "0"}</div>
-              <p className="text-[10px] text-muted-foreground font-semibold mt-1">
-                Across {widgets.spend_metrics.po_count || 0} Purchase Orders
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        {widgets.pending_approvals && (
+        
+        {widgets.pending_approvals !== undefined && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Pending Approvals</span>
               <FileCheck className="w-4 h-4 text-amber-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{widgets.pending_approvals.count || 0}</div>
+              <div className="text-2xl font-bold">{widgets.pending_approvals || 0}</div>
               <p className="text-[10px] text-muted-foreground font-semibold mt-1">
-                Awaiting your signature
+                Awaiting sign-off
               </p>
             </CardContent>
           </Card>
         )}
 
-        {widgets.budget_utilization && (
+        {widgets.department_spend && widgets.department_spend.length > 0 && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Budget Limit Utilization</span>
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Dept Spend</span>
+              <DollarSign className="w-4 h-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                ${widgets.department_spend.reduce((acc: number, cur: any) => acc + (cur.spend || 0), 0).toLocaleString()}
+              </div>
+              <p className="text-[10px] text-muted-foreground font-semibold mt-1">
+                Across {widgets.department_spend.length} Departments
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {widgets.budget_utilization && widgets.budget_utilization.length > 0 && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Avg Budget Util</span>
               <Percent className="w-4 h-4 text-emerald-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{(widgets.budget_utilization.utilization_rate || 0).toFixed(1)}%</div>
+              <div className="text-2xl font-bold">
+                {(widgets.budget_utilization.reduce((acc: number, cur: any) => acc + (cur.percentage || 0), 0) / widgets.budget_utilization.length).toFixed(1)}%
+              </div>
               <p className="text-[10px] text-muted-foreground font-semibold mt-1">
-                Spent: ${widgets.budget_utilization.spent_amount?.toLocaleString() || 0}
+                Across active budgets
               </p>
             </CardContent>
           </Card>
         )}
 
-        {widgets.vendor_performance && (
+        {widgets.vendor_performance && widgets.vendor_performance.length > 0 && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Vendor Compliance</span>
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Avg Vendor Score</span>
               <Clock className="w-4 h-4 text-blue-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{widgets.vendor_performance.avg_score || 92}/100</div>
+              <div className="text-2xl font-bold">
+                {(widgets.vendor_performance.reduce((acc: number, cur: any) => acc + (cur.score || 0), 0) / widgets.vendor_performance.length).toFixed(1)}/100
+              </div>
               <p className="text-[10px] text-muted-foreground font-semibold mt-1">
-                On-time delivery performance rating
+                Performance rating
               </p>
             </CardContent>
           </Card>
@@ -169,9 +175,11 @@ export const Dashboard: React.FC = () => {
               <ClipboardList className="w-4 h-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{widgets.my_purchase_requests.count || 0}</div>
+              <div className="text-2xl font-bold">
+                {Object.values(widgets.my_purchase_requests).reduce((acc: any, cur: any) => acc + cur, 0) as number}
+              </div>
               <p className="text-[10px] text-muted-foreground font-semibold mt-1">
-                Active requests this month
+                Active requests
               </p>
             </CardContent>
           </Card>
@@ -180,7 +188,7 @@ export const Dashboard: React.FC = () => {
         {widgets.employee_reimbursements && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Employee Reimbursements</span>
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Emp Reimbursements</span>
               <CreditCard className="w-4 h-4 text-purple-500" />
             </CardHeader>
             <CardContent>
@@ -216,7 +224,24 @@ export const Dashboard: React.FC = () => {
             <CardContent>
               <div className="text-2xl font-bold">${widgets.my_reimbursements.amount?.toLocaleString() || "0"}</div>
               <p className="text-[10px] text-muted-foreground font-semibold mt-1">
-                {widgets.my_reimbursements.count || 0} total approved claims
+                {widgets.my_reimbursements.count || 0} approved claims
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {widgets.purchase_orders && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total PO Spend</span>
+              <DollarSign className="w-4 h-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                ${Object.values(widgets.purchase_orders.amounts).reduce((a: any, b: any) => a + b, 0).toLocaleString()}
+              </div>
+              <p className="text-[10px] text-muted-foreground font-semibold mt-1">
+                Across all orders
               </p>
             </CardContent>
           </Card>
@@ -296,9 +321,13 @@ export const Dashboard: React.FC = () => {
                   </ul>
                 </div>
               ) : (
-                <div className="p-12 text-center text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-                  No recent activity recorded.
-                </div>
+                <EmptyState
+                  icon={<Activity className="w-8 h-8" />}
+                  title="No recent activity recorded."
+                  description="Your workflow events will appear here once you participate in the cycle."
+                  actionLabel="Start a new request"
+                  actionHref="/prs"
+                />
               )}
             </CardContent>
           </Card>
@@ -313,27 +342,51 @@ export const Dashboard: React.FC = () => {
             {!hasRole("Vendor Portal") && !hasRole("Vendor") && (
               <a
                 href="/prs"
-                className="flex items-center justify-between p-3 rounded-lg border border-border bg-accent/20 hover:bg-accent hover:scale-[1.01] transition-all font-semibold text-xs uppercase tracking-wider"
+                className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:-translate-y-[1px] hover:border-violet/50 hover:shadow-sm transition-all group"
               >
-                <span>Submit Purchase Requisition</span>
-                <span>&rarr;</span>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 rounded-md bg-violet/10 text-violet flex items-center justify-center">
+                    <ClipboardList className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="block font-bold text-sm text-foreground group-hover:text-violet transition-colors">Submit Purchase Requisition</span>
+                    <span className="block text-[10px] text-muted-foreground font-medium mt-0.5">Start a new department request</span>
+                  </div>
+                </div>
+                <span className="text-muted-foreground group-hover:text-violet transition-colors">&rarr;</span>
               </a>
             )}
             {(hasRole("Finance") || hasRole("CFO") || hasRole("CEO") || hasRole("Admin")) && (
               <a
                 href="/reports"
-                className="flex items-center justify-between p-3 rounded-lg border border-border bg-accent/20 hover:bg-accent hover:scale-[1.01] transition-all font-semibold text-xs uppercase tracking-wider"
+                className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:-translate-y-[1px] hover:border-cyan/50 hover:shadow-sm transition-all group"
               >
-                <span>Export Spend Reports</span>
-                <span>&rarr;</span>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 rounded-md bg-cyan/10 text-cyan flex items-center justify-center">
+                    <FileCheck className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="block font-bold text-sm text-foreground group-hover:text-cyan transition-colors">Export Spend Reports</span>
+                    <span className="block text-[10px] text-muted-foreground font-medium mt-0.5">Download financial data</span>
+                  </div>
+                </div>
+                <span className="text-muted-foreground group-hover:text-cyan transition-colors">&rarr;</span>
               </a>
             )}
             <a
               href="/search"
-              className="flex items-center justify-between p-3 rounded-lg border border-border bg-accent/20 hover:bg-accent hover:scale-[1.01] transition-all font-semibold text-xs uppercase tracking-wider"
+              className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:-translate-y-[1px] hover:border-lime/50 hover:shadow-sm transition-all group"
             >
-              <span>Global Audit Search</span>
-              <span>&rarr;</span>
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 rounded-md bg-lime/10 text-lime flex items-center justify-center">
+                  <PackageCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="block font-bold text-sm text-foreground group-hover:text-lime transition-colors">Global Audit Search</span>
+                  <span className="block text-[10px] text-muted-foreground font-medium mt-0.5">Find any record instantly</span>
+                </div>
+              </div>
+              <span className="text-muted-foreground group-hover:text-lime transition-colors">&rarr;</span>
             </a>
           </CardContent>
         </Card>

@@ -128,12 +128,24 @@ class RFQService:
                 detail=f"Vendor '{vendor.vendor_name}' is blacklisted/inactive and cannot submit quotes"
             )
 
+        from sqlalchemy import select
+        from src.models.rfq import RFQItem
+        rfq_items_query = select(RFQItem).where(RFQItem.rfq_id == rfq.rfq_id)
+        rfq_items_result = await self.db.execute(rfq_items_query)
+        rfq_items_map = {item.rfq_item_id: item for item in rfq_items_result.scalars().all()}
+
         # Calculate totals
         total_amount = Decimal("0.00")
         items_to_create = []
 
         for item_data in data.items:
-            total_item_price = (item_data.unit_price * Decimal(1.00)) + item_data.tax_amount - item_data.discount_amount
+            rfq_item = rfq_items_map.get(item_data.rfq_item_id)
+            if not rfq_item:
+                raise HTTPException(status_code=400, detail=f"RFQ item {item_data.rfq_item_id} not found in RFQ")
+                
+            qty = Decimal(rfq_item.quantity)
+            total_item_price = ((item_data.unit_price - item_data.discount_amount) * qty) + item_data.tax_amount
+            
             # Ensure price is valid
             total_amount += total_item_price
             

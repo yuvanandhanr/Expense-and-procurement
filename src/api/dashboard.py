@@ -17,12 +17,28 @@ async def get_dashboard(
     Returns dashboard metrics tailored to the current user's role.
     """
     # Default to "Employee" if roles is empty or status is disabled
-    role_name = "Employee"
-    for r in current_user.roles:
-        if r.status:
-            role_name = r.role_name
-            break
+    role_priority = {
+        "CEO": 100,
+        "Admin": 90,
+        "CFO": 80,
+        "Finance Manager": 70,
+        "Finance": 60,
+        "Procurement": 50,
+        "Manager": 40,
+        "Vendor": 30,
+        "Vendor Portal": 20,
+        "Employee": 10
+    }
+
+    active_roles = [r.role_name for r in current_user.roles if r.status]
+    if active_roles:
+        active_roles.sort(key=lambda x: role_priority.get(x, 0), reverse=True)
+        role_name = active_roles[0]
+    else:
+        role_name = "Employee"
 
     dashboard_service = DashboardService(db)
     data = await dashboard_service.get_dashboard_data(role_name, current_user.user_id)
+    # inject debug
+    data["debug_active_roles"] = active_roles
     return data

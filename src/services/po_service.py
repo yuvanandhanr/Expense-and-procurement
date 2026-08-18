@@ -179,3 +179,93 @@ class POService:
         po.status = "Issued"
         await self.po_repo.update(po)
         return po
+
+    async def mark_item_delivered_by_vendor(self, po_id: int, po_item_id: int, vendor_product_id: str) -> PurchaseOrderItem:
+        po = await self.po_repo.get_by_id(po_id)
+        if not po:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PO not found")
+        
+        target_item = None
+        for item in po.items:
+            if item.po_item_id == po_item_id:
+                target_item = item
+                break
+        
+        if not target_item:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PO Item not found")
+
+        target_item.vendor_delivery_id = vendor_product_id
+        target_item.delivery_verification_status = "Vendor Delivered"
+        await self.po_item_repo.update(target_item)
+        return target_item
+
+    async def verify_item_delivery(self, po_id: int, po_item_id: int, receiver_product_id: str, user_id: int) -> PurchaseOrderItem:
+        po = await self.po_repo.get_by_id(po_id)
+        if not po:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PO not found")
+        
+        target_item = None
+        for item in po.items:
+            if item.po_item_id == po_item_id:
+                target_item = item
+                break
+        
+        if not target_item:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PO Item not found")
+
+        if target_item.delivery_verification_status != "Vendor Delivered":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Vendor has not marked this item as delivered yet.")
+
+        target_item.receiver_delivery_id = receiver_product_id
+        
+        # Load vendor performance to adjust score
+        from sqlalchemy import select
+        from src.models.vendor import VendorPerformance
+        query = select(VendorPerformance).where(VendorPerformance.vendor_id == po.vendor_id)
+        result = await self.db.execute(query)
+        vendor_perf = result.scalar_one_or_none()
+
+        if target_item.vendor_delivery_id == receiver_product_id:
+            # Verification Success!
+            target_item.delivery_verification_status = "Matched"
+            
+            # Increase Vendor score
+            if vendor_perf:
+                vendor_perf.quality_score = min(Decimal("100.00"), vendor_perf.quality_score + Decimal("5.00"))
+                self.db.add(vendor_perf)
+
+            # Create Asset for the receiver
+            from src.models.assets import Asset
+            pr_creator = user_id
+            if po.pr_id:
+                from sqlalchemy import select
+                from src.models.purchase_requisition import PurchaseRequisition
+                pr_query = select(PurchaseRequisition.requestor_id).where(PurchaseRequisition.pr_id == po.pr_id)
+                pr_result = await self.db.execute(pr_query)
+                fetched_requestor = pr_result.scalar_one_or_none()
+                if fetched_requestor:
+                    pr_creator = fetched_requestor
+
+            new_asset = Asset(
+                asset_number=f"AST-{uuid.uuid4().hex[:8].upper()}",
+                asset_tag=receiver_product_id,
+                po_id=po.po_id,
+                vendor_id=po.vendor_id,
+                model=target_item.item_name,
+                assigned_employee_id=pr_creator,
+                status="Assigned"
+            )
+            self.db.add(new_asset)
+
+        else:
+            # Verification Failed!
+            target_item.delivery_verification_status = "Returned / Cancelled"
+            
+            # Decrease Vendor score
+            if vendor_perf:
+                vendor_perf.quality_score = max(Decimal("0.00"), vendor_perf.quality_score - Decimal("5.00"))
+                self.db.add(vendor_perf)
+
+        await self.po_item_repo.update(target_item)
+        await self.db.commit()
+        return target_item

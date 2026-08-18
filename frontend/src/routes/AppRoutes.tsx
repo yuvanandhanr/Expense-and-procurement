@@ -26,6 +26,7 @@ const SystemHealth = lazy(() => import("../pages/SystemHealth"));
 const Settings = lazy(() => import("../pages/Settings"));
 const GlobalSearch = lazy(() => import("../pages/GlobalSearch"));
 const VendorPortal = lazy(() => import("../pages/VendorPortal"));
+const DeliveredItems = lazy(() => import("../pages/DeliveredItems"));
 const Users = lazy(() => import("../pages/Users"));
 const ProcurementDashboard = lazy(() => import("../pages/ProcurementDashboard"));
 const MyAssets = lazy(() => import("../pages/MyAssets"));
@@ -152,7 +153,7 @@ export const AppRoutes: React.FC = () => {
         <Route
           path="/quotations"
           element={
-            <ProtectedRoute requiredPermission="manage_rfq">
+            <ProtectedRoute allowedRoles={["Admin", "Procurement Officer", "Procurement Manager", "Finance Manager", "Finance", "CFO", "Manager"]}>
               <Quotations />
             </ProtectedRoute>
           }
@@ -176,7 +177,7 @@ export const AppRoutes: React.FC = () => {
         <Route
           path="/deliveries"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={["Finance", "CFO", "CEO", "Admin"]}>
               <Deliveries />
             </ProtectedRoute>
           }
@@ -274,6 +275,14 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute requiredRole="Vendor">
               <VendorPortal />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/delivered-items"
+          element={
+            <ProtectedRoute requiredRole="Vendor">
+              <DeliveredItems />
             </ProtectedRoute>
           }
         />

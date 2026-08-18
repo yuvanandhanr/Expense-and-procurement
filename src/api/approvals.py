@@ -3,9 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.dependency import get_db_session
 from src.auth.dependencies import get_current_user
-from src.models.auth import User
-from src.models.approval import ApprovalStep
+from src.models.auth import User, Role
+from src.models.approval import ApprovalStep, ApprovalWorkflow
+from src.models.purchase_requisition import PurchaseRequisition
 from src.schemas.purchase_requisition import PRSchema
+from sqlalchemy import select
 from src.schemas.approval import (
     PRApproveRequest,
     PRRejectRequest,
@@ -20,7 +22,11 @@ from src.services.approval_service import ApprovalService
 router = APIRouter(prefix="/pr", tags=["Approvals"])
 
 
-def verify_approver_role(step: ApprovalStep, current_user: User) -> None:
+def verify_approver_role_sync(step: ApprovalStep, current_user: User) -> None:
+    # Deprecated sync version, unused but keeping signature for history. Use async version.
+    pass
+
+async def verify_approver_role(step: ApprovalStep, current_user: User, db: AsyncSession) -> None:
     """
     Enforces that the user has the required role (or Admin status) to approve/action the step.
     If a specific approver_id is assigned, strictly enforce it.
@@ -38,11 +44,37 @@ def verify_approver_role(step: ApprovalStep, current_user: User) -> None:
         return
 
     user_role_ids = [role.role_id for role in current_user.roles]
-    if step.approver_role_id not in user_role_ids:
+
+    from sqlalchemy import select
+    from src.models.auth import Role
+    
+    # Cross-wire "Finance" and "Finance Manager" role IDs
+    is_admin = any(r.role_name == "Admin" for r in current_user.roles)
+    
+    has_finance = any(r.role_name in ["Finance", "Finance Manager"] for r in current_user.roles)
+    if has_finance:
+        res = await db.execute(select(Role.role_id).where(Role.role_name.in_(["Finance", "Finance Manager"])))
+        extra_ids = res.scalars().all()
+        for eid in extra_ids:
+            if eid not in user_role_ids:
+                user_role_ids.append(eid)
+
+    if not is_admin and step.approver_role_id not in user_role_ids:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not possess the required role to action this approval step"
         )
+        
+    workflow = await db.execute(select(ApprovalWorkflow).where(ApprovalWorkflow.workflow_id == step.workflow_id))
+    workflow = workflow.scalar_one_or_none()
+    if workflow:
+        pr = await db.execute(select(PurchaseRequisition).where(PurchaseRequisition.pr_id == workflow.pr_id))
+        pr = pr.scalar_one_or_none()
+        if pr and pr.requestor_id == current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You cannot approve your own request."
+            )
 
 
 @router.post("/{id}/approve", response_model=PRSchema)
@@ -54,7 +86,7 @@ async def approve_pr(
 ):
     service = ApprovalService(db)
     active_step = await service.get_active_step(id)
-    verify_approver_role(active_step, current_user)
+    await verify_approver_role(active_step, current_user, db)
     return await service.approve_step(id, current_user.user_id, data.comments)
 
 
@@ -67,7 +99,7 @@ async def reject_pr(
 ):
     service = ApprovalService(db)
     active_step = await service.get_active_step(id)
-    verify_approver_role(active_step, current_user)
+    await verify_approver_role(active_step, current_user, db)
     return await service.reject_step(id, current_user.user_id, data.comments)
 
 
@@ -80,7 +112,7 @@ async def return_pr(
 ):
     service = ApprovalService(db)
     active_step = await service.get_active_step(id)
-    verify_approver_role(active_step, current_user)
+    await verify_approver_role(active_step, current_user, db)
     return await service.return_step(id, current_user.user_id, data.comments)
 
 
@@ -93,7 +125,7 @@ async def delegate_pr(
 ):
     service = ApprovalService(db)
     active_step = await service.get_active_step(id)
-    verify_approver_role(active_step, current_user)
+    await verify_approver_role(active_step, current_user, db)
     return await service.delegate_step(id, current_user.user_id, data.delegate_to_user_id, data.comments)
 
 
@@ -106,7 +138,7 @@ async def escalate_pr(
 ):
     service = ApprovalService(db)
     active_step = await service.get_active_step(id)
-    verify_approver_role(active_step, current_user)
+    await verify_approver_role(active_step, current_user, db)
     return await service.escalate_step(id, current_user.user_id, data.comments)
 
 

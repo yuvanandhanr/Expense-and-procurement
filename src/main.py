@@ -8,6 +8,7 @@ and manages application startup/shutdown lifespans.
 import logging
 from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -33,6 +34,7 @@ from src.api.budget_codes import router as budget_codes_router
 from src.api.organization import router as org_router
 from src.api.purchase_requisitions import router as pr_router
 from src.api.approvals import router as approvals_router
+from src.api.approvals_inbox import router as approvals_inbox_router
 from src.api.comments import router as comments_router
 from src.api.attachments import router as attachments_router
 from src.api.vendors import router as vendors_router
@@ -168,6 +170,7 @@ app.include_router(budget_codes_router, prefix="/api/v1/budget_codes")
 app.include_router(org_router, prefix="/api/v1/settings")
 app.include_router(pr_router, prefix="/api/v1")
 app.include_router(approvals_router, prefix="/api/v1")
+app.include_router(approvals_inbox_router, prefix="/api/v1")
 app.include_router(comments_router, prefix="/api/v1")
 app.include_router(attachments_router, prefix="/api/v1")
 app.include_router(vendors_router, prefix="/api/v1")
@@ -193,6 +196,11 @@ app.include_router(monitoring_router, prefix="/api/v1")
 app.include_router(settings_router, prefix="/api/v1")
 app.include_router(invoices_router, prefix="/api/v1")
 app.include_router(expenses_router, prefix="/api/v1")
+
+# Mount Static Files for Uploads
+import os
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 
 @app.get("/", tags=["system"])

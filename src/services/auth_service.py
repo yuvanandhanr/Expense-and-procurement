@@ -135,12 +135,12 @@ class AuthenticationService:
                     detail="Google email address is not verified."
                 )
 
-        # 2. Strict @dataeko.ai domain check (Removed for demo purposes to allow testing)
-        # if not email.lower().endswith("@dataeko.ai"):
-        #     raise HTTPException(
-        #         status_code=status.HTTP_403_FORBIDDEN,
-        #         detail="Only DataEko employees can login."
-        #     )
+        # 2. Strict @dataeko.ai domain check
+        if not email.lower().endswith("@dataeko.ai"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only DataEko employees can login."
+            )
 
         # 3. Retrieve user by email (or by google_id if already linked)
         user = await self.user_repo.get_by_email(email)
@@ -251,10 +251,18 @@ class AuthenticationService:
         result = await self.db.execute(query)
         vendor = result.scalar_one_or_none()
         if not vendor:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Vendor profile not found. Please contact procurement."
+            # Auto-create the vendor profile for new suppliers
+            vendor_code = f"VND-{secrets.token_hex(4).upper()}"
+            vendor_name = email.split('@')[0]
+            vendor = Vendor(
+                vendor_code=vendor_code,
+                vendor_name=vendor_name,
+                email=email,
+                status="Active",
+                preferred_vendor=False
             )
+            self.db.add(vendor)
+            await self.db.flush()
 
         if vendor.status != "Active":
             raise HTTPException(

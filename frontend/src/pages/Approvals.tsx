@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { ApprovalWorkflow } from "../types";
-import { Button, Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Dialog, Input } from "../components/ui";
+import {Button, Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Dialog, Input, EmptyState} from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
 import { formatDate } from "../utils/helpers";
@@ -40,10 +40,19 @@ export const Approvals: React.FC = () => {
         await api.delete(`/approvals/${selectedWorkflow.workflow_id}`);
         toast.success("Workflow successfully cancelled!");
       } else {
-        await api.post(`/pr/${selectedWorkflow.entity_id}/${action}`, {
-          action,
-          comment,
-        });
+        let endpoint = "";
+        if (selectedWorkflow.entity_type === "ExpenseReport") {
+          endpoint = `/expenses/${selectedWorkflow.entity_id}/${action}`;
+        } else if (selectedWorkflow.entity_type === "VendorInvoice") {
+          endpoint = `/invoices/${selectedWorkflow.entity_id}/${action}`;
+        } else {
+          endpoint = `/pr/${selectedWorkflow.entity_id}/${action}`;
+        }
+        
+        // Match the expected payload for the endpoint
+        const payload = selectedWorkflow.entity_type === "ExpenseReport" ? { comments: comment } : { action, comment };
+        
+        await api.post(endpoint, payload);
         toast.success(`Workflow successfully ${action}d!`);
       }
       setSelectedWorkflow(null);
@@ -71,9 +80,7 @@ export const Approvals: React.FC = () => {
               <Skeleton className="h-8 w-full" />
             </div>
           ) : workflows.length === 0 ? (
-            <div className="p-12 text-center text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-              No pending approvals found.
-            </div>
+            <EmptyState title="No pending approvals found." description="Data will appear here once available." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -147,6 +154,17 @@ export const Approvals: React.FC = () => {
                 <div className="flex flex-wrap gap-2">
                   {selectedWorkflow.past_approvers.map((approver, idx) => (
                     <Badge key={idx} variant="info">{approver}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {selectedWorkflow.pending_approvers && selectedWorkflow.pending_approvers.length > 0 && (
+              <div className="bg-accent/20 p-3 rounded-lg border border-border mt-2">
+                <span className="block text-muted-foreground font-semibold uppercase text-xs mb-1">Pending Approvers</span>
+                <div className="flex flex-wrap gap-2">
+                  {selectedWorkflow.pending_approvers.map((approver, idx) => (
+                    <Badge key={idx} variant="warning">{approver}</Badge>
                   ))}
                 </div>
               </div>

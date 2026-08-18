@@ -54,6 +54,10 @@ class ExpenseReportResponse(ExpenseReportBase):
     employee_id: int
     status: str
     total_amount: Decimal
+    duplicate_flag: Optional[bool]
+    policy_flags: Optional[str]
+    payment_status: Optional[str]
+    payment_reference: Optional[str]
     created_at: datetime
     updated_at: datetime
     receipts: List[ReceiptResponse] = []

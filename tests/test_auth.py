@@ -214,7 +214,6 @@ async def test_vendor_otp_request_success(
 
 
 @pytest.mark.anyio
-@patch("src.services.auth_service.OTPRequestRepository")
 @patch.object(UserRepository, "get_by_email", new_callable=AsyncMock)
 @patch.object(UserRepository, "create", new_callable=AsyncMock)
 @patch.object(SessionRepository, "create", new_callable=AsyncMock)
@@ -224,77 +223,54 @@ async def test_vendor_otp_verify_success(
     mock_session_create,
     mock_user_create,
     mock_get_by_email,
-    mock_otp_repo_class,
     async_client: AsyncClient,
     override_db,
     mock_user
 ):
-    mock_otp = MagicMock()
-    mock_otp.otp_hash = hashlib.sha256("123456".encode("utf-8")).hexdigest()
-    mock_otp.attempts = 0
-    mock_otp.expires_at = datetime.utcnow() + timedelta(minutes=5)
-    mock_otp_repo_class.return_value.get_active_by_email = AsyncMock(return_value=mock_otp)
-    mock_otp_repo_class.return_value.update = AsyncMock()
-
+    import pyotp
     mock_vendor = MagicMock()
     mock_vendor.vendor_id = 10
     mock_vendor.vendor_code = "VND10"
     mock_vendor.vendor_name = "Mock Supplier"
+    mock_vendor.mfa_secret = pyotp.random_base32()
+    mock_vendor.mfa_enabled = True
+    
     mock_result = MagicMock()
     mock_result.scalar_one_or_none.return_value = mock_vendor
     override_db.execute = AsyncMock(return_value=mock_result)
 
-    mock_get_by_email.return_value = None
-    mock_user_create.return_value = mock_user
+    mock_get_by_email.return_value = mock_user
+    
+    valid_otp = pyotp.TOTP(mock_vendor.mfa_secret).now()
 
     response = await async_client.post(
         "/api/v1/auth/vendor/otp-verify",
-        json={"email": "supplier@example.com", "otp": "123456"}
+        json={"email": "supplier@example.com", "otp": valid_otp}
     )
     assert response.status_code == status.HTTP_200_OK
     assert "access_token" in response.json()
 
 
 @pytest.mark.anyio
-@patch("src.services.auth_service.OTPRequestRepository")
-async def test_vendor_otp_verify_expired(
-    mock_otp_repo_class,
+async def test_vendor_otp_verify_invalid(
     async_client: AsyncClient,
     override_db
 ):
-    mock_otp = MagicMock()
-    mock_otp.otp_hash = hashlib.sha256("123456".encode("utf-8")).hexdigest()
-    mock_otp.attempts = 0
-    mock_otp.expires_at = datetime.utcnow() - timedelta(minutes=5)
-    mock_otp_repo_class.return_value.get_active_by_email = AsyncMock(return_value=mock_otp)
+    import pyotp
+    mock_vendor = MagicMock()
+    mock_vendor.mfa_secret = pyotp.random_base32()
+    mock_vendor.mfa_enabled = True
+    
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = mock_vendor
+    override_db.execute = AsyncMock(return_value=mock_result)
 
     response = await async_client.post(
         "/api/v1/auth/vendor/otp-verify",
-        json={"email": "supplier@example.com", "otp": "123456"}
+        json={"email": "supplier@example.com", "otp": "000000"} # Invalid OTP
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert response.json()["detail"] == "OTP expired or not found"
-
-
-@pytest.mark.anyio
-@patch("src.services.auth_service.OTPRequestRepository")
-async def test_vendor_otp_verify_retry_limit(
-    mock_otp_repo_class,
-    async_client: AsyncClient,
-    override_db
-):
-    mock_otp = MagicMock()
-    mock_otp.otp_hash = hashlib.sha256("123456".encode("utf-8")).hexdigest()
-    mock_otp.attempts = 5
-    mock_otp.expires_at = datetime.utcnow() + timedelta(minutes=5)
-    mock_otp_repo_class.return_value.get_active_by_email = AsyncMock(return_value=mock_otp)
-
-    response = await async_client.post(
-        "/api/v1/auth/vendor/otp-verify",
-        json={"email": "supplier@example.com", "otp": "123456"}
-    )
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert response.json()["detail"] == "Maximum verification attempts exceeded"
+    assert response.json()["detail"] == "Invalid Authenticator code."
 
 
 # --- LOGOUT & REFRESH TESTS ---

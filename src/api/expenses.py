@@ -22,24 +22,33 @@ router = APIRouter(prefix="/expenses", tags=["Employee Expenses"])
 UPLOAD_DIR = "uploads/receipts"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-@router.get("/", response_model=List[ExpenseReportResponse])
+def parse_ocr_date(date_str: str):
+    if not date_str:
+        return None
+    for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%d-%m-%Y', '%m-%d-%Y'):
+        try:
+            return datetime.strptime(date_str, fmt).date()
+        except ValueError:
+            pass
+    return None
+
+@router.get("", response_model=List[ExpenseReportResponse])
 async def list_expenses(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
     repo = ExpenseRepository(db)
-    # Simple role check: if Employee, show their own. If Manager/Finance, show all (or filtered).
-    role_names = [r.role.role_name for r in current_user.roles]
-    if "Admin" in role_names or "Finance" in role_names or "CFO" in role_names:
+    # Simple role check: if Employee, show their own. If Manager, show their department. If Finance/CFO/Admin, show all.
+    role_names = [r.role_name for r in current_user.roles]
+    if "Admin" in role_names or "Finance" in role_names or "Finance Manager" in role_names or "CFO" in role_names:
         reports = await repo.get_all_reports()
     elif "Manager" in role_names:
-        # Simplification: just show all, in a real system we'd filter by department
-        reports = await repo.get_all_reports()
+        reports = await repo.get_all_reports(department_id=current_user.department_id)
     else:
         reports = await repo.get_all_reports(employee_id=current_user.user_id)
     return reports
 
-@router.post("/", response_model=ExpenseReportResponse)
+@router.post("", response_model=ExpenseReportResponse)
 async def create_expense_report(
     payload: ExpenseReportCreate,
     db: AsyncSession = Depends(get_db_session),
@@ -58,7 +67,8 @@ async def create_expense_report(
         total_amount=Decimal("0.00")
     )
     await repo.create_report(new_report)
-    return new_report
+    loaded_report = await repo.get_report_by_id(new_report.expense_report_id)
+    return loaded_report
 
 @router.get("/{report_id}", response_model=ExpenseReportResponse)
 async def get_expense_report(
@@ -109,16 +119,23 @@ async def upload_receipts(
         # If low confidence, employee must manually verify. Default to 0.00 so report cannot be submitted blindly.
         verified_amount = ocr_amount if confidence > Decimal("50.00") else Decimal("0.00")
         
+        # Convert Decimal values to float for JSON serialization
+        import decimal
+        safe_ocr_result = {
+            k: float(v) if isinstance(v, decimal.Decimal) else v
+            for k, v in ocr_result.items()
+        }
+        
         receipt = Receipt(
             expense_report_id=report_id,
             merchant_name=ocr_result.get("merchant_name"),
-            receipt_date=ocr_result.get("date"),
+            receipt_date=parse_ocr_date(ocr_result.get("date")),
             ocr_amount=ocr_amount,
             verified_amount=verified_amount,
             image_path=f"/uploads/receipts/{unique_name}",
             file_name=file.filename,
             ocr_confidence=confidence,
-            ocr_json=ocr_result
+            ocr_json=safe_ocr_result
         )
         await repo.add_receipt(receipt)
         created_receipts.append(receipt)
@@ -188,6 +205,11 @@ async def delete_receipt(
     await db.commit()
     return {"status": "success"}
 
+from pydantic import BaseModel
+
+class ExpenseActionPayload(BaseModel):
+    comments: str = ""
+
 @router.post("/{report_id}/submit")
 async def submit_report(
     report_id: int,
@@ -206,6 +228,34 @@ async def submit_report(
     for r in report.receipts:
         if r.verified_amount == Decimal("0.00") and r.ocr_confidence and r.ocr_confidence < Decimal("50.00"):
             raise HTTPException(status_code=400, detail=f"Receipt {r.file_name} requires manual verification of the amount.")
+            
+    # Duplicate and Policy Checks
+    duplicates_found = False
+    policy_issues = []
+    
+    if report.total_amount > Decimal("500.00") and not report.justification:
+        policy_issues.append("High amount requires justification")
+        
+    from sqlalchemy import select
+    for r in report.receipts:
+        if r.merchant_name and r.receipt_date:
+            query_dup = select(Receipt).join(ExpenseReport).where(
+                ExpenseReport.employee_id == report.employee_id,
+                ExpenseReport.expense_report_id != report.expense_report_id,
+                ExpenseReport.status != "Rejected",
+                Receipt.merchant_name == r.merchant_name,
+                Receipt.receipt_date == r.receipt_date,
+                Receipt.verified_amount == r.verified_amount
+            )
+            result_dup = await db.execute(query_dup)
+            if result_dup.scalars().first():
+                duplicates_found = True
+                
+        if r.verified_amount > Decimal("100.00") and not r.category:
+            policy_issues.append(f"Receipt {r.file_name} > $100 requires a category")
+            
+    report.duplicate_flag = duplicates_found
+    report.policy_flags = ", ".join(policy_issues) if policy_issues else None
             
     # Transition status
     report.status = "Pending Approval"
@@ -227,4 +277,123 @@ async def submit_report(
         raise HTTPException(status_code=500, detail=f"Failed to initialize approval flow: {str(e)}")
 
     await db.commit()
-    return {"status": "submitted", "total_amount": report.total_amount}
+    return {"status": "submitted", "total_amount": report.total_amount, "duplicates": duplicates_found, "policies": report.policy_flags}
+
+@router.post("/{report_id}/approve")
+async def approve_expense_manager(
+    report_id: int,
+    payload: ExpenseActionPayload,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    from src.models.expense import ExpenseApproval
+    from sqlalchemy import select
+    
+    repo = ExpenseRepository(db)
+    report = await repo.get_report_by_id(report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+        
+    if report.status != "Pending Manager Approval":
+        raise HTTPException(status_code=400, detail="Report is not pending manager approval")
+        
+    query = select(ExpenseApproval).where(
+        ExpenseApproval.expense_report_id == report_id,
+        ExpenseApproval.approver_id == current_user.user_id,
+        ExpenseApproval.status == "Pending"
+    )
+    result = await db.execute(query)
+    approval = result.scalar_one_or_none()
+    
+    if not approval and not any(r.role_name == "Admin" for r in current_user.roles):
+        raise HTTPException(status_code=403, detail="Not authorized to approve this report")
+        
+    if approval:
+        approval.status = "Approved"
+        approval.comments = payload.comments
+        approval.actioned_at = datetime.utcnow()
+        
+    report.status = "Finance Verified" # Skip separate step for demo, or "Pending Finance Verification"
+    # Actually let's make it "Pending Finance Verification"
+    report.status = "Pending Finance Verification"
+    
+    await repo.update_report(report)
+    await db.commit()
+    return {"status": "Approved by Manager"}
+
+@router.post("/{report_id}/reject")
+async def reject_expense_manager(
+    report_id: int,
+    payload: ExpenseActionPayload,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    repo = ExpenseRepository(db)
+    report = await repo.get_report_by_id(report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+        
+    report.status = "Rejected"
+    await repo.update_report(report)
+    await db.commit()
+    return {"status": "Rejected"}
+
+@router.post("/{report_id}/return")
+async def return_expense_manager(
+    report_id: int,
+    payload: ExpenseActionPayload,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    repo = ExpenseRepository(db)
+    report = await repo.get_report_by_id(report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+        
+    report.status = "Returned for Correction"
+    await repo.update_report(report)
+    await db.commit()
+    return {"status": "Returned"}
+
+@router.post("/{report_id}/finance-verify")
+async def finance_verify_expense(
+    report_id: int,
+    payload: ExpenseActionPayload,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    repo = ExpenseRepository(db)
+    report = await repo.get_report_by_id(report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+        
+    if report.status != "Pending Finance Verification":
+        raise HTTPException(status_code=400, detail="Report is not pending finance verification")
+        
+    report.status = "Payment Requested"
+    report.payment_status = "Pending Payment"
+    await repo.update_report(report)
+    await db.commit()
+    return {"status": "Finance Verified"}
+
+@router.post("/{report_id}/pay")
+async def pay_expense(
+    report_id: int,
+    payload: ExpenseActionPayload,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    repo = ExpenseRepository(db)
+    report = await repo.get_report_by_id(report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+        
+    if report.status != "Payment Requested":
+        raise HTTPException(status_code=400, detail="Report is not requesting payment")
+        
+    report.status = "Closed"
+    report.payment_status = "Paid"
+    report.payment_reference = f"PAY-EXP-{report_id}-{uuid.uuid4().hex[:6]}"
+    await repo.update_report(report)
+    await db.commit()
+    return {"status": "Paid", "payment_reference": report.payment_reference}

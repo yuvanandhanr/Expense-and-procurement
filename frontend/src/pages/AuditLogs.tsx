@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { AuditLog } from "../types";
-import { Card, CardHeader, CardTitle, CardContent, Badge, Skeleton } from "../components/ui";
+import {Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, EmptyState} from "../components/ui";
 
 export const AuditLogs: React.FC = () => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -35,9 +35,7 @@ export const AuditLogs: React.FC = () => {
               <Skeleton className="h-8 w-full" />
             </div>
           ) : logs.length === 0 ? (
-            <div className="p-12 text-center text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-              No audit logs captured.
-            </div>
+            <EmptyState title="No audit logs captured." description="Data will appear here once available." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm border-collapse">

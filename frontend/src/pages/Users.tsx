@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { CurrentUser, Role } from "../types";
-import { Button, Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Dialog, Input } from "../components/ui";
+import {Button, Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Dialog, Input, EmptyState} from "../components/ui";
 import toast from "react-hot-toast";
 import { getErrorMessage } from "../utils/helpers";
 
@@ -149,9 +149,7 @@ export const Users: React.FC = () => {
               <Skeleton className="h-8 w-full" />
             </div>
           ) : users.length === 0 ? (
-            <div className="p-12 text-center text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-              No users found.
-            </div>
+            <EmptyState title="No users found." description="Data will appear here once available." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">

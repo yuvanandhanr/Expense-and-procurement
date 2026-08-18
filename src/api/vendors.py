@@ -34,6 +34,24 @@ async def create_vendor(
     return await service.create_vendor(data)
 
 
+@router.get("/me", response_model=VendorSchema)
+async def get_my_vendor_profile(
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    from sqlalchemy import select
+    from src.models.vendor import Vendor
+    stmt = select(Vendor).where(Vendor.email == current_user.email)
+    result = await db.execute(stmt)
+    vendor = result.scalar_one_or_none()
+    if not vendor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vendor profile not found")
+    
+    # ensure relations are loaded or handled
+    service = VendorService(db)
+    return await service.vendor_repo.get_by_id(vendor.vendor_id)
+
+
 @router.get("", response_model=List[VendorSchema])
 async def list_vendors(
     db: AsyncSession = Depends(get_db_session),

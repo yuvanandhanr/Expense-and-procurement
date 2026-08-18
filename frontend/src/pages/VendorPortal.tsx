@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { useAuth } from "../hooks/useAuth";
-import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Skeleton, Dialog, Input } from "../components/ui";
+import {Card, CardHeader, CardTitle, CardContent, Button, Badge, Skeleton, Dialog, Input, EmptyState} from "../components/ui";
 import { formatDate } from "../utils/helpers";
 import toast from "react-hot-toast";
 
@@ -10,7 +10,7 @@ export const VendorPortal: React.FC = () => {
   
   const [rfqs, setRfqs] = useState<any[]>([]);
   const [quotations, setQuotations] = useState<any[]>([]);
-  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
+  const [vendorProfile, setVendorProfile] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   
   // Submit Quotation states
@@ -22,15 +22,14 @@ export const VendorPortal: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [rfqRes, quoteRes, poRes] = await Promise.all([
-        api.get("/rfqs"),
+      const [rfqRes, quoteRes, vendorRes] = await Promise.all([
+        api.get("/rfq"),
         api.get("/quotations"),
-        api.get("/purchase-orders"),
+        api.get("/vendors/me").catch(() => ({ data: null }))
       ]);
-      // For demonstration, open RFQs are shown to the vendor
       setRfqs(rfqRes.data);
       setQuotations(quoteRes.data);
-      setPurchaseOrders(poRes.data);
+      if (vendorRes.data) setVendorProfile(vendorRes.data);
     } catch (err) {
       console.error("Failed to load vendor portal data:", err);
     } finally {
@@ -82,7 +81,7 @@ export const VendorPortal: React.FC = () => {
     try {
       await api.post("/quotations", {
         rfq_id: selectedRfq.rfq_id,
-        vendor_id: 0, 
+        vendor_id: vendorProfile?.vendor_id || 0, 
         lead_time_days: parseInt(timeline),
         items: itemsPayload
       });
@@ -107,17 +106,17 @@ export const VendorPortal: React.FC = () => {
               Supplier Partner Workspace
             </span>
             <h1 className="text-3xl font-extrabold tracking-tight text-white mt-3">
-              Welcome, {user?.first_name || "Supplier Partner"}
+              Welcome, {vendorProfile?.vendor_name || user?.first_name || "Supplier Partner"}
             </h1>
             <p className="text-slate-400 text-xs mt-1">
-              Active Vendor Code: <span className="font-mono text-primary font-bold">{user?.employee_code}</span>
+              Active Vendor Code: <span className="font-mono text-primary font-bold">{vendorProfile?.vendor_code || user?.employee_code}</span>
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-3">
             <Badge variant="success">Active Status</Badge>
             <div className="bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-center min-w-[100px]">
-              <span className="block text-[10px] text-slate-500 font-bold uppercase tracking-wider">Rating Index</span>
-              <span className="text-lg font-extrabold text-white">95 / 100</span>
+              <span className="block text-[10px] text-slate-500 font-bold uppercase tracking-wider">Quality Score</span>
+              <span className="text-lg font-extrabold text-white">{vendorProfile?.performance?.quality_score || "100.00"}</span>
             </div>
           </div>
         </div>
@@ -135,18 +134,17 @@ export const VendorPortal: React.FC = () => {
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
               </div>
-            ) : rfqs.length === 0 ? (
-              <div className="p-12 text-center text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-                No active RFQs at the moment. Check back later.
-              </div>
+            ) : rfqs.filter(rfq => !quotations.some(q => q.rfq_id === rfq.rfq_id)).length === 0 ? (
+              <EmptyState title="No active RFQs at the moment. Check back later." description="Data will appear here once available." />
             ) : (
               <div className="divide-y divide-border">
-                {rfqs.map((rfq) => (
+                {rfqs.filter(rfq => !quotations.some(q => q.rfq_id === rfq.rfq_id)).map((rfq) => (
                   <div key={rfq.rfq_id} className="p-4 hover:bg-accent/10 transition-colors flex items-center justify-between">
                     <div>
                       <div className="flex items-center space-x-2">
                         <span className="text-xs font-bold font-mono text-primary">#{rfq.rfq_number}</span>
                         <Badge variant="warning">Open for Bids</Badge>
+                        {rfq.pr_id && <Badge variant="neutral">PR #{rfq.pr_id}</Badge>}
                       </div>
                       <h4 className="text-sm font-bold text-foreground/90 mt-1">{rfq.title}</h4>
                       <span className="text-[10px] text-muted-foreground block mt-0.5">
@@ -211,50 +209,7 @@ export const VendorPortal: React.FC = () => {
         </Card>
       </div>
 
-      {/* Bottom: Purchase Orders */}
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Assigned Purchase Orders</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="p-6 space-y-4">
-              <Skeleton className="h-8 w-full" />
-            </div>
-          ) : purchaseOrders.length === 0 ? (
-            <div className="p-12 text-center text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-              No active Purchase Orders at the moment.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm border-collapse">
-                <thead>
-                  <tr className="border-b border-border bg-accent/40 text-[10px] font-bold text-muted-foreground uppercase">
-                    <th className="p-4">PO Number</th>
-                    <th className="p-4">RFQ Ref</th>
-                    <th className="p-4">Amount</th>
-                    <th className="p-4">Date</th>
-                    <th className="p-4">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {purchaseOrders.map((po) => (
-                    <tr key={po.po_id} className="hover:bg-accent/10">
-                      <td className="p-4 font-mono font-bold text-xs">{po.po_number}</td>
-                      <td className="p-4 font-mono text-xs">{po.rfq_id ? `#RFQ-${po.rfq_id}` : "N/A"}</td>
-                      <td className="p-4 font-bold text-primary">${po.grand_total?.toLocaleString()}</td>
-                      <td className="p-4 text-xs">{formatDate(po.created_at)}</td>
-                      <td className="p-4">
-                        <Badge variant="success">{po.status}</Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+
 
       {/* Bid Submission Dialog */}
       {selectedRfq && (
@@ -264,6 +219,45 @@ export const VendorPortal: React.FC = () => {
               <span className="block font-semibold text-muted-foreground uppercase">RFQ Title</span>
               <span className="font-bold text-sm text-foreground/90">{selectedRfq.title}</span>
             </div>
+
+            {(selectedRfq.pr_description || selectedRfq.pr_justification) && (
+              <div className="bg-muted/40 p-4 rounded-lg border border-border text-xs space-y-3 mt-4">
+                <h4 className="font-bold text-sm text-foreground/90 border-b border-border pb-2 mb-2 flex items-center gap-2">
+                  <span className="text-primary">Original Purchase Requisition</span>
+                </h4>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  {selectedRfq.pr_project_code && (
+                    <div>
+                      <span className="block font-semibold text-muted-foreground uppercase text-[10px]">Project Code</span>
+                      <span className="text-foreground/90 font-medium">{selectedRfq.pr_project_code}</span>
+                    </div>
+                  )}
+                  {selectedRfq.pr_priority && (
+                    <div>
+                      <span className="block font-semibold text-muted-foreground uppercase text-[10px]">Priority</span>
+                      <Badge variant={selectedRfq.pr_priority === 'High' || selectedRfq.pr_priority === 'Urgent' ? 'warning' : 'neutral'}>
+                        {selectedRfq.pr_priority}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+
+                {selectedRfq.pr_description && (
+                  <div>
+                    <span className="block font-semibold text-muted-foreground uppercase text-[10px] mb-1">Description</span>
+                    <p className="text-foreground/80 whitespace-pre-wrap leading-relaxed">{selectedRfq.pr_description}</p>
+                  </div>
+                )}
+
+                {selectedRfq.pr_justification && (
+                  <div>
+                    <span className="block font-semibold text-muted-foreground uppercase text-[10px] mb-1">Business Justification</span>
+                    <p className="text-foreground/80 whitespace-pre-wrap leading-relaxed">{selectedRfq.pr_justification}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {selectedRfq.items && selectedRfq.items.length > 0 && (
               <div className="bg-background rounded-lg border border-border mt-4">

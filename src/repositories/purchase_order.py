@@ -10,6 +10,19 @@ class PORepository(BaseRepository[PurchaseOrder]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(PurchaseOrder, session)
 
+    async def list_all(self, skip: int = 0, limit: int = 100) -> List[PurchaseOrder]:
+        query = (
+            select(self.model)
+            .options(
+                selectinload(self.model.items),
+                selectinload(self.model.approvals)
+            )
+            .offset(skip)
+            .limit(limit)
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
     async def get_by_id(self, entity_id: int) -> Optional[PurchaseOrder]:
         query = (
             select(self.model)
@@ -31,6 +44,20 @@ class PORepository(BaseRepository[PurchaseOrder]):
         query = (
             select(self.model)
             .where(self.model.vendor_id == vendor_id)
+            .options(
+                selectinload(self.model.items),
+                selectinload(self.model.approvals)
+            )
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def list_by_requestor(self, requestor_id: int) -> List[PurchaseOrder]:
+        from src.models.purchase_requisition import PurchaseRequisition
+        query = (
+            select(self.model)
+            .join(PurchaseRequisition, self.model.pr_id == PurchaseRequisition.pr_id)
+            .where(PurchaseRequisition.requestor_id == requestor_id)
             .options(
                 selectinload(self.model.items),
                 selectinload(self.model.approvals)

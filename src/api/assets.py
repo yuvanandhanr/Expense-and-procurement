@@ -37,7 +37,7 @@ async def get_my_assets(
             "asset_code": a.asset_number,
             "asset_name": a.model or "Hardware Asset",
             "category": a.category.category_name if a.category else "Uncategorized",
-            "serial_number": a.serial_number,
+            "serial_number": a.serial_number or a.asset_tag,
             "purchase_date": str(a.purchase_date) if a.purchase_date else "",
             "vendor_name": a.vendor.vendor_name if a.vendor else "Unknown",
             "status": a.status
@@ -50,6 +50,11 @@ async def get_assets(
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
+    user_roles = [r.role_name for r in current_user.roles]
+    allowed = {"Admin", "CEO", "CFO", "Finance Manager"}
+    if not allowed.intersection(user_roles):
+        raise HTTPException(status_code=403, detail="Not authorized to view all assets")
+
     stmt = select(Asset).options(
         selectinload(Asset.category),
         selectinload(Asset.assigned_employee)
@@ -67,7 +72,7 @@ async def get_assets(
             "category": a.category.category_name if a.category else "Uncategorized",
             "assigned_to_id": a.assigned_employee_id,
             "assigned_to_name": f"{a.assigned_employee.first_name} {a.assigned_employee.last_name}" if a.assigned_employee else "Unassigned",
-            "serial_number": a.serial_number,
+            "serial_number": a.serial_number or a.asset_tag,
             "cost": 0, # Could be fetched from PO if joined
             "purchase_date": str(a.purchase_date) if a.purchase_date else "",
             "location": a.location or "HQ",

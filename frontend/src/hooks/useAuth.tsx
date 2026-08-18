@@ -118,6 +118,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Treat "Finance" and "Finance Manager" interchangeably for frontend access checks
     if (roleName === "Finance" && user.roles.some((role) => role.role_name === "Finance Manager" && role.status)) return true;
     if (roleName === "Finance Manager" && user.roles.some((role) => role.role_name === "Finance" && role.status)) return true;
+    // Treat "Vendor" and "Vendor Portal" interchangeably
+    if (roleName === "Vendor" && user.roles.some((role) => role.role_name === "Vendor Portal" && role.status)) return true;
+    if (roleName === "Vendor Portal" && user.roles.some((role) => role.role_name === "Vendor" && role.status)) return true;
     return user.roles.some((role) => role.role_name === roleName && role.status);
   };
 

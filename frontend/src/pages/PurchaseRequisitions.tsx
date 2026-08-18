@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { PurchaseRequisition } from "../types";
-import { Button, Input, Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Dialog } from "../components/ui";
+import { Button, Input, Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Dialog, HeroTimestamp, EmptyState } from "../components/ui";
+import { ClipboardList } from "lucide-react";
 import toast from "react-hot-toast";
 import { formatDate, getErrorMessage } from "../utils/helpers";
 import { useAuth } from "../hooks/useAuth";
@@ -9,6 +10,7 @@ import { useAuth } from "../hooks/useAuth";
 export const PurchaseRequisitions: React.FC = () => {
   const { user } = useAuth();
   const [prs, setPrs] = useState<PurchaseRequisition[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("All");
@@ -25,8 +27,12 @@ export const PurchaseRequisitions: React.FC = () => {
   const fetchPRs = async () => {
     setLoading(true);
     try {
-      const response = await api.get("/pr");
+      const [response, poRes] = await Promise.all([
+        api.get("/pr"),
+        api.get("/purchase-orders").catch(() => ({ data: [] })) // In case the user doesn't have PO access
+      ]);
       setPrs(response.data);
+      setPurchaseOrders(poRes.data);
     } catch (err) {
       console.error("Failed to load PRs:", err);
     } finally {
@@ -51,7 +57,7 @@ export const PurchaseRequisitions: React.FC = () => {
         title,
         justification: description || "No justification provided",
         priority,
-        department_id: 1,
+        department_id: 123,
         items: [
           {
             category: "Standard",
@@ -135,9 +141,12 @@ export const PurchaseRequisitions: React.FC = () => {
           <h1 className="text-3xl font-bold tracking-tight">Purchase Requisitions</h1>
           <p className="text-xs text-muted-foreground mt-1">Submit and track department purchase requests.</p>
         </div>
-        <Button onClick={() => setIsCreateOpen(true)} className="font-bold text-xs uppercase tracking-wider">
-          New Requisition
-        </Button>
+        <div className="flex items-center space-x-4">
+          <HeroTimestamp />
+          <Button onClick={() => setIsCreateOpen(true)} className="font-bold text-xs uppercase tracking-wider">
+            New Requisition
+          </Button>
+        </div>
       </div>
 
       {/* Filters & Controls */}
@@ -168,9 +177,13 @@ export const PurchaseRequisitions: React.FC = () => {
               <Skeleton className="h-8 w-full" />
             </div>
           ) : filteredPrs.length === 0 ? (
-            <div className="p-12 text-center text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-              No Requisitions found.
-            </div>
+            <EmptyState
+              icon={<ClipboardList className="w-8 h-8" />}
+              title="No Requisitions found."
+              description="You have not submitted any purchase requests yet."
+              actionLabel="Create new requisition"
+              onAction={() => setIsCreateOpen(true)}
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -206,9 +219,9 @@ export const PurchaseRequisitions: React.FC = () => {
                             Submit
                           </Button>
                         )}
-                        {(["Pending", "Under Review", "Submitted", "Pending Manager Approval", "Pending Finance Approval", "Pending CFO Approval"].includes(pr.status)) && (
+                        {(["Pending", "Under Review", "Submitted", "Pending Manager Approval", "Pending Finance Approval", "Pending CFO Approval", "Approved", "Completed"].includes(pr.status)) && (
                           <Button size="sm" onClick={() => setSelectedPr(pr)}>
-                            Review
+                            {["Approved", "Completed"].includes(pr.status) ? "View" : "Review"}
                           </Button>
                         )}
                       </td>
@@ -296,23 +309,80 @@ export const PurchaseRequisitions: React.FC = () => {
               />
             </div>
 
+            {/* Delivery Verification Section */}
+            {purchaseOrders.filter(po => po.pr_id === selectedPr.pr_id).map(po => (
+              <div key={po.po_id} className="mt-4 pt-4 border-t border-border">
+                <h4 className="text-xs font-bold uppercase text-muted-foreground mb-3 tracking-wider">PO #{po.po_number} Deliveries</h4>
+                <div className="space-y-3">
+                  {po.items?.map((item: any) => (
+                    <div key={item.po_item_id} className="bg-background border border-border p-3 rounded-lg shadow-sm">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-semibold text-sm">{item.item_name}</span>
+                        <Badge variant={
+                          item.delivery_verification_status === "Matched" ? "success" : 
+                          item.delivery_verification_status === "Returned / Cancelled" ? "danger" : 
+                          item.delivery_verification_status === "Vendor Delivered" ? "warning" : "neutral"
+                        }>
+                          {item.delivery_verification_status || "Pending"}
+                        </Badge>
+                      </div>
+                      
+                      {item.delivery_verification_status === "Vendor Delivered" && (
+                        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border">
+                          <Input
+                            id={`verify-${item.po_item_id}`}
+                            type="text"
+                            placeholder="Enter received Unique ID..."
+                            value={(window as any)[`verify_${item.po_item_id}`] || ""}
+                            onChange={(e) => {
+                              (window as any)[`verify_${item.po_item_id}`] = e.target.value;
+                              // Force re-render just to update input (hacky but works for this demo scope)
+                              setComment(comment + " "); 
+                              setTimeout(() => setComment(comment.trim()), 0);
+                            }}
+                          />
+                          <Button size="sm" onClick={async () => {
+                            const val = (window as any)[`verify_${item.po_item_id}`];
+                            if (!val) { toast.error("Enter the product unique ID"); return; }
+                            try {
+                              await api.post(`/purchase-orders/${po.po_id}/items/${item.po_item_id}/verify-delivery`, {
+                                receiver_product_id: val
+                              });
+                              toast.success("Verification processed!");
+                              fetchPRs();
+                              const poRes = await api.get("/purchase-orders");
+                              setPurchaseOrders(poRes.data);
+                            } catch (e: any) {
+                              toast.error(e.response?.data?.detail || "Failed to verify");
+                            }
+                          }}>Verify</Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+
             <div className="flex justify-end space-x-2 pt-4 border-t border-border">
               <Button variant="outline" onClick={() => setSelectedPr(null)}>
                 Close
               </Button>
-              {selectedPr.requestor_id === user?.user_id || selectedPr.requested_by === user?.user_id ? (
-                <Button variant="danger" disabled={isSubmitting} onClick={() => handleAction("cancel")}>
-                  Cancel Request
-                </Button>
-              ) : (
-                <>
-                  <Button variant="danger" disabled={isSubmitting} onClick={() => handleAction("reject")}>
-                    Reject
+              {(!["Approved", "Completed", "Cancelled", "Rejected"].includes(selectedPr.status)) && (
+                selectedPr.requestor_id === user?.user_id || selectedPr.requested_by === user?.user_id ? (
+                  <Button variant="danger" disabled={isSubmitting} onClick={() => handleAction("cancel")}>
+                    Cancel Request
                   </Button>
-                  <Button disabled={isSubmitting} onClick={() => handleAction("approve")}>
-                    Approve
-                  </Button>
-                </>
+                ) : (
+                  <>
+                    <Button variant="danger" disabled={isSubmitting} onClick={() => handleAction("reject")}>
+                      Reject
+                    </Button>
+                    <Button disabled={isSubmitting} onClick={() => handleAction("approve")}>
+                      Approve
+                    </Button>
+                  </>
+                )
               )}
             </div>
           </div>

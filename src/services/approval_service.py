@@ -3,6 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from fastapi import HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.auth import User, Role
 from src.models.purchase_requisition import PurchaseRequisition
@@ -38,14 +39,55 @@ class ApprovalService:
         from src.services.notification_service import NotificationService
         self.notification_service = NotificationService(db)
 
-    async def get_cfo_role_id(self) -> int:
-        """
-        Locates the CFO role or returns Admin (role_id=4) as fallback.
-        """
-        query = select(Role).where(Role.role_name == "CFO")
+    async def get_role_id_by_name(self, role_name: str, fallback_id: int) -> int:
+        query = select(Role).where(Role.role_name == role_name)
         result = await self.db.execute(query)
         role = result.scalar_one_or_none()
-        return role.role_id if role else 4
+        return role.role_id if role else fallback_id
+
+    async def initialize_approval_flow(self, document_type: str, document_id: int, amount: Decimal, department_id: Optional[int] = None):
+        if document_type == "PurchaseRequisition":
+            pr = await self.pr_repo.get_by_id(document_id)
+            if not pr:
+                raise ValueError("PR not found")
+            return await self.generate_workflow(pr)
+        elif document_type == "ExpenseReport":
+            from src.models.expense import ExpenseReport, ExpenseApproval
+            from src.models.auth import User
+            
+            query = select(ExpenseReport).where(ExpenseReport.expense_report_id == document_id)
+            result = await self.db.execute(query)
+            report = result.scalar_one_or_none()
+            if not report:
+                raise ValueError("Expense report not found")
+                
+            query_user = select(User).where(User.user_id == report.employee_id)
+            user_result = await self.db.execute(query_user)
+            employee = user_result.scalar_one_or_none()
+            manager_id = employee.manager_id if employee else None
+            
+            manager_approval = ExpenseApproval(
+                expense_report_id=report.expense_report_id,
+                approver_id=manager_id,
+                status="Pending"
+            )
+            self.db.add(manager_approval)
+            
+            report.status = "Pending Manager Approval"
+            
+            if manager_id:
+                try:
+                    await self.notification_service.send_notification(
+                        user_id=manager_id,
+                        template_name="ExpenseApprovalRequestAlert",
+                        context={"report_id": report.expense_report_id, "amount": str(report.total_amount)}
+                    )
+                except Exception:
+                    pass
+            
+            return manager_approval
+        else:
+            raise ValueError(f"Unknown document type: {document_type}")
 
     async def generate_workflow(self, pr: PurchaseRequisition) -> ApprovalWorkflow:
         """
@@ -68,36 +110,33 @@ class ApprovalService:
         
         # Get requestor's manager_id
         from src.models.auth import User
-        query_user = select(User).where(User.user_id == pr.requestor_id)
+        query_user = select(User).where(User.user_id == pr.requestor_id).options(selectinload(User.roles))
         result_user = await self.db.execute(query_user)
         requestor = result_user.scalar_one_or_none()
         manager_id = requestor.manager_id if requestor else None
         
-        # If rules exist, parse them. Otherwise generate default Manager -> Finance steps.
-        if rules:
-            for idx, rule in enumerate(rules, start=1):
-                app_id = manager_id if idx == 1 else None
-                steps_to_create.append({
-                    "step_number": idx,
-                    "approver_role_id": rule.role_id,
-                    "approver_id": app_id
-                })
-        else:
-            # Default fallback: Level 1 Manager, Level 2 Finance
-            steps_to_create.append({"step_number": 1, "approver_role_id": 2, "approver_id": manager_id}) # Manager
-            steps_to_create.append({"step_number": 2, "approver_role_id": 3, "approver_id": None}) # Finance
+        requestor_is_cfo = False
+        if requestor:
+            requestor_is_cfo = any(r.role_name == "CFO" for r in requestor.roles)
 
-        # High-value threshold check (> $50,000 automatically requires CFO approval)
-        if pr.total_estimated_amount > Decimal("50000.00"):
-            cfo_role_id = await self.get_cfo_role_id()
-            # Check if CFO role step is already present
-            cfo_exists = any(s["approver_role_id"] == cfo_role_id for s in steps_to_create)
-            if not cfo_exists:
-                steps_to_create.append({
-                    "step_number": len(steps_to_create) + 1,
-                    "approver_role_id": cfo_role_id,
-                    "approver_id": None
-                })
+        if requestor_is_cfo:
+            ceo_role_id = await self.get_role_id_by_name("CEO", 5)
+            steps_to_create.append({"step_number": 1, "approver_role_id": ceo_role_id, "approver_id": None})
+        else:
+            manager_role_id = await self.get_role_id_by_name("Manager", 2)
+            finance_role_id = await self.get_role_id_by_name("Finance", 3)
+            cfo_role_id = await self.get_role_id_by_name("CFO", 4)
+
+            # Rule 1: Always Manager
+            steps_to_create.append({"step_number": 1, "approver_role_id": manager_role_id, "approver_id": manager_id})
+
+            # Rule 2: > $500 requires Finance Manager
+            if pr.total_estimated_amount > Decimal("500.00"):
+                steps_to_create.append({"step_number": 2, "approver_role_id": finance_role_id, "approver_id": None})
+
+            # Rule 3: > $5000 requires CFO
+            if pr.total_estimated_amount > Decimal("5000.00"):
+                steps_to_create.append({"step_number": 3, "approver_role_id": cfo_role_id, "approver_id": None})
 
         # Create overall workflow
         workflow = ApprovalWorkflow(
@@ -144,6 +183,133 @@ class ApprovalService:
             )
 
         return workflow
+
+    async def get_pending_approvals_for_user(self, user: User) -> List[dict]:
+        from src.models.auth import User as UserModel
+        
+        user_role_ids = [role.role_id for role in user.roles]
+        is_admin = any(role.role_name == "Admin" for role in user.roles)
+
+        # Cross-wire "Finance" and "Finance Manager" role IDs
+        has_finance = any(r.role_name in ["Finance", "Finance Manager"] for r in user.roles)
+        if has_finance:
+            res = await self.db.execute(select(Role.role_id).where(Role.role_name.in_(["Finance", "Finance Manager"])))
+            extra_ids = res.scalars().all()
+            for eid in extra_ids:
+                if eid not in user_role_ids:
+                    user_role_ids.append(eid)
+
+        query = (
+            select(ApprovalWorkflow, PurchaseRequisition, UserModel)
+            .join(PurchaseRequisition, ApprovalWorkflow.pr_id == PurchaseRequisition.pr_id)
+            .join(UserModel, PurchaseRequisition.requestor_id == UserModel.user_id)
+            .where(ApprovalWorkflow.status.in_(["Under Review", "Approved"]))
+            .order_by(ApprovalWorkflow.created_at.desc())
+        )
+
+        result = await self.db.execute(query)
+        workflows_data = result.all()
+        
+        if not workflows_data:
+            return []
+            
+        wf_ids = [w[0].workflow_id for w in workflows_data]
+        steps_query = select(ApprovalStep).where(ApprovalStep.workflow_id.in_(wf_ids))
+        steps_res = await self.db.execute(steps_query)
+        all_steps = steps_res.scalars().all()
+        
+        steps_by_wf = {}
+        step_to_wf = {}
+        for s in all_steps:
+            steps_by_wf.setdefault(s.workflow_id, []).append(s)
+            step_to_wf[s.step_id] = s.workflow_id
+            
+        step_ids = [s.step_id for s in all_steps]
+        hist_query = select(ApprovalHistory).where(ApprovalHistory.step_id.in_(step_ids))
+        hist_res = await self.db.execute(hist_query)
+        all_history = hist_res.scalars().all()
+        
+        history_by_wf = {}
+        for h in all_history:
+            wf_id = step_to_wf.get(h.step_id)
+            if wf_id:
+                history_by_wf.setdefault(wf_id, []).append(h)
+                
+        user_query = select(UserModel)
+        user_res = await self.db.execute(user_query)
+        users_by_id = {u.user_id: u for u in user_res.scalars().all()}
+        
+        role_query = select(Role)
+        role_res = await self.db.execute(role_query)
+        roles_by_id = {r.role_id: r.role_name for r in role_res.scalars().all()}
+
+        pending_workflows = []
+        is_ceo_or_cfo = any(role.role_name in ["CEO", "CFO"] for role in user.roles)
+
+        for workflow, pr, requestor in workflows_data:
+            wf_steps = steps_by_wf.get(workflow.workflow_id, [])
+            pending_steps = [s for s in wf_steps if s.status == "Pending"]
+            active_step = min(pending_steps, key=lambda x: x.step_number) if pending_steps else None
+
+            can_approve = False
+            if active_step:
+                if is_admin:
+                    can_approve = True
+                elif active_step.approver_id == user.user_id:
+                    can_approve = True
+                elif active_step.approver_id is None and active_step.approver_role_id in user_role_ids:
+                    can_approve = True
+
+            can_view = False
+            if is_admin or is_ceo_or_cfo:
+                can_view = True
+            elif can_approve:
+                can_view = True
+            elif pr.requestor_id == user.user_id:
+                can_view = True
+            elif workflow.status == "Approved":
+                can_view = True
+            else:
+                wf_hist = history_by_wf.get(workflow.workflow_id, [])
+                if any(h.performed_by == user.user_id for h in wf_hist):
+                    can_view = True
+
+            if can_view:
+                wf_hist = history_by_wf.get(workflow.workflow_id, [])
+                past_approvers = []
+                for h in wf_hist:
+                    if h.action == "Approve" and h.performed_by in users_by_id:
+                        u = users_by_id[h.performed_by]
+                        step = next((s for s in wf_steps if s.step_id == h.step_id), None)
+                        role_name = roles_by_id.get(step.approver_role_id, "Approver") if step else "Approver"
+                        past_approvers.append(f"{role_name} ({u.first_name} {u.last_name})")
+                        
+                pending_approvers = []
+                for s in pending_steps:
+                    role_name = roles_by_id.get(s.approver_role_id, "Approver")
+                    pending_approvers.append(role_name)
+                        
+                current_step_sequence = active_step.step_number if active_step else (max(s.step_number for s in wf_steps) if wf_steps else 0)
+                steps_to_return = [active_step] if active_step else wf_steps
+
+                pending_workflows.append({
+                    "workflow_id": workflow.workflow_id,
+                    "entity_type": "Purchase Requisition",
+                    "entity_id": pr.pr_id,
+                    "current_step_sequence": current_step_sequence,
+                    "status": workflow.status,
+                    "created_at": workflow.created_at,
+                    "requestor_id": pr.requestor_id,
+                    "requestor_name": f"{requestor.first_name} {requestor.last_name}",
+                    "title": pr.title,
+                    "justification": pr.justification,
+                    "past_approvers": past_approvers,
+                    "pending_approvers": pending_approvers,
+                    "steps": steps_to_return,
+                    "can_approve": can_approve
+                })
+
+        return pending_workflows
 
     async def get_active_step(self, pr_id: int) -> ApprovalStep:
         workflow = await self.workflow_repo.get_by_pr_id(pr_id)
@@ -471,6 +637,44 @@ class ApprovalService:
         await self.workflow_history_repo.create(w_hist)
 
         return await self.pr_repo.get_by_id(pr_id)
+
+    async def cancel_workflow(self, workflow_id: int, user_id: int, comments: str = "Cancelled by requestor") -> bool:
+        workflow = await self.workflow_repo.get_by_id(workflow_id)
+        if not workflow:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow not found")
+            
+        pr = await self.pr_repo.get_by_id(workflow.pr_id)
+        if not pr:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Purchase Requisition not found")
+            
+        if pr.requestor_id != user_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the requestor can cancel this approval")
+            
+        # Cancel workflow
+        workflow.status = "Cancelled"
+        await self.workflow_repo.update(workflow)
+        
+        old_status = pr.status
+        pr.status = "Cancelled"
+        await self.pr_repo.update(pr)
+        
+        # Release budget reservation
+        if pr.budget_code:
+            await self.budget_service.release_budget(pr.pr_id)
+            
+        # Log workflow history
+        w_hist = WorkflowHistory(
+            pr_id=pr.pr_id,
+            action="Cancelled",
+            performed_by=user_id,
+            from_status=old_status,
+            to_status="Cancelled",
+            comments=comments,
+            created_at=datetime.utcnow()
+        )
+        await self.workflow_history_repo.create(w_hist)
+        
+        return True
 
     async def _get_status_from_role_id(self, role_id: int) -> str:
         """

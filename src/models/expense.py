@@ -16,9 +16,13 @@ class ExpenseReport(Base):
     department_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("departments.department_id", ondelete="SET NULL"), nullable=True)
     cost_center_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("cost_centres.cost_center_id", ondelete="SET NULL"), nullable=True)
     project_code: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    status: Mapped[str] = mapped_column(String(50), default="Draft") # Draft, Submitted, Pending Approval, Approved, Rejected, Reimbursed
+    status: Mapped[str] = mapped_column(String(50), default="Draft") # Draft, Submitted, Pending Approval, Approved, Finance Verified, Payment Requested, Closed
     currency: Mapped[str] = mapped_column(String(10), default="USD")
     total_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0.00"))
+    duplicate_flag: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    policy_flags: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    payment_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    payment_reference: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

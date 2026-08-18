@@ -49,6 +49,24 @@ class ApprovalWorkflowSchema(BaseModel):
     steps: List[ApprovalStepSchema] = []
 
 
+class InboxApprovalWorkflowSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    workflow_id: int
+    entity_type: str
+    entity_id: int
+    current_step_sequence: int
+    status: str
+    created_at: datetime
+    requestor_id: Optional[int] = None
+    requestor_name: str
+    title: Optional[str] = None
+    justification: Optional[str] = None
+    past_approvers: List[str] = []
+    steps: List[ApprovalStepSchema] = []
+    can_approve: bool = False
+
+
 class WorkflowHistorySchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -17,6 +17,17 @@ class POItemSchema(POItemCreate):
     po_item_id: int
     po_id: int
     total_price: Decimal
+    vendor_delivery_id: Optional[str] = None
+    receiver_delivery_id: Optional[str] = None
+    delivery_verification_status: Optional[str] = None
+
+
+class ItemDeliveryRequest(BaseModel):
+    vendor_product_id: str
+
+
+class ItemVerificationRequest(BaseModel):
+    receiver_product_id: str
 
 
 class POApprovalSchema(BaseModel):

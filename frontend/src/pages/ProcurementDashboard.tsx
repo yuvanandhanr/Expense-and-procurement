@@ -1,7 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../services/api";
-import { Card, CardHeader, CardTitle, CardContent, Skeleton, Badge } from "../components/ui";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Skeleton,
+  Badge,
+  HeroTimestamp,
+} from "../components/ui";
 import { formatDate } from "../utils/helpers";
 import {
   Users,
@@ -105,9 +113,7 @@ export const ProcurementDashboard: React.FC = () => {
             Supplier and Contract health overview for: <Badge variant="info" className="ml-1">{role}</Badge>
           </p>
         </div>
-        <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-          As of {data?.timestamp ? new Date(data.timestamp).toLocaleString() : new Date().toLocaleString()}
-        </div>
+        <HeroTimestamp staticDate={data?.timestamp} />
       </div>
 
       {/* KPI Cards Grid */}
@@ -206,24 +212,63 @@ export const ProcurementDashboard: React.FC = () => {
           <CardContent className="space-y-3">
             <a
               href="/vendors"
-              className="flex items-center justify-between p-3 rounded-lg border border-border bg-accent/20 hover:bg-accent hover:scale-[1.01] transition-all font-semibold text-xs uppercase tracking-wider"
+              className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:-translate-y-[1px] hover:border-violet/50 hover:shadow-sm transition-all group"
             >
-              <span>Manage Vendors</span>
-              <span>&rarr;</span>
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 rounded-md bg-violet/10 text-violet flex items-center justify-center">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="block font-bold text-sm text-foreground group-hover:text-violet transition-colors">Manage Vendors</span>
+                  <span className="block text-[10px] text-muted-foreground font-medium mt-0.5">Approve and onboard</span>
+                </div>
+              </div>
+              <span className="text-muted-foreground group-hover:text-violet transition-colors">&rarr;</span>
             </a>
             <a
               href="/contracts"
-              className="flex items-center justify-between p-3 rounded-lg border border-border bg-accent/20 hover:bg-accent hover:scale-[1.01] transition-all font-semibold text-xs uppercase tracking-wider"
+              className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:-translate-y-[1px] hover:border-cyan/50 hover:shadow-sm transition-all group"
             >
-              <span>Review Contracts</span>
-              <span>&rarr;</span>
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 rounded-md bg-cyan/10 text-cyan flex items-center justify-center">
+                  <FileSpreadsheet className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="block font-bold text-sm text-foreground group-hover:text-cyan transition-colors">Review Contracts</span>
+                  <span className="block text-[10px] text-muted-foreground font-medium mt-0.5">Manage agreements</span>
+                </div>
+              </div>
+              <span className="text-muted-foreground group-hover:text-cyan transition-colors">&rarr;</span>
+            </a>
+            <a
+              href="/quotations"
+              className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:-translate-y-[1px] hover:border-lime/50 hover:shadow-sm transition-all group"
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 rounded-md bg-lime/10 text-lime flex items-center justify-center">
+                  <Briefcase className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="block font-bold text-sm text-foreground group-hover:text-lime transition-colors">Review Quotations</span>
+                  <span className="block text-[10px] text-muted-foreground font-medium mt-0.5">Evaluate supplier bids</span>
+                </div>
+              </div>
+              <span className="text-muted-foreground group-hover:text-lime transition-colors">&rarr;</span>
             </a>
             <a
               href="/pos"
-              className="flex items-center justify-between p-3 rounded-lg border border-border bg-accent/20 hover:bg-accent hover:scale-[1.01] transition-all font-semibold text-xs uppercase tracking-wider"
+              className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:-translate-y-[1px] hover:border-violet/50 hover:shadow-sm transition-all group"
             >
-              <span>View Open POs</span>
-              <span>&rarr;</span>
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 rounded-md bg-violet/10 text-violet flex items-center justify-center">
+                  <Package className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="block font-bold text-sm text-foreground group-hover:text-violet transition-colors">View Open POs</span>
+                  <span className="block text-[10px] text-muted-foreground font-medium mt-0.5">Track fulfillments</span>
+                </div>
+              </div>
+              <span className="text-muted-foreground group-hover:text-violet transition-colors">&rarr;</span>
             </a>
           </CardContent>
         </Card>

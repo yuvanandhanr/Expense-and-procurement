@@ -258,9 +258,22 @@ async def test_submit_pr_success(
     mock_alloc_get.return_value = None
     mock_get_pr.return_value = mock_pr
 
-    mock_result = MagicMock()
-    mock_result.scalars.return_value.all.return_value = []
-    override_db.execute = AsyncMock(return_value=mock_result)
+    def execute_side_effect(query):
+        res = MagicMock()
+        query_str = str(query)
+        if "FROM roles" in query_str:
+            if "role_id" in query_str:
+                mock_role = MagicMock()
+                mock_role.role_name = "Manager"
+                res.scalar_one_or_none.return_value = mock_role
+            else:
+                res.scalar_one_or_none.return_value = None
+        else:
+            res.scalars().all.return_value = []
+            res.scalar_one_or_none.return_value = None
+        return res
+    
+    override_db.execute = AsyncMock(side_effect=execute_side_effect)
 
     response = await async_client.post("/api/v1/pr/1/submit")
     assert response.status_code == status.HTTP_200_OK
@@ -331,7 +344,9 @@ async def test_cancel_pr(
 @patch.object(ApprovalStepRepository, "update", new_callable=AsyncMock)
 @patch.object(ApprovalHistoryRepository, "create", new_callable=AsyncMock)
 @patch.object(WorkflowHistoryRepository, "create", new_callable=AsyncMock)
+@patch("src.services.rfq_service.RFQService")
 async def test_approve_step_success(
+    mock_rfq_service_class,
     mock_wf_hist,
     mock_app_hist,
     mock_step_update,
@@ -355,6 +370,10 @@ async def test_approve_step_success(
     from src.auth.dependencies import get_current_user
     app.dependency_overrides[get_current_user] = lambda: mock_manager
 
+    mock_rfq_instance = AsyncMock()
+    mock_rfq_instance.create_rfq.return_value = MagicMock(rfq_id=1)
+    mock_rfq_service_class.return_value = mock_rfq_instance
+
     mock_pr.status = "Pending Manager Approval"
     mock_pr_get.return_value = mock_pr
 
@@ -365,6 +384,30 @@ async def test_approve_step_success(
     mock_step = ApprovalStep(step_id=1, workflow_id=1, step_number=1, approver_role_id=2, status="Pending")
     mock_active_step.side_effect = [mock_step, mock_step, None] # First call: route handler, second call: service verification, third call: next step
     mock_step_get.return_value = mock_step
+
+    def execute_side_effect(query):
+        res = MagicMock()
+        query_str = str(query)
+        if "approval_workflows" in query_str:
+            res.scalar_one_or_none.return_value = mock_wf
+        elif "purchase_requisitions" in query_str:
+            res.scalar_one_or_none.return_value = mock_pr
+        elif "FROM users" in query_str:
+            mock_requestor = MagicMock()
+            mock_requestor.manager_id = 2
+            res.scalar_one_or_none.return_value = mock_requestor
+        elif "FROM roles" in query_str:
+            if "role_id" in query_str:
+                mock_role = MagicMock()
+                mock_role.role_id = 2
+                res.scalar_one_or_none.return_value = mock_role
+            else:
+                res.scalar_one_or_none.return_value = None
+        else:
+            res.scalars().first.return_value = None
+            res.scalar_one_or_none.return_value = None
+        return res
+    override_db.execute.side_effect = execute_side_effect
 
     headers = {"Authorization": f"Bearer {manager_jwt}"}
     response = await async_client.post("/api/v1/pr/1/approve", json={"comments": "Looks good"}, headers=headers)

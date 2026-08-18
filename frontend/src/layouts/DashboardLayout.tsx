@@ -71,64 +71,107 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Define sidebar items with role/permission filters
-  const sidebarItems = hasRole("Vendor Portal") || hasRole("Vendor") ? [
-    {
-      title: "Vendor Operations",
-      items: [
-        { label: "Vendor Portal", path: "/vendor-portal", icon: LayoutDashboard, show: true },
-        { label: "Invoices", path: "/invoices", icon: CreditCard, show: true },
-      ]
+  const buildSidebar = () => {
+    const isVendor = hasRole("Vendor Portal") || hasRole("Vendor");
+    const isEmployee = !isVendor && user?.roles?.some(r => r.role_name === "Employee");
+    const isManager = hasRole("Manager");
+    const isFinance = hasRole("Finance") || hasRole("Finance Manager");
+    const isCFO = hasRole("CFO");
+    const isCTO = hasRole("CTO");
+    const isAdmin = hasRole("Admin") || hasRole("CEO");
+    const isProcurement = hasRole("Procurement") || hasRole("Procurement Officer") || hasRole("Procurement Manager");
+
+    if (isVendor) {
+      return [
+        {
+          title: "Vendor Operations",
+          items: [
+            { label: "Vendor Dashboard", path: "/vendor-portal", icon: LayoutDashboard, show: true },
+            { label: "RFQs & Details", path: "/rfqs", icon: Briefcase, show: true },
+            { label: "Purchase Orders", path: "/pos", icon: Package, show: true },
+            { label: "Delivered Items", path: "/delivered-items", icon: Activity, show: true },
+            { label: "Invoices", path: "/invoices", icon: CreditCard, show: true },
+          ]
+        }
+      ];
     }
-  ] : [
-    {
-      title: "Overview",
-      items: [
-        { label: "Dashboard", path: "/", icon: LayoutDashboard, show: true },
-        { label: "Global Search", path: "/search", icon: Search, show: true },
-      ],
-    },
-    {
-      title: "Expense Operations",
-      items: [
-        { label: "My Assets", path: "/my-assets", icon: HardDrive, show: true },
-        { label: "Employee Expenses", path: "/expenses", icon: FileText, show: true },
-        { label: "Purchase Requisitions", path: "/prs", icon: FileText, show: true },
-        { label: "Approvals Inbox", path: "/approvals", icon: CheckSquare, show: hasRole("Manager") || hasRole("Finance") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("CEO") },
-      ],
-    },
-    {
-      title: "Procurement Cycle",
-      items: [
-        { label: "Cycle Dashboard", path: "/procurement-dashboard", icon: LayoutDashboard, show: hasRole("Finance") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("Manager") || hasRole("Admin") || hasRole("CEO") },
-        { label: "Vendors & Scores", path: "/vendors", icon: Users, show: hasPermission("manage_vendors") || hasRole("Procurement") || hasRole("CFO") },
-        { label: "RFQs & Invitations", path: "/rfqs", icon: Briefcase, show: hasPermission("manage_rfq") || hasRole("Procurement") },
-        { label: "Quotations Inbox", path: "/quotations", icon: Layers, show: hasPermission("manage_rfq") || hasRole("Procurement") },
-        { label: "Purchase Orders", path: "/pos", icon: Package, show: true },
-        { label: "Contracts", path: "/contracts", icon: FileSpreadsheet, show: hasRole("Finance") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("Procurement") || hasRole("Admin") || hasRole("CEO") },
-      ],
-    },
-    {
-      title: "Execution & Match",
-      items: [
-        { label: "Deliveries", path: "/deliveries", icon: Activity, show: true },
-        { label: "Goods Receipt (GRNs)", path: "/grns", icon: CheckCircle, show: hasRole("Manager") || hasRole("Finance") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("Procurement") || hasRole("Admin") || hasRole("CEO") },
-        { label: "Assets Registry", path: "/assets", icon: HardDrive, show: true },
-        { label: "Invoices", path: "/invoices", icon: CreditCard, show: true },
-      ],
-    },
-    {
-      title: "Intelligence & Platform",
-      items: [
-        { label: "Analytics & Trends", path: "/analytics", icon: TrendingUp, show: hasRole("CEO") || hasRole("CFO") || hasRole("Finance") || hasRole("Finance Manager") || hasRole("Procurement") },
-        { label: "Reports Export", path: "/reports", icon: FileSpreadsheet, show: true },
-        { label: "Audit Timeline", path: "/audit-logs", icon: ShieldCheck, show: hasRole("CEO") || hasRole("CFO") || hasRole("Finance") || hasRole("Finance Manager") || hasRole("Admin") },
-        { label: "User Management", path: "/users", icon: UserCog, show: hasRole("Admin") },
-        { label: "System Health", path: "/monitoring", icon: Activity, show: hasRole("Admin") || hasRole("CEO") },
-        { label: "Settings", path: "/settings", icon: Settings, show: hasRole("Admin") || hasRole("CEO") },
-      ],
-    },
-  ];
+
+    type MenuItem = { label: string; path: string; icon: any; show: boolean };
+    type MenuGroup = { title: string; items: MenuItem[] };
+
+    const menuConfig: MenuGroup[] = [
+      {
+        title: "Overview",
+        items: [
+          { label: isCFO || isCTO ? "Executive Dashboard" : "Dashboard", path: "/", icon: LayoutDashboard, show: true },
+          { label: "Global Search", path: "/search", icon: Search, show: true },
+        ],
+      },
+      {
+        title: "My Requests",
+        items: [
+          { label: isManager ? "Team Reimbursements" : "Employee Reimbursements", path: "/expenses", icon: FileText, show: isEmployee || isManager || isAdmin },
+          { label: "Purchase Requisitions", path: "/prs", icon: FileText, show: isEmployee || isManager || isAdmin },
+          { label: "My Assets", path: "/my-assets", icon: HardDrive, show: isEmployee || isManager || isAdmin },
+        ]
+      },
+      {
+        title: "Approvals",
+        items: [
+          { label: isCFO ? "Approval Queue" : "Pending Approvals", path: "/approvals", icon: CheckSquare, show: isManager || isFinance || isCFO || isAdmin },
+        ]
+      },
+      {
+        title: "Financial Operations",
+        items: [
+          { label: "Expense Verification", path: "/expenses", icon: FileText, show: isFinance && !isAdmin },
+          { label: "Reimbursements", path: "/expenses", icon: FileText, show: isCFO || isAdmin },
+          { label: isCFO ? "Vendor Payments" : "Vendor Invoices", path: "/invoices", icon: CreditCard, show: isFinance || isCFO || isAdmin },
+          { label: "Financial Analytics", path: "/analytics", icon: TrendingUp, show: isFinance || isCFO || isAdmin },
+          { label: "Reports", path: "/reports", icon: FileSpreadsheet, show: isFinance || isCFO || isAdmin },
+        ]
+      },
+      {
+        title: "Procurement Cycle",
+        items: [
+          { label: "Cycle Dashboard", path: "/procurement-dashboard", icon: LayoutDashboard, show: isProcurement || isFinance || isCFO || isAdmin },
+          { label: "Vendors & Scores", path: "/vendors", icon: Users, show: isProcurement || isFinance || isCFO || isAdmin },
+          { label: "RFQs & Invitations", path: "/rfqs", icon: Briefcase, show: isProcurement || isFinance || isCFO || isAdmin },
+          { label: "Quotations Inbox", path: "/quotations", icon: Layers, show: isProcurement || isFinance || isCFO || isAdmin },
+          { label: "Purchase Orders", path: "/pos", icon: Package, show: isProcurement || isFinance || isCFO || isAdmin },
+          { label: "Contracts", path: "/contracts", icon: FileSpreadsheet, show: isProcurement || isFinance || isCFO || isAdmin },
+          { label: "Deliveries & GRNs", path: "/grns", icon: CheckCircle, show: isProcurement || isFinance || isCFO || isAdmin },
+          { label: "Assets Registry", path: "/assets", icon: HardDrive, show: isProcurement || isFinance || isCFO || isAdmin },
+        ]
+      },
+      {
+        title: "Intelligence & Platform",
+        items: [
+          { label: "System Analytics", path: "/monitoring", icon: Activity, show: isCTO || isAdmin },
+          { label: "Operational Analytics", path: "/analytics", icon: TrendingUp, show: isCTO },
+          { label: "Audit Timeline", path: "/audit-logs", icon: ShieldCheck, show: isCTO || isAdmin },
+          { label: "User Management", path: "/users", icon: UserCog, show: isAdmin },
+          { label: "Settings", path: "/settings", icon: Settings, show: isAdmin },
+        ]
+      }
+    ];
+
+    // Deduplicate any items that might appear multiple times due to role overlap (like expenses)
+    const uniquePaths = new Set();
+    const finalSidebar = menuConfig.map(group => {
+      const filteredItems = group.items.filter(item => {
+        if (!item.show) return false;
+        if (uniquePaths.has(item.path)) return false;
+        uniquePaths.add(item.path);
+        return true;
+      });
+      return { ...group, items: filteredItems };
+    }).filter(group => group.items.length > 0);
+
+    return finalSidebar;
+  };
+
+  const sidebarItems = buildSidebar();
 
   // Derive breadcrumbs from path
   const pathParts = location.pathname.split("/").filter(Boolean);
@@ -158,11 +201,11 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       >
         <div className="h-16 flex items-center justify-between px-6 border-b border-border/40">
           <div className="flex items-center space-x-3 overflow-hidden">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
+            <div className="w-[34px] h-[34px] rounded-[11px] gradient-accent flex items-center justify-center text-white font-bold text-lg shadow-sm">
               E
             </div>
             {isSidebarOpen && (
-              <span className="font-bold text-md tracking-wider uppercase font-sans">
+              <span className="font-bold text-md tracking-wider uppercase font-sans text-foreground">
                 ProcureEnt
               </span>
             )}
@@ -184,7 +227,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
             return (
               <div key={groupIdx} className="space-y-2">
                 {isSidebarOpen && (
-                  <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-2">
+                  <span className="block text-[10.5px] font-semibold text-muted-foreground uppercase tracking-[1.6px] px-2 mb-2">
                     {group.title}
                   </span>
                 )}
@@ -196,14 +239,19 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
                       <Link
                         key={itemIdx}
                         to={item.path}
-                        className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                        className={`flex items-center justify-between px-3 py-2.5 rounded-[10px] text-sm font-semibold transition-all duration-200 ${
                           isActive
-                            ? "bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-[1.02]"
-                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                            ? "gradient-accent text-white shadow-lg shadow-violet/20"
+                            : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
                         }`}
                       >
-                        <Icon className="w-5 h-5 flex-shrink-0" />
-                        {isSidebarOpen && <span>{item.label}</span>}
+                        <div className="flex items-center space-x-3">
+                          <Icon className="w-5 h-5 flex-shrink-0" />
+                          {isSidebarOpen && <span>{item.label}</span>}
+                        </div>
+                        {isActive && isSidebarOpen && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-lime animate-pulse mr-1" />
+                        )}
                       </Link>
                     );
                   })}
@@ -243,12 +291,17 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
                             key={itemIdx}
                             to={item.path}
                             onClick={() => setIsMobileSidebarOpen(false)}
-                            className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-semibold ${
-                              isActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"
+                            className={`flex items-center justify-between px-3 py-2.5 rounded-[10px] text-sm font-semibold ${
+                              isActive ? "gradient-accent text-white shadow-lg shadow-violet/20" : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
                             }`}
                           >
-                            <Icon className="w-5 h-5" />
-                            <span>{item.label}</span>
+                            <div className="flex items-center space-x-3">
+                              <Icon className="w-5 h-5" />
+                              <span>{item.label}</span>
+                            </div>
+                            {isActive && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-lime animate-pulse mr-1" />
+                            )}
                           </Link>
                         );
                       })}
@@ -292,7 +345,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
                 placeholder="Quick search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-4 py-1.5 w-60 rounded-full bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-ring focus:w-72 transition-all duration-300"
+                className="pl-9 pr-4 py-1.5 w-60 rounded-full bg-card/50 backdrop-blur-md border border-border text-xs focus:outline-none focus:ring-1 focus:ring-violet focus:w-72 transition-all duration-300 shadow-sm"
               />
             </form>
 
@@ -342,10 +395,10 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
             <div className="relative">
               <button
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className="flex items-center space-x-2 p-1.5 rounded-full hover:bg-accent transition-colors"
+                className="flex items-center space-x-2 p-1.5 rounded-full hover:bg-accent/50 transition-colors"
               >
-                <div className="w-8 h-8 rounded-full bg-primary/20 text-primary font-bold flex items-center justify-center text-sm border border-primary/20">
-                  {user?.first_name[0]}{user?.last_name[0]}
+                <div className="w-[34px] h-[34px] rounded-full gradient-accent text-white font-bold flex items-center justify-center text-sm shadow-sm border border-white/10">
+                  {user?.first_name?.[0] || user?.email?.[0]?.toUpperCase() || "U"}
                 </div>
               </button>
 

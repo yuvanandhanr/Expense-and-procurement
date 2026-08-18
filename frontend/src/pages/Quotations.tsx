@@ -1,28 +1,34 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { useAuth } from "../hooks/useAuth";
-import { Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Button } from "../components/ui";
+import {Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Button, EmptyState} from "../components/ui";
 import toast from "react-hot-toast";
 import { Quotation } from "../types";
 
 export const Quotations: React.FC = () => {
   const { user } = useAuth();
   const [quotes, setQuotes] = useState<Quotation[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedQuoteId, setExpandedQuoteId] = useState<number | null>(null);
 
+  const fetchData = async () => {
+    try {
+      const [quotesRes, poRes] = await Promise.all([
+        api.get("/quotations"),
+        api.get("/purchase-orders")
+      ]);
+      setQuotes(quotesRes.data);
+      setPurchaseOrders(poRes.data);
+    } catch (err) {
+      console.error("Failed to load data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchQuotes = async () => {
-      try {
-        const response = await api.get("/quotations");
-        setQuotes(response.data);
-      } catch (err) {
-        console.error("Failed to load quotations:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchQuotes();
+    fetchData();
   }, []);
 
   const handleApprove = async (quote: any) => {
@@ -33,9 +39,8 @@ export const Quotations: React.FC = () => {
         reason: "Approved by Finance"
       });
       toast.success("Quotation approved and Purchase Order auto-generated!");
-      // Refetch
-      const response = await api.get("/quotations");
-      setQuotes(response.data);
+      // Refetch both quotes and POs to get the newly generated PO
+      fetchData();
     } catch (err) {
       console.error(err);
       toast.error("Failed to approve quotation.");
@@ -58,9 +63,7 @@ export const Quotations: React.FC = () => {
               <Skeleton className="h-8 w-full" />
             </div>
           ) : quotes.length === 0 ? (
-            <div className="p-12 text-center text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-              No bids or quotations recorded yet.
-            </div>
+            <EmptyState title="No bids or quotations recorded yet." description="Data will appear here once available." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm border-collapse">
@@ -127,6 +130,47 @@ export const Quotations: React.FC = () => {
                                 </tbody>
                               </table>
                             </div>
+                            
+                            {/* Embed Auto-Generated Purchase Order Details if this quote is selected */}
+                            {(q.is_selected || q.status === "Selected") && (
+                              (() => {
+                                const linkedPo = purchaseOrders.find(
+                                  po => po.rfq_id === q.rfq_id && po.vendor_id === q.vendor_id
+                                );
+                                if (!linkedPo) return null;
+                                return (
+                                  <div className="mt-4 p-4 bg-primary/5 border-l-4 border-primary rounded-r-lg">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <h4 className="font-bold text-sm text-foreground">Auto-Generated Purchase Order</h4>
+                                      <Badge variant="neutral">{linkedPo.status}</Badge>
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                                      <div>
+                                        <p className="text-muted-foreground mb-1">PO Number</p>
+                                        <p className="font-mono font-bold text-primary">{linkedPo.po_number}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-muted-foreground mb-1">Grand Total</p>
+                                        <p className="font-bold">${linkedPo.grand_total?.toLocaleString()}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-muted-foreground mb-1">Delivery Date</p>
+                                        <p className="font-medium">{new Date(linkedPo.delivery_date || linkedPo.created_at).toLocaleDateString()}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-muted-foreground mb-1">Generated On</p>
+                                        <p className="font-medium">{new Date(linkedPo.created_at).toLocaleDateString()}</p>
+                                      </div>
+                                    </div>
+                                    <div className="mt-3 flex justify-end">
+                                      <Button variant="outline" size="sm" onClick={() => window.location.href='/purchase-orders'}>
+                                        View Full PO
+                                      </Button>
+                                    </div>
+                                  </div>
+                                );
+                              })()
+                            )}
                           </td>
                         </tr>
                       )}

@@ -21,11 +21,27 @@ class RequestForQuotation(Base):
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    pr: Mapped[Optional["PurchaseRequisition"]] = relationship("PurchaseRequisition")
+    pr: Mapped[Optional["PurchaseRequisition"]] = relationship("PurchaseRequisition", lazy="selectin")
     creator: Mapped[Optional["User"]] = relationship("User")
     items: Mapped[List["RFQItem"]] = relationship("RFQItem", back_populates="rfq", cascade="all, delete-orphan")
     rfq_vendors: Mapped[List["RFQVendor"]] = relationship("RFQVendor", back_populates="rfq", cascade="all, delete-orphan")
     quotations: Mapped[List["VendorQuotation"]] = relationship("VendorQuotation", back_populates="rfq", cascade="all, delete-orphan")
+
+    @property
+    def pr_description(self) -> Optional[str]:
+        return self.pr.description if self.pr else None
+
+    @property
+    def pr_justification(self) -> Optional[str]:
+        return self.pr.justification if self.pr else None
+
+    @property
+    def pr_project_code(self) -> Optional[str]:
+        return self.pr.project_code if self.pr else None
+
+    @property
+    def pr_priority(self) -> Optional[str]:
+        return self.pr.priority if self.pr else None
 
 
 class RFQItem(Base):

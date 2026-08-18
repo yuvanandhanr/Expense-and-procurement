@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { Asset, User } from "../types";
-import { Card, CardContent, Badge, Skeleton, Button, Dialog } from "../components/ui";
+import {Card, CardContent, Badge, Skeleton, Button, Dialog, EmptyState} from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
 import { ArrowRightLeft } from "lucide-react";
@@ -19,21 +19,27 @@ export const Assets: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isAdmin = user?.roles?.some(r => r.role_name === "Admin") || false;
+  const canViewAll = user?.roles?.some(r => ["Admin", "CEO", "CFO", "Finance Manager"].includes(r.role_name)) || false;
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [assetsRes, usersRes] = await Promise.all([
-          api.get("/assets"),
-          api.get("/users")
-        ]);
+        const endpoint = canViewAll ? "/assets" : "/assets/my-assets";
+        const assetsRes = await api.get(endpoint);
         setAssets(assetsRes.data);
-        setUsers(usersRes.data);
       } catch (err) {
-        console.error("Failed to load data:", err);
-      } finally {
-        setLoading(false);
+        console.error("Failed to load assets:", err);
       }
+      
+      if (isAdmin) {
+        try {
+          const usersRes = await api.get("/users");
+          setUsers(usersRes.data);
+        } catch (err) {
+          console.error("Failed to load users:", err);
+        }
+      }
+      setLoading(false);
     };
     fetchData();
   }, []);
@@ -53,7 +59,8 @@ export const Assets: React.FC = () => {
       setTransferNotes("");
       
       // Reload assets
-      const assetsRes = await api.get("/assets");
+      const endpoint = canViewAll ? "/assets" : "/assets/my-assets";
+      const assetsRes = await api.get(endpoint);
       setAssets(assetsRes.data);
     } catch (err) {
       toast.error("Failed to transfer asset.");
@@ -77,9 +84,7 @@ export const Assets: React.FC = () => {
               <Skeleton className="h-8 w-full" />
             </div>
           ) : assets.length === 0 ? (
-            <div className="p-12 text-center text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-              No registered assets found.
-            </div>
+            <EmptyState title="No registered assets found." description="Data will appear here once available." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm border-collapse">
@@ -89,8 +94,8 @@ export const Assets: React.FC = () => {
                     <th className="p-4">Name</th>
                     <th className="p-4">Serial Number</th>
                     <th className="p-4">Category</th>
-                    <th className="p-4">Assigned To</th>
-                    <th className="p-4">Cost</th>
+                    {canViewAll && <th className="p-4">Assigned To</th>}
+                    {canViewAll && <th className="p-4">Cost</th>}
                     <th className="p-4">Status</th>
                     {isAdmin && <th className="p-4 text-right">Actions</th>}
                   </tr>
@@ -102,8 +107,8 @@ export const Assets: React.FC = () => {
                       <td className="p-4 font-semibold">{a.asset_name}</td>
                       <td className="p-4 font-mono text-xs">{a.serial_number || "N/A"}</td>
                       <td className="p-4">{a.category}</td>
-                      <td className="p-4 text-xs font-semibold">{a.assigned_to_name || "Unassigned"}</td>
-                      <td className="p-4 font-bold">${a.cost?.toLocaleString()}</td>
+                      {canViewAll && <td className="p-4 text-xs font-semibold">{a.assigned_to_name || "Unassigned"}</td>}
+                      {canViewAll && <td className="p-4 font-bold">${a.cost?.toLocaleString()}</td>}
                       <td className="p-4">
                         <Badge variant={a.status === "Active" || a.status === "Assigned" ? "success" : "neutral"}>
                           {a.status}

@@ -92,8 +92,8 @@ async def request_vendor_otp(
     Validates the vendor email address and triggers a 6-digit verification OTP.
     """
     auth_service = AuthenticationService(db)
-    await auth_service.request_vendor_otp(body.email)
-    return {"message": "OTP generated and logged successfully."}
+    result = await auth_service.request_vendor_otp(body.email)
+    return result
 
 
 @router.post(

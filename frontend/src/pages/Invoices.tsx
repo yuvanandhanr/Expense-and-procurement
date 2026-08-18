@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { api } from "../services/api";
 import { Invoice } from "../types";
 import { useAuth } from "../hooks/useAuth";
-import { Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Button, Dialog, Input } from "../components/ui";
+import {Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Button, Dialog, Input, EmptyState} from "../components/ui";
 import { formatDate, getErrorMessage } from "../utils/helpers";
 import toast from "react-hot-toast";
 import { FileText, Edit2, CheckCircle, XCircle } from "lucide-react";
@@ -27,6 +27,11 @@ export const Invoices: React.FC = () => {
   const [serialNumber, setSerialNumber] = useState("");
 
   const isManager = user?.roles?.some(r => ["Manager", "Finance Manager", "CFO", "Admin"].includes(r.role_name)) || false;
+  const isVendor = user?.roles?.some(r => ["Vendor", "Vendor Portal"].includes(r.role_name)) || false;
+  const isFinance = user?.roles?.some(r => ["Finance", "Finance Manager", "CFO", "Admin"].includes(r.role_name)) || false;
+
+  // Security Check: Block standard employees who aren't managers/finance/vendors from seeing this.
+  const isEmployeeOnly = user?.roles?.some(r => r.role_name === "Employee") && !isManager && !isFinance && !isVendor;
 
   const fetchInvoices = async () => {
     setLoading(true);
@@ -117,6 +122,18 @@ export const Invoices: React.FC = () => {
     }
   };
 
+  if (isEmployeeOnly) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <EmptyState 
+          icon={<XCircle className="w-16 h-16 text-rose-500/50" />} 
+          title="Access Denied" 
+          description="Vendor Invoices are restricted to Finance and Vendor operations. Please go to My Reimbursements to manage your expenses." 
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -154,9 +171,7 @@ export const Invoices: React.FC = () => {
               <Skeleton className="h-8 w-full" />
             </div>
           ) : invoices.length === 0 ? (
-            <div className="p-12 text-center text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-              No invoices uploaded.
-            </div>
+            <EmptyState title="No invoices uploaded." description="Data will appear here once available." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm border-collapse">

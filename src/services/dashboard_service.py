@@ -116,22 +116,22 @@ class DashboardService:
         """
         query = select(
             Vendor.vendor_id,
-            Vendor.name,
-            Vendor.code,
-            func.coalesce(func.avg(VendorPerformance.quality_rating), 0).label("avg_quality"),
-            func.coalesce(func.avg(VendorPerformance.delivery_rating), 0).label("avg_delivery"),
-            func.coalesce(func.avg(VendorPerformance.compliance_rating), 0).label("avg_compliance")
+            Vendor.vendor_name,
+            Vendor.vendor_code,
+            func.coalesce(func.avg(VendorPerformance.quality_score), 0).label("avg_quality"),
+            func.coalesce(func.avg(VendorPerformance.delivery_performance), 0).label("avg_delivery"),
+            func.coalesce(func.avg(VendorPerformance.contract_compliance), 0).label("avg_compliance")
         ).outerjoin(
             VendorPerformance, Vendor.vendor_id == VendorPerformance.vendor_id
-        ).group_by(Vendor.vendor_id, Vendor.name, Vendor.code)
+        ).group_by(Vendor.vendor_id, Vendor.vendor_name, Vendor.vendor_code)
 
         result = await self.db.execute(query)
         vendors = []
         for row in result.all():
             vendors.append({
                 "vendor_id": row.vendor_id,
-                "name": row.name,
-                "code": row.code,
+                "name": row.vendor_name,
+                "code": row.vendor_code,
                 "quality_rating": float(row.avg_quality),
                 "delivery_rating": float(row.avg_delivery),
                 "compliance_rating": float(row.avg_compliance),
@@ -261,19 +261,19 @@ class DashboardService:
 
     async def _get_top_vendors(self) -> List[Dict[str, Any]]:
         query = select(
-            Vendor.name,
+            Vendor.vendor_name,
             func.sum(PurchaseOrder.total_amount).label("total_po_spend")
         ).join(
             PurchaseOrder, Vendor.vendor_id == PurchaseOrder.vendor_id
         ).where(
             PurchaseOrder.status.in_(["Issued", "Delivered", "Billed"])
-        ).group_by(Vendor.name).order_by(desc("total_po_spend")).limit(5)
+        ).group_by(Vendor.vendor_name).order_by(desc("total_po_spend")).limit(5)
         
         result = await self.db.execute(query)
         vendors = []
         for row in result.all():
             vendors.append({
-                "vendor": row.name,
+                "vendor": row.vendor_name,
                 "spend": float(row.total_po_spend or 0.0)
             })
         return vendors
@@ -293,11 +293,11 @@ class DashboardService:
 
     async def _get_vendor_performance_summary(self) -> List[Dict[str, Any]]:
         query = select(
-            Vendor.name,
-            func.avg(VendorPerformance.score).label("avg_score")
+            Vendor.vendor_name,
+            func.avg(VendorPerformance.rating).label("avg_score")
         ).join(
             VendorPerformance, Vendor.vendor_id == VendorPerformance.vendor_id
-        ).group_by(Vendor.name).order_by(desc("avg_score")).limit(5)
+        ).group_by(Vendor.vendor_name).order_by(desc("avg_score")).limit(5)
         result = await self.db.execute(query)
         return [{"vendor": row[0], "score": float(row[1] or 0.0)} for row in result.all()]
 

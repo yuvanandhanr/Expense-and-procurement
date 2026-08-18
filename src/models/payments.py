@@ -10,7 +10,8 @@ class PaymentRequest(Base):
     __tablename__ = "payment_requests"
 
     payment_request_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    invoice_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("vendor_invoices.invoice_id", ondelete="CASCADE"))
+    invoice_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("vendor_invoices.invoice_id", ondelete="CASCADE"), nullable=True)
+    expense_report_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("expense_reports.expense_report_id", ondelete="CASCADE"), nullable=True)
     po_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("purchase_orders.po_id", ondelete="SET NULL"), nullable=True)
     request_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
@@ -20,7 +21,8 @@ class PaymentRequest(Base):
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    invoice: Mapped["VendorInvoice"] = relationship("VendorInvoice")
+    invoice: Mapped[Optional["VendorInvoice"]] = relationship("VendorInvoice")
+    expense_report: Mapped[Optional["ExpenseReport"]] = relationship("ExpenseReport")
     po: Mapped[Optional["PurchaseOrder"]] = relationship("PurchaseOrder")
     approvals: Mapped[List["PaymentApproval"]] = relationship("PaymentApproval", back_populates="payment_request", cascade="all, delete-orphan")
 

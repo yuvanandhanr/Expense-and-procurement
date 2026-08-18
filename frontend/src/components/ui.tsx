@@ -16,11 +16,11 @@ export const Button: React.FC<ButtonProps> = ({
   const baseStyle = "inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none";
   
   const variants = {
-    primary: "bg-primary text-primary-foreground hover:bg-primary/90 focus:ring-ring shadow-sm",
-    secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 focus:ring-ring",
-    danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus:ring-destructive",
-    outline: "border border-border bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground focus:ring-ring",
-    ghost: "bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground focus:ring-ring",
+    primary: "gradient-accent text-white hover:opacity-90 focus:ring-violet shadow-sm",
+    secondary: "bg-card-2 text-foreground hover:bg-accent/50 focus:ring-violet border border-border",
+    danger: "bg-pink text-white hover:opacity-90 focus:ring-pink shadow-sm",
+    outline: "border border-border bg-transparent text-foreground hover:bg-accent/50 focus:ring-violet",
+    ghost: "bg-transparent text-foreground hover:bg-accent/50 focus:ring-violet",
   };
 
   const sizes = {
@@ -71,9 +71,50 @@ export const Input: React.FC<InputProps> = ({
   );
 };
 
+// --- Select Component ---
+interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+  label?: string;
+  error?: string;
+  options: { label: string; value: string | number }[];
+}
+
+export const Select: React.FC<SelectProps> = ({
+  label,
+  error,
+  className = "",
+  id,
+  options,
+  ...props
+}) => {
+  return (
+    <div className="w-full space-y-1">
+      {label && (
+        <label htmlFor={id} className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          {label}
+        </label>
+      )}
+      <select
+        id={id}
+        className={`w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200 ${
+          error ? "border-destructive focus:ring-destructive" : ""
+        } ${className}`}
+        {...props}
+      >
+        <option value="" disabled>Select an option</option>
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+      {error && <p className="text-xs text-destructive font-medium">{error}</p>}
+    </div>
+  );
+};
+
 // --- Card Components ---
 export const Card: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className = "", children, ...props }) => (
-  <div className={`rounded-xl border border-border bg-card text-card-foreground shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md ${className}`} {...props}>
+  <div className={`rounded-[18px] border border-border bg-card text-foreground shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md ${className}`} {...props}>
     {children}
   </div>
 );
@@ -117,7 +158,7 @@ export const Badge: React.FC<BadgeProps> = ({
 
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-colors duration-200 ${styles[variant]} ${className}`}
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full font-mono text-[10px] font-semibold uppercase tracking-wider transition-colors duration-200 ${styles[variant]} ${className}`}
       {...props}
     >
       {children}
@@ -139,8 +180,8 @@ export const Dialog: React.FC<DialogProps> = ({ isOpen, onClose, title, children
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <div className="relative w-full max-w-lg bg-card text-card-foreground rounded-xl border border-border shadow-2xl p-6 overflow-hidden animate-slide-up">
-        <div className="flex items-center justify-between pb-4 border-b border-border">
-          <h2 className="text-lg font-bold">{title}</h2>
+        <div className="flex items-center justify-between pb-4 border-b border-border/40">
+          <h2 className="text-lg font-bold font-display tracking-tight">{title}</h2>
           <button
             onClick={onClose}
             className="text-muted-foreground hover:text-foreground transition-colors"
@@ -219,4 +260,46 @@ export const TabsContent: React.FC<{ value: string; children: React.ReactNode }>
 // --- Loading Skeleton Component ---
 export const Skeleton: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className = "", ...props }) => (
   <div className={`animate-pulse rounded bg-muted/60 ${className}`} {...props} />
+);
+
+export const HeroTimestamp: React.FC<{ staticDate?: string }> = ({ staticDate }) => {
+  const [time, setTime] = React.useState(new Date());
+  
+  React.useEffect(() => {
+    if (staticDate) return;
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, [staticDate]);
+
+  return (
+    <div className="text-[10px] font-mono text-muted-foreground font-semibold uppercase tracking-[1.6px] border border-border px-3 py-1.5 rounded-lg bg-card-2/50 shadow-sm whitespace-nowrap">
+      AS OF {staticDate ? new Date(staticDate).toLocaleString() : time.toLocaleString()}
+    </div>
+  );
+};
+
+export const EmptyState: React.FC<{
+  icon?: React.ReactNode;
+  title: string;
+  description: string;
+  actionLabel?: string;
+  actionHref?: string;
+  onAction?: () => void;
+}> = ({ icon, title, description, actionLabel, actionHref, onAction }) => (
+  <div className="p-10 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl m-4 bg-card/20 backdrop-blur-sm">
+    {icon && <div className="text-muted-foreground/50 mb-3">{icon}</div>}
+    <p className="text-sm font-semibold text-foreground mb-1">{title}</p>
+    <p className="text-xs text-muted-foreground mb-4">{description}</p>
+    {(actionLabel || onAction) && (
+      actionHref ? (
+        <a href={actionHref} className="text-xs font-bold text-cyan hover:text-cyan/80 flex items-center transition-colors">
+          {actionLabel} <span className="ml-1">&rarr;</span>
+        </a>
+      ) : (
+        <button onClick={onAction} className="text-xs font-bold text-cyan hover:text-cyan/80 flex items-center transition-colors">
+          {actionLabel} <span className="ml-1">&rarr;</span>
+        </button>
+      )
+    )}
+  </div>
 );

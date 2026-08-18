@@ -48,6 +48,9 @@ class PurchaseOrderItem(Base):
     quantity: Mapped[int] = mapped_column(BigInteger, nullable=False)
     unit_price: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
     total_price: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
+    vendor_delivery_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    receiver_delivery_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    delivery_verification_status: Mapped[Optional[str]] = mapped_column(String(50), default="Pending")
 
     # Relationships
     po: Mapped["PurchaseOrder"] = relationship("PurchaseOrder", back_populates="items")

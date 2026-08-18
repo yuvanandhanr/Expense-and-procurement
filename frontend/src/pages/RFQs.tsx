@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { RFQ } from "../types";
-import { Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Button } from "../components/ui";
+import {Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Button, EmptyState} from "../components/ui";
 import { formatDate } from "../utils/helpers";
 
 export const RFQs: React.FC = () => {
@@ -11,7 +11,7 @@ export const RFQs: React.FC = () => {
   useEffect(() => {
     const fetchRFQs = async () => {
       try {
-        const response = await api.get("/rfqs");
+        const response = await api.get("/rfq");
         setRfqs(response.data);
       } catch (err) {
         console.error("Failed to load RFQs:", err);
@@ -36,9 +36,7 @@ export const RFQs: React.FC = () => {
               <Skeleton className="h-8 w-full" />
             </div>
           ) : rfqs.length === 0 ? (
-            <div className="p-12 text-center text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-              No active RFQ sessions found.
-            </div>
+            <EmptyState title="No active RFQ sessions found." description="Data will appear here once available." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm border-collapse">

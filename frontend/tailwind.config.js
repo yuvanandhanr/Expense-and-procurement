@@ -8,39 +8,43 @@ export default {
   theme: {
     extend: {
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
-        },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
-        },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+        background: "var(--bg)",
+        foreground: "var(--text)",
+        card: {
+          DEFAULT: "var(--card)",
+          foreground: "var(--text)",
         },
         popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+          DEFAULT: "var(--card-2)",
+          foreground: "var(--text)",
         },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+        primary: {
+          DEFAULT: "var(--violet)",
+          foreground: "#FFFFFF",
         },
+        secondary: {
+          DEFAULT: "var(--card-2)",
+          foreground: "var(--text)",
+        },
+        muted: {
+          DEFAULT: "var(--line)",
+          foreground: "var(--text-dim)",
+        },
+        accent: {
+          DEFAULT: "var(--line-2)",
+          foreground: "var(--text)",
+        },
+        destructive: {
+          DEFAULT: "var(--pink)",
+          foreground: "#FFFFFF",
+        },
+        border: "var(--line)",
+        input: "var(--line)",
+        ring: "var(--violet)",
+        violet: "var(--violet)",
+        pink: "var(--pink)",
+        lime: "var(--lime)",
+        cyan: "var(--cyan)",
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -60,6 +64,11 @@ export default {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+      },
+      fontFamily: {
+        sans: ["Inter", "sans-serif"],
+        display: ["Space Grotesk", "sans-serif"],
+        mono: ["JetBrains Mono", "monospace"],
       },
     },
   },

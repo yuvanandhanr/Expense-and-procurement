@@ -4,67 +4,91 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222 47% 11%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.75rem;
+    --bg: #FBFAFF;
+    --card: #FFFFFF;
+    --card-2: #FDFCFF;
+    --line: rgba(20,10,40,0.08);
+    --line-2: rgba(20,10,40,0.14);
+    --text: #17132A;
+    --text-dim: #625C7A;
+    --text-faint: #938DAE;
+    --violet: #7C3AED;
+    --pink: #DB2777;
+    --lime: #4D8B1F;
+    --cyan: #0E8FA3;
+    
+    --glow-opacity: 0.12;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 7.5%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 7.5%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47% 11%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --bg: #0A0A12;
+    --card: #14141F;
+    --card-2: #191926;
+    --line: rgba(255,255,255,0.07);
+    --line-2: rgba(255,255,255,0.14);
+    --text: #F3F1FA;
+    --text-dim: #9C99B5;
+    --text-faint: #6B6884;
+    --violet: #8B5CF6;
+    --pink: #F472B6;
+    --lime: #B6FF6E;
+    --cyan: #4CE0E8;
+    
+    --glow-opacity: 0.35;
   }
 }
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: var(--line);
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: var(--bg);
+    color: var(--text);
     font-family: 'Inter', sans-serif;
+    position: relative;
+    min-height: 100vh;
   }
+  
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    background: 
+      radial-gradient(circle at 10% 10%, rgba(139, 92, 246, var(--glow-opacity)) 0%, transparent 40%),
+      radial-gradient(circle at 90% 10%, rgba(244, 114, 182, calc(var(--glow-opacity) * 0.6)) 0%, transparent 40%),
+      radial-gradient(circle at 50% 90%, rgba(76, 224, 232, calc(var(--glow-opacity) * 0.3)) 0%, transparent 40%);
+  }
+
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Space Grotesk', sans-serif;
+    letter-spacing: -0.5px;
   }
+}
+
+.gradient-accent {
+  background: linear-gradient(120deg, var(--violet) 0%, var(--pink) 55%, #FF9F6E 100%);
+}
+
+.gradient-accent-text {
+  background: linear-gradient(120deg, var(--violet) 0%, var(--pink) 55%, #FF9F6E 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* Glassmorphism utility card class */
 .glass-panel {
-  @apply bg-white/80 dark:bg-card/80 backdrop-blur-md border border-white/20 dark:border-white/5 shadow-xl;
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 20px rgba(20,10,40,0.04);
+}
+.dark .glass-panel {
+  background-color: rgba(20, 20, 31, 0.8);
+  border: 1px solid var(--line);
+  box-shadow: none;
 }
 
 /* Custom scrollbars */
@@ -76,5 +100,9 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/30;
+  background-color: var(--line-2);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-dim);
 }

@@ -50,6 +50,10 @@ class RFQSchema(BaseModel):
     pr_id: Optional[int] = None
     title: str
     description: Optional[str] = None
+    pr_description: Optional[str] = None
+    pr_justification: Optional[str] = None
+    pr_project_code: Optional[str] = None
+    pr_priority: Optional[str] = None
     status: str
     submission_deadline: Optional[datetime] = None
     closing_date: Optional[datetime] = None

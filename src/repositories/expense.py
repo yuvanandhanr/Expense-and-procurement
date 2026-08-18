@@ -10,13 +10,15 @@ class ExpenseRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_all_reports(self, employee_id: Optional[int] = None) -> Sequence[ExpenseReport]:
+    async def get_all_reports(self, employee_id: Optional[int] = None, department_id: Optional[int] = None) -> Sequence[ExpenseReport]:
         stmt = select(ExpenseReport).options(
             selectinload(ExpenseReport.receipts),
             selectinload(ExpenseReport.approvals)
         )
         if employee_id:
             stmt = stmt.where(ExpenseReport.employee_id == employee_id)
+        if department_id:
+            stmt = stmt.where(ExpenseReport.department_id == department_id)
         stmt = stmt.order_by(ExpenseReport.created_at.desc())
         result = await self.db.execute(stmt)
         return result.scalars().all()

@@ -11,10 +11,15 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
+    port: 3001,
     proxy: {
       "/api": {
-        target: "http://localhost:8001",
+        target: "http://localhost:8080",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/uploads": {
+        target: "http://localhost:8080",
         changeOrigin: true,
         secure: false,
       },
@@ -23,6 +28,7 @@ export default defineConfig({
   build: {
     sourcemap: false,
     outDir: "dist",
+    assetsDir: "static",
     rollupOptions: {
       output: {
         manualChunks: {

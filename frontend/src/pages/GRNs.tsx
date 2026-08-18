@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { GRN } from "../types";
-import { Card, CardHeader, CardTitle, CardContent, Badge, Skeleton } from "../components/ui";
+import {Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, EmptyState} from "../components/ui";
 import { formatDate } from "../utils/helpers";
 
 export const GRNs: React.FC = () => {
@@ -36,9 +36,7 @@ export const GRNs: React.FC = () => {
               <Skeleton className="h-8 w-full" />
             </div>
           ) : grns.length === 0 ? (
-            <div className="p-12 text-center text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-              No Goods Receipt Notes registered yet.
-            </div>
+            <EmptyState title="No Goods Receipt Notes registered yet." description="Data will appear here once available." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm border-collapse">

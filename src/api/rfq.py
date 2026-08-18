@@ -50,10 +50,45 @@ async def list_rfqs(
 
     if any(role in ("Admin", "Procurement Officer", "Procurement Manager") for role in user_roles):
         return await service.rfq_repo.list_all()
+    elif "Vendor Portal" in user_roles:
+        from sqlalchemy import select
+        from sqlalchemy.orm import selectinload
+        from src.models.vendor import Vendor
+        from src.models.rfq import RFQVendor
+        
+        # Get vendor ID
+        stmt = select(Vendor.vendor_id).where(Vendor.email == current_user.email)
+        result = await db.execute(stmt)
+        vendor_id = result.scalar_one_or_none()
+        
+        if vendor_id:
+            # Get RFQs where this vendor is invited
+            query = (
+                select(service.rfq_repo.model)
+                .join(RFQVendor, RFQVendor.rfq_id == service.rfq_repo.model.rfq_id)
+                .where(RFQVendor.vendor_id == vendor_id)
+                .options(
+                    selectinload(service.rfq_repo.model.items),
+                    selectinload(service.rfq_repo.model.rfq_vendors),
+                    selectinload(service.rfq_repo.model.quotations)
+                )
+            )
+            result = await db.execute(query)
+            return list(result.scalars().all())
+        return []
     else:
         # Employees see only RFQs they created
         from sqlalchemy import select
-        query = select(service.rfq_repo.model).where(service.rfq_repo.model.created_by == current_user.user_id)
+        from sqlalchemy.orm import selectinload
+        query = (
+            select(service.rfq_repo.model)
+            .where(service.rfq_repo.model.created_by == current_user.user_id)
+            .options(
+                selectinload(service.rfq_repo.model.items),
+                selectinload(service.rfq_repo.model.rfq_vendors),
+                selectinload(service.rfq_repo.model.quotations)
+            )
+        )
         result = await db.execute(query)
         return list(result.scalars().all())
 

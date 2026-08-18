@@ -49,9 +49,9 @@ async def get_invoices(
     
     if current_user.roles:
         for role in current_user.roles:
-            if role.role_name in ["Manager", "Finance Manager", "CFO", "Admin"]:
+            if role.role_name in ["Manager", "Finance", "Finance Manager", "CFO", "Admin", "Procurement"]:
                 is_manager_or_admin = True
-            elif role.role_name == "Vendor Portal":
+            elif role.role_name in ["Vendor Portal", "Vendor"]:
                 is_vendor = True
 
     if is_vendor and not is_manager_or_admin:
