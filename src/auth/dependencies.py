@@ -124,7 +124,7 @@ class RoleChecker:
 
     def __call__(self, current_user: User = Depends(get_current_user)) -> User:
         user_roles = {role.role_name for role in current_user.roles if role.status}
-        if not any(req_role in user_roles for req_role in self.required_roles):
+        if "Admin" not in user_roles and not any(req_role in user_roles for req_role in self.required_roles):
             logger.warning(
                 f"User {current_user.email} (ID: {current_user.user_id}) denied access. "
                 f"Requires one of roles: {self.required_roles}"
@@ -147,13 +147,16 @@ class PermissionChecker:
     def __call__(self, current_user: User = Depends(get_current_user)) -> User:
         # Check active permissions across all user's active roles
         user_permissions = set()
+        is_admin = False
         for role in current_user.roles:
             if not role.status:
                 continue
+            if role.role_name == "Admin":
+                is_admin = True
             for perm in role.permissions:
                 user_permissions.add(perm.permission_name)
 
-        if self.required_permission not in user_permissions:
+        if not is_admin and self.required_permission not in user_permissions:
             logger.warning(
                 f"User {current_user.email} (ID: {current_user.user_id}) denied access. "
                 f"Missing required permission: '{self.required_permission}'"

@@ -53,7 +53,7 @@ class DashboardService:
 
         # Compile specific metrics based on role
         role_upper = role.upper()
-        if role_upper in ("CEO", "CFO", "FINANCE"):
+        if role_upper in ("CEO", "CFO", "FINANCE", "ADMIN"):
             data["widgets"]["pending_approvals"] = await self._get_pending_approvals_count()
             data["widgets"]["department_spend"] = await self._get_department_spend()
             data["widgets"]["budget_utilization"] = await self._get_budget_utilization()
@@ -62,14 +62,14 @@ class DashboardService:
             data["widgets"]["payment_status"] = await self._get_payment_status_counts()
             data["widgets"]["top_vendors"] = await self._get_top_vendors()
 
-        if role_upper in ("CFO", "PROCUREMENT"):
+        if role_upper in ("CFO", "PROCUREMENT", "ADMIN"):
             data["widgets"]["purchase_orders"] = await self._get_po_summary()
             data["widgets"]["vendor_performance"] = await self._get_vendor_performance_summary()
             data["widgets"]["monthly_procurement"] = await self._get_monthly_procurement_trends()
             data["widgets"]["contract_expiry"] = await self._get_expiring_contracts_count()
             data["widgets"]["open_requests"] = await self._get_open_procurement_requests()
 
-        if role_upper in ("IT", "FINANCE"):
+        if role_upper in ("IT", "FINANCE", "ADMIN"):
             data["widgets"]["asset_summary"] = await self._get_asset_summary()
             data["widgets"]["amc_expiry"] = await self._get_expiring_amc_count()
 

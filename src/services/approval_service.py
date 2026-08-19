@@ -127,8 +127,8 @@ class ApprovalService:
             finance_role_id = await self.get_role_id_by_name("Finance", 3)
             cfo_role_id = await self.get_role_id_by_name("CFO", 4)
 
-            # Rule 1: Always Manager
-            steps_to_create.append({"step_number": 1, "approver_role_id": manager_role_id, "approver_id": manager_id})
+            # Rule 1: Always Manager (Role-based)
+            steps_to_create.append({"step_number": 1, "approver_role_id": manager_role_id, "approver_id": None})
 
             # Rule 2: > $500 requires Finance Manager
             if pr.total_estimated_amount > Decimal("500.00"):

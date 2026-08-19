@@ -19,7 +19,8 @@ from src.services.approval_service import ApprovalService
 router = APIRouter(prefix="/expenses", tags=["Employee Expenses"])
 
 # Helper for file uploads
-UPLOAD_DIR = "uploads/receipts"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+UPLOAD_DIR = os.path.join(BASE_DIR, "uploads", "receipts")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 def parse_ocr_date(date_str: str):

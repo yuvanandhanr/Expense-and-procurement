@@ -57,7 +57,7 @@ export const PurchaseRequisitions: React.FC = () => {
         title,
         justification: description || "No justification provided",
         priority,
-        department_id: 123,
+        department_id: 1,
         items: [
           {
             category: "Standard",

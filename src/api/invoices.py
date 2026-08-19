@@ -120,7 +120,8 @@ async def upload_invoice_batch(
         await session.flush()
         
         # Save file to disk
-        upload_dir = "/app/uploads"
+        BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        upload_dir = os.path.join(BASE_DIR, "uploads", "invoices")
         os.makedirs(upload_dir, exist_ok=True)
         file_path = os.path.join(upload_dir, f"{invoice.invoice_id}_{file.filename}")
         with open(file_path, "wb") as f:
