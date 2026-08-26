@@ -136,7 +136,7 @@ class SessionRepository(BaseRepository[LoginSession]):
             LoginSession.status == "Active"
         )
         result = await self.session.execute(query)
-        return result.scalar_one_or_none()
+        return result.scalars().first()
 
 
 class LoginHistoryRepository(BaseRepository[LoginHistory]):

@@ -21,6 +21,7 @@ async def seed():
         "mock_google_finance@dataeko.ai": "Finance Manager",
         "mock_google_employee@dataeko.ai": "Employee",
         "mock_google_ceo@dataeko.ai": "CEO",
+        "mock_google_y.raja@dataeko.ai": "Admin",
     }
 
     async with async_session() as session:

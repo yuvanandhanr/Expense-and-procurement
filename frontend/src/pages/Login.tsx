@@ -190,6 +190,7 @@ export const Login: React.FC = () => {
                     variant="outline"
                     className="w-full text-xs font-semibold py-2"
                     onClick={() => handleCredentialResponse({ credential: "mock_google_y.raja@dataeko.ai" })}
+                    disabled={isSubmitting}
                   >
                     Admin
                   </Button>
@@ -198,6 +199,7 @@ export const Login: React.FC = () => {
                     variant="outline"
                     className="w-full text-xs font-semibold py-2"
                     onClick={() => handleCredentialResponse({ credential: "mock_google_ceo@dataeko.ai" })}
+                    disabled={isSubmitting}
                   >
                     CEO
                   </Button>
@@ -206,6 +208,7 @@ export const Login: React.FC = () => {
                     variant="outline"
                     className="w-full text-xs font-semibold py-2"
                     onClick={() => handleCredentialResponse({ credential: "mock_google_cfo@dataeko.ai" })}
+                    disabled={isSubmitting}
                   >
                     CFO
                   </Button>
@@ -214,6 +217,7 @@ export const Login: React.FC = () => {
                     variant="outline"
                     className="w-full text-xs font-semibold py-2"
                     onClick={() => handleCredentialResponse({ credential: "mock_google_finance@dataeko.ai" })}
+                    disabled={isSubmitting}
                   >
                     Finance Mgr
                   </Button>
@@ -222,6 +226,7 @@ export const Login: React.FC = () => {
                     variant="outline"
                     className="w-full text-xs font-semibold py-2 col-span-2"
                     onClick={() => handleCredentialResponse({ credential: "mock_google_manager@dataeko.ai" })}
+                    disabled={isSubmitting}
                   >
                     Manager
                   </Button>
@@ -230,6 +235,7 @@ export const Login: React.FC = () => {
                     variant="outline"
                     className="w-full text-xs font-semibold py-2 col-span-2"
                     onClick={() => handleCredentialResponse({ credential: "mock_google_employee@dataeko.ai" })}
+                    disabled={isSubmitting}
                   >
                     Employee
                   </Button>
@@ -306,6 +312,25 @@ export const Login: React.FC = () => {
                   : otpSent
                   ? "Verify & Login"
                   : "Continue"}
+              </Button>
+              
+              <Button 
+                type="button"
+                variant="outline" 
+                className="w-full" 
+                onClick={async () => {
+                  try {
+                    // Mock bypass for E2E tests
+                    await vendorLogin("vendor@example.com", "123456");
+                    setTimeout(() => {
+                      navigate("/vendor-portal");
+                    }, 100);
+                  } catch (err) {
+                    console.error("Mock Vendor Login failed:", err);
+                  }
+                }}
+              >
+                Mock Vendor Access (Test)
               </Button>
 
               {otpSent && (

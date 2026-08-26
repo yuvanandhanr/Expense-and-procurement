@@ -122,6 +122,16 @@ export const Users: React.FC = () => {
     }
   };
 
+  const handleOffboard = async (user: CurrentUser) => {
+    if (!confirm(`Are you sure you want to initiate offboarding for ${user.email}?`)) return;
+    try {
+      await api.post(`/offboarding/${user.user_id}/trigger`);
+      toast.success(`Offboarding initiated for ${user.email}. Tasks have been generated.`);
+    } catch (err: any) {
+      toast.error(getErrorMessage(err, "Failed to initiate offboarding."));
+    }
+  };
+
   const toggleRoleSelection = (roleId: number) => {
     setSelectedRoles(prev => 
       prev.includes(roleId) ? prev.filter(id => id !== roleId) : [...prev, roleId]
@@ -205,6 +215,14 @@ export const Users: React.FC = () => {
                           onClick={() => handleToggleLock(user)}
                         >
                           {user.is_locked ? "Unlock" : "Lock"}
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => handleOffboard(user)}
+                          disabled={!user.is_active}
+                        >
+                          Offboard
                         </Button>
                       </td>
                     </tr>

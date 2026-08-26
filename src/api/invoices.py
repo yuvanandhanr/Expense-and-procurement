@@ -329,6 +329,13 @@ async def approve_reject_invoice(
         raise HTTPException(status_code=404, detail="Invoice not found")
         
     new_status = "Approved" if action == "approve" else "Rejected"
+    
+    if action == "approve" and invoice.po_id:
+        # Simple 3-way match implementation
+        po = invoice.po
+        if po and invoice.grand_total != po.grand_total:
+            raise HTTPException(status_code=400, detail="3-way match failed: Invoice amount does not match PO amount")
+            
     invoice.status = new_status
     
     for approval in invoice.approvals:

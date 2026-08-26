@@ -9,9 +9,9 @@ from src.models.purchase_order import PurchaseOrder
 from src.repositories.grn import GRNRepository, GRNItemRepository
 from src.repositories.purchase_order import PORepository
 from src.repositories.inspection import InspectionRepository
+from src.repositories.purchase_requisition import PRRepository
 from src.services.asset_service import AssetService
 from src.schemas.grn import GRNCreate
-
 
 class GRNService:
     def __init__(self, db: AsyncSession) -> None:
@@ -20,6 +20,7 @@ class GRNService:
         self.item_repo = GRNItemRepository(db)
         self.po_repo = PORepository(db)
         self.inspection_repo = InspectionRepository(db)
+        self.pr_repo = PRRepository(db)
         self.asset_service = AssetService(db)
 
     def generate_grn_number(self) -> str:
@@ -110,12 +111,19 @@ class GRNService:
             # We check if item contains hardware, IT, laptop, server, mobile etc.
             # (or we can register any accepted physical items as assets for robust test coverage!)
             if insp_item.quantity_accepted > 0:
+                requestor_id = None
+                if po.pr_id:
+                    pr = await self.pr_repo.get_by_id(po.pr_id)
+                    if pr:
+                        requestor_id = pr.requestor_id
+                        
                 await self.asset_service.register_assets_from_grn(
                     po_id=po.po_id,
                     vendor_id=data.vendor_id,
                     item_name=insp_item.delivery_item.item_name,
                     quantity=insp_item.quantity_accepted,
-                    serial_numbers=insp_item.serial_numbers
+                    serial_numbers=insp_item.serial_numbers,
+                    requestor_id=requestor_id
                 )
 
         await self.po_repo.update(po)

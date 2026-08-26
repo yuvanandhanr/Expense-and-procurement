@@ -14,12 +14,12 @@ export default defineConfig({
     port: 3001,
     proxy: {
       "/api": {
-        target: "http://localhost:8080",
+        target: "http://127.0.0.1:8000",
         changeOrigin: true,
         secure: false,
       },
       "/uploads": {
-        target: "http://localhost:8080",
+        target: "http://127.0.0.1:8000",
         changeOrigin: true,
         secure: false,
       },

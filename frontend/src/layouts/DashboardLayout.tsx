@@ -104,7 +104,6 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         title: "Overview",
         items: [
           { label: isCFO || isCTO ? "Executive Dashboard" : "Dashboard", path: "/", icon: LayoutDashboard, show: true },
-          { label: "Global Search", path: "/search", icon: Search, show: true },
         ],
       },
       {
@@ -139,19 +138,14 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
           { label: "RFQs & Invitations", path: "/rfqs", icon: Briefcase, show: isProcurement || isFinance || isCFO || isAdmin },
           { label: "Quotations Inbox", path: "/quotations", icon: Layers, show: isProcurement || isFinance || isCFO || isAdmin },
           { label: "Purchase Orders", path: "/pos", icon: Package, show: isProcurement || isFinance || isCFO || isAdmin },
-          { label: "Contracts", path: "/contracts", icon: FileSpreadsheet, show: isProcurement || isFinance || isCFO || isAdmin },
-          { label: "Deliveries & GRNs", path: "/grns", icon: CheckCircle, show: isProcurement || isFinance || isCFO || isAdmin },
           { label: "Assets Registry", path: "/assets", icon: HardDrive, show: isProcurement || isFinance || isCFO || isAdmin },
         ]
       },
       {
         title: "Intelligence & Platform",
         items: [
-          { label: "System Analytics", path: "/monitoring", icon: Activity, show: isCTO || isAdmin },
           { label: "Operational Analytics", path: "/analytics", icon: TrendingUp, show: isCTO },
-          { label: "Audit Timeline", path: "/audit-logs", icon: ShieldCheck, show: isCTO || isAdmin },
           { label: "User Management", path: "/users", icon: UserCog, show: isAdmin },
-          { label: "Settings", path: "/settings", icon: Settings, show: isAdmin },
         ]
       }
     ];
@@ -195,27 +189,17 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     <div className="min-h-screen bg-background flex text-foreground transition-colors duration-300">
       {/* Sidebar - Desktop */}
       <aside
-        className={`hidden md:flex flex-col border-r border-border bg-card/65 backdrop-blur-md transition-all duration-300 ${
-          isSidebarOpen ? "w-64" : "w-20"
-        }`}
+        className={`hidden md:flex flex-col border-r border-border bg-card/65 backdrop-blur-md transition-all duration-300 w-64`}
       >
         <div className="h-16 flex items-center justify-between px-6 border-b border-border/40">
           <div className="flex items-center space-x-3 overflow-hidden">
             <div className="w-[34px] h-[34px] rounded-[11px] gradient-accent flex items-center justify-center text-white font-bold text-lg shadow-sm">
               E
             </div>
-            {isSidebarOpen && (
-              <span className="font-bold text-md tracking-wider uppercase font-sans text-foreground">
-                ProcureEnt
-              </span>
-            )}
+            <span className="font-bold text-md tracking-wider uppercase font-sans text-foreground">
+              ProcureEnt
+            </span>
           </div>
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="text-muted-foreground hover:text-foreground hidden md:block"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
         </div>
 
         {/* Navigation Items */}
@@ -226,11 +210,9 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
 
             return (
               <div key={groupIdx} className="space-y-2">
-                {isSidebarOpen && (
-                  <span className="block text-[10.5px] font-semibold text-muted-foreground uppercase tracking-[1.6px] px-2 mb-2">
-                    {group.title}
-                  </span>
-                )}
+                <span className="block text-[10.5px] font-semibold text-muted-foreground uppercase tracking-[1.6px] px-2 mb-2">
+                  {group.title}
+                </span>
                 <div className="space-y-1">
                   {visibleItems.map((item, itemIdx) => {
                     const isActive = location.pathname === item.path;
@@ -247,9 +229,9 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
                       >
                         <div className="flex items-center space-x-3">
                           <Icon className="w-5 h-5 flex-shrink-0" />
-                          {isSidebarOpen && <span>{item.label}</span>}
+                          <span>{item.label}</span>
                         </div>
-                        {isActive && isSidebarOpen && (
+                        {isActive && (
                           <span className="w-1.5 h-1.5 rounded-full bg-lime animate-pulse mr-1" />
                         )}
                       </Link>
@@ -389,6 +371,18 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Role Switcher */}
+            <div className="hidden md:flex items-center border border-border rounded-lg bg-card overflow-hidden">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-3 border-r border-border bg-accent/30 flex items-center h-full">Role</span>
+              <select className="bg-transparent text-xs font-semibold py-1.5 px-2 outline-none cursor-pointer">
+                <option>Employee</option>
+                <option>Manager</option>
+                <option>Admin</option>
+                <option>Finance</option>
+                <option>Vendor</option>
+              </select>
             </div>
 
             {/* User Profile Menu */}

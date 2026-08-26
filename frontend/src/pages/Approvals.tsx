@@ -1,18 +1,23 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { ApprovalWorkflow } from "../types";
-import {Button, Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Dialog, Input, EmptyState} from "../components/ui";
+import { Button, Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Dialog, Input, EmptyState } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
 import { formatDate } from "../utils/helpers";
+import { Check, X as XIcon } from "lucide-react";
+
+type TabType = "Requisitions" | "Expenses" | "Asset Incidents" | "Resignations";
 
 export const Approvals: React.FC = () => {
   const { user } = useAuth();
   const [workflows, setWorkflows] = useState<ApprovalWorkflow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedWorkflow, setSelectedWorkflow] = useState<ApprovalWorkflow | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>("Requisitions");
   
   // Action state
+  const [selectedWorkflow, setSelectedWorkflow] = useState<ApprovalWorkflow | null>(null);
+  const [actionType, setActionType] = useState<"approve" | "reject" | null>(null);
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -32,30 +37,26 @@ export const Approvals: React.FC = () => {
     fetchWorkflows();
   }, []);
 
-  const handleAction = async (action: "approve" | "reject" | "delegate" | "cancel") => {
-    if (!selectedWorkflow) return;
+  const handleAction = async () => {
+    if (!selectedWorkflow || !actionType) return;
     setIsSubmitting(true);
     try {
-      if (action === "cancel") {
-        await api.delete(`/approvals/${selectedWorkflow.workflow_id}`);
-        toast.success("Workflow successfully cancelled!");
+      let endpoint = "";
+      if (selectedWorkflow.entity_type === "ExpenseReport") {
+        endpoint = `/expenses/${selectedWorkflow.entity_id}/${actionType}`;
+      } else if (selectedWorkflow.entity_type === "VendorInvoice") {
+        endpoint = `/invoices/${selectedWorkflow.entity_id}/${actionType}`;
       } else {
-        let endpoint = "";
-        if (selectedWorkflow.entity_type === "ExpenseReport") {
-          endpoint = `/expenses/${selectedWorkflow.entity_id}/${action}`;
-        } else if (selectedWorkflow.entity_type === "VendorInvoice") {
-          endpoint = `/invoices/${selectedWorkflow.entity_id}/${action}`;
-        } else {
-          endpoint = `/pr/${selectedWorkflow.entity_id}/${action}`;
-        }
-        
-        // Match the expected payload for the endpoint
-        const payload = selectedWorkflow.entity_type === "ExpenseReport" ? { comments: comment } : { action, comment };
-        
-        await api.post(endpoint, payload);
-        toast.success(`Workflow successfully ${action}d!`);
+        endpoint = `/pr/${selectedWorkflow.entity_id}/${actionType}`;
       }
+      
+      const payload = selectedWorkflow.entity_type === "ExpenseReport" ? { comments: comment } : { action: actionType, comment };
+      
+      await api.post(endpoint, payload);
+      toast.success(`Workflow successfully ${actionType}d!`);
+      
       setSelectedWorkflow(null);
+      setActionType(null);
       setComment("");
       fetchWorkflows();
     } catch (err: any) {
@@ -65,146 +66,131 @@ export const Approvals: React.FC = () => {
     }
   };
 
+  const getFilteredWorkflows = () => {
+    return workflows.filter(wf => {
+      if (activeTab === "Requisitions") return wf.entity_type === "PurchaseRequisition";
+      if (activeTab === "Expenses") return wf.entity_type === "ExpenseReport";
+      if (activeTab === "Asset Incidents") return wf.entity_type === "AssetIncident";
+      if (activeTab === "Resignations") return wf.entity_type === "Resignation";
+      return false;
+    });
+  };
+
+  const filteredWorkflows = getFilteredWorkflows();
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Approvals Inbox</h1>
-        <p className="text-xs text-muted-foreground mt-1">Review and sign off on requisitions and operational workflows.</p>
+        <p className="text-xs text-muted-foreground mt-1">Review and sign off on pending workflows.</p>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="p-6 space-y-4">
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-            </div>
-          ) : workflows.length === 0 ? (
-            <EmptyState title="No pending approvals found." description="Data will appear here once available." />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-border bg-accent/40 text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    <th className="p-4">Workflow ID</th>
-                    <th className="p-4">Request Context</th>
-                    <th className="p-4">Submitted By</th>
-                    <th className="p-4">Date Created</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border text-sm">
-                  {workflows.map((wf) => (
-                    <tr key={wf.workflow_id} className="hover:bg-accent/20 transition-colors">
-                      <td className="p-4 font-bold text-xs tracking-wider text-primary">#WF-{wf.workflow_id}</td>
-                      <td className="p-4 text-xs">
-                        <div className="font-bold text-foreground">{wf.title || `${wf.entity_type} #${wf.entity_id}`}</div>
-                        {wf.justification && <div className="text-muted-foreground mt-1 line-clamp-1 max-w-xs">{wf.justification}</div>}
-                        <div className="mt-1"><Badge variant="outline">{wf.entity_type} #{wf.entity_id}</Badge></div>
-                      </td>
-                      <td className="p-4 font-semibold text-xs">{wf.requestor_name || "Unknown"}</td>
-                      <td className="p-4 text-xs text-muted-foreground">{formatDate(wf.created_at)}</td>
-                      <td className="p-4">
-                        <Badge variant={wf.status === "Approved" ? "success" : wf.status === "Pending" ? "warning" : "error"}>
-                          {wf.status}
-                        </Badge>
-                        <div className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">Step {wf.current_step_sequence}</div>
-                      </td>
-                      <td className="p-4">
-                        <Button size="sm" onClick={() => setSelectedWorkflow(wf)}>
-                          {(wf.can_approve || wf.requestor_id === user?.user_id) ? "Review" : "View Progress"}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Tabs */}
+      <div className="flex space-x-2 border-b border-border">
+        {(["Requisitions", "Expenses", "Asset Incidents", "Resignations"] as TabType[]).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 text-sm font-semibold transition-colors border-b-2 ${
+              activeTab === tab 
+                ? "border-violet text-violet" 
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
 
-      {/* Review Dialog */}
-      {selectedWorkflow && (
-        <Dialog isOpen={true} onClose={() => setSelectedWorkflow(null)} title={`Review Workflow #WF-${selectedWorkflow.workflow_id}`}>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 bg-muted/40 p-3 rounded-lg border border-border text-xs">
-              <div>
-                <span className="block text-muted-foreground font-semibold uppercase">Target Entity</span>
-                <span className="font-bold text-sm uppercase tracking-wider text-foreground">{selectedWorkflow.entity_type} #{selectedWorkflow.entity_id}</span>
-              </div>
-              <div>
-                <span className="block text-muted-foreground font-semibold uppercase">Submitted By</span>
-                <span className="font-bold text-sm tracking-wider text-foreground">{selectedWorkflow.requestor_name || "Unknown"}</span>
-              </div>
-              <div className="col-span-2">
-                <span className="block text-muted-foreground font-semibold uppercase">Title</span>
-                <span className="font-bold text-sm tracking-wider text-foreground">{selectedWorkflow.title || "N/A"}</span>
-              </div>
-              <div className="col-span-2">
-                <span className="block text-muted-foreground font-semibold uppercase">Justification / Description</span>
-                <span className="font-medium text-sm text-foreground">{selectedWorkflow.justification || "None provided"}</span>
-              </div>
-            </div>
-
-            {selectedWorkflow.past_approvers && selectedWorkflow.past_approvers.length > 0 && (
-              <div className="bg-accent/20 p-3 rounded-lg border border-border">
-                <span className="block text-muted-foreground font-semibold uppercase text-xs mb-1">Past Approvers</span>
-                <div className="flex flex-wrap gap-2">
-                  {selectedWorkflow.past_approvers.map((approver, idx) => (
-                    <Badge key={idx} variant="info">{approver}</Badge>
-                  ))}
+      {/* Cards Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Skeleton className="h-40 w-full rounded-lg" />
+          <Skeleton className="h-40 w-full rounded-lg" />
+          <Skeleton className="h-40 w-full rounded-lg" />
+        </div>
+      ) : filteredWorkflows.length === 0 ? (
+        <Card className="bg-transparent border-dashed">
+          <CardContent className="py-12">
+             <EmptyState title={`No pending ${activeTab.toLowerCase()}.`} description="You're all caught up!" />
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {filteredWorkflows.map(wf => (
+            <Card key={wf.workflow_id} className="flex flex-col">
+              <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                    {wf.entity_type} #{wf.entity_id}
+                  </span>
+                  <CardTitle className="text-base">{wf.workflow_step} Step</CardTitle>
                 </div>
-              </div>
-            )}
-
-            {selectedWorkflow.pending_approvers && selectedWorkflow.pending_approvers.length > 0 && (
-              <div className="bg-accent/20 p-3 rounded-lg border border-border mt-2">
-                <span className="block text-muted-foreground font-semibold uppercase text-xs mb-1">Pending Approvers</span>
-                <div className="flex flex-wrap gap-2">
-                  {selectedWorkflow.pending_approvers.map((approver, idx) => (
-                    <Badge key={idx} variant="warning">{approver}</Badge>
-                  ))}
+                <Badge variant={wf.status === "Pending" ? "warning" : "neutral"}>{wf.status}</Badge>
+              </CardHeader>
+              <CardContent className="flex-1 flex flex-col justify-between pt-0 space-y-4">
+                <div className="text-sm space-y-2 mt-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Requested By:</span>
+                    <span className="font-semibold">User {wf.requester_id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Date:</span>
+                    <span>{formatDate(wf.created_at)}</span>
+                  </div>
                 </div>
-              </div>
-            )}
-
-            {selectedWorkflow.can_approve && selectedWorkflow.requestor_id !== user?.user_id && (
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">Comments / Decision Notes</label>
-                <textarea
-                  placeholder="Include details explaining your decision (required if rejecting)"
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring min-h-[80px]"
-                />
-              </div>
-            )}
-
-            <div className="flex justify-end space-x-2 pt-4 border-t border-border">
-              <Button variant="outline" onClick={() => setSelectedWorkflow(null)}>
-                Close
-              </Button>
-              {selectedWorkflow.requestor_id === user?.user_id ? (
-                <Button variant="danger" disabled={isSubmitting} onClick={() => handleAction("cancel")}>
-                  Cancel Request
-                </Button>
-              ) : selectedWorkflow.can_approve ? (
-                <>
-                  <Button variant="danger" disabled={isSubmitting} onClick={() => handleAction("reject")}>
-                    Reject
+                
+                <div className="flex space-x-2 pt-4 border-t border-border">
+                  <Button 
+                    variant="primary" 
+                    className="flex-1 flex items-center justify-center space-x-2"
+                    onClick={() => { setSelectedWorkflow(wf); setActionType("approve"); }}
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Approve</span>
                   </Button>
-                  <Button disabled={isSubmitting} onClick={() => handleAction("approve")}>
-                    Approve
+                  <Button 
+                    variant="danger" 
+                    className="flex-1 flex items-center justify-center space-x-2 bg-pink hover:bg-pink/90 text-white shadow-sm"
+                    onClick={() => { setSelectedWorkflow(wf); setActionType("reject"); }}
+                  >
+                    <XIcon className="w-4 h-4" />
+                    <span>Reject</span>
                   </Button>
-                </>
-              ) : null}
-            </div>
-          </div>
-        </Dialog>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
+
+      {/* Action Dialog */}
+      <Dialog 
+        isOpen={!!selectedWorkflow} 
+        onClose={() => { setSelectedWorkflow(null); setActionType(null); setComment(""); }}
+        title={`${actionType === 'approve' ? 'Approve' : 'Reject'} ${selectedWorkflow?.entity_type} #${selectedWorkflow?.entity_id}`}
+      >
+        <div className="space-y-4">
+          <Input 
+            label="Comments (Optional)" 
+            value={comment} 
+            onChange={(e) => setComment(e.target.value)} 
+            placeholder="Add a note..." 
+          />
+          <div className="flex justify-end space-x-2">
+            <Button variant="ghost" onClick={() => { setSelectedWorkflow(null); setActionType(null); }}>Cancel</Button>
+            <Button 
+              variant={actionType === "approve" ? "primary" : "danger"} 
+              onClick={handleAction} 
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Processing..." : `Confirm ${actionType}`}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 };
+
 export default Approvals;

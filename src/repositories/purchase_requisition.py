@@ -67,6 +67,7 @@ class PRRepository(BaseRepository[PurchaseRequisition]):
                 selectinload(self.model.items),
                 selectinload(self.model.requestor)
             )
+            .order_by(self.model.created_at.desc())
             .offset(skip)
             .limit(limit)
         )

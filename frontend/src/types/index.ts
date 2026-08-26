@@ -252,7 +252,7 @@ export interface Invoice {
   po_id?: number;
   invoice_date: string;
   due_date: string;
-  amount: number;
+  grand_total: number;
   currency: string;
   status: string;
   matching_status: string;

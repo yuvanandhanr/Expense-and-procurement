@@ -257,9 +257,12 @@ async def submit_report(
             
     report.duplicate_flag = duplicates_found
     report.policy_flags = ", ".join(policy_issues) if policy_issues else None
-            
+    
+    is_manager = any(r.role_name == "Manager" for r in current_user.roles)
+    if is_manager and policy_issues and not report.justification:
+        raise HTTPException(status_code=400, detail="Policy violations found. Manager claims require justification.")
     # Transition status
-    report.status = "Pending Approval"
+    report.status = "Pending Manager Approval"
     await repo.update_report(report)
     
     # Trigger approval engine based on total_amount
@@ -281,13 +284,14 @@ async def submit_report(
     return {"status": "submitted", "total_amount": report.total_amount, "duplicates": duplicates_found, "policies": report.policy_flags}
 
 @router.post("/{report_id}/approve")
-async def approve_expense_manager(
+async def approve_expense(
     report_id: int,
     payload: ExpenseActionPayload,
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
     from src.models.expense import ExpenseApproval
+    from src.models.auth import Role, User
     from sqlalchemy import select
     
     repo = ExpenseRepository(db)
@@ -295,8 +299,8 @@ async def approve_expense_manager(
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
         
-    if report.status != "Pending Manager Approval":
-        raise HTTPException(status_code=400, detail="Report is not pending manager approval")
+    if report.status not in ["Pending Manager Approval", "Pending Finance Manager Approval"]:
+        raise HTTPException(status_code=400, detail="Report is not pending approval")
         
     query = select(ExpenseApproval).where(
         ExpenseApproval.expense_report_id == report_id,
@@ -314,25 +318,59 @@ async def approve_expense_manager(
         approval.comments = payload.comments
         approval.actioned_at = datetime.utcnow()
         
-    report.status = "Finance Verified" # Skip separate step for demo, or "Pending Finance Verification"
-    # Actually let's make it "Pending Finance Verification"
-    report.status = "Pending Finance Verification"
-    
+    if report.status == "Pending Manager Approval":
+        if report.total_amount > Decimal("1000.00"):
+            report.status = "Pending Finance Manager Approval"
+            
+            # Find a Finance Manager
+            fm_query = select(User).join(User.roles).where(Role.role_name == "Finance Manager", User.status == "Active")
+            fm_result = await db.execute(fm_query)
+            finance_manager = fm_result.scalars().first()
+            
+            fm_approval = ExpenseApproval(
+                expense_report_id=report.expense_report_id,
+                approver_id=finance_manager.user_id if finance_manager else None,
+                status="Pending"
+            )
+            db.add(fm_approval)
+        else:
+            report.status = "Payment Requested"
+            report.payment_status = "Pending Payment"
+    elif report.status == "Pending Finance Manager Approval":
+        report.status = "Payment Requested"
+        report.payment_status = "Pending Payment"
+        
     await repo.update_report(report)
     await db.commit()
-    return {"status": "Approved by Manager"}
+    return {"status": "Approved"}
 
 @router.post("/{report_id}/reject")
-async def reject_expense_manager(
+async def reject_expense(
     report_id: int,
     payload: ExpenseActionPayload,
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
+    from src.models.expense import ExpenseApproval
+    from sqlalchemy import select
+    
     repo = ExpenseRepository(db)
     report = await repo.get_report_by_id(report_id)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+        
+    query = select(ExpenseApproval).where(
+        ExpenseApproval.expense_report_id == report_id,
+        ExpenseApproval.approver_id == current_user.user_id,
+        ExpenseApproval.status == "Pending"
+    )
+    result = await db.execute(query)
+    approval = result.scalar_one_or_none()
+    
+    if approval:
+        approval.status = "Rejected"
+        approval.comments = payload.comments
+        approval.actioned_at = datetime.utcnow()
         
     report.status = "Rejected"
     await repo.update_report(report)
@@ -340,42 +378,37 @@ async def reject_expense_manager(
     return {"status": "Rejected"}
 
 @router.post("/{report_id}/return")
-async def return_expense_manager(
+async def return_expense(
     report_id: int,
     payload: ExpenseActionPayload,
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
+    from src.models.expense import ExpenseApproval
+    from sqlalchemy import select
+    
     repo = ExpenseRepository(db)
     report = await repo.get_report_by_id(report_id)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+        
+    query = select(ExpenseApproval).where(
+        ExpenseApproval.expense_report_id == report_id,
+        ExpenseApproval.approver_id == current_user.user_id,
+        ExpenseApproval.status == "Pending"
+    )
+    result = await db.execute(query)
+    approval = result.scalar_one_or_none()
+    
+    if approval:
+        approval.status = "Returned"
+        approval.comments = payload.comments
+        approval.actioned_at = datetime.utcnow()
         
     report.status = "Returned for Correction"
     await repo.update_report(report)
     await db.commit()
     return {"status": "Returned"}
-
-@router.post("/{report_id}/finance-verify")
-async def finance_verify_expense(
-    report_id: int,
-    payload: ExpenseActionPayload,
-    db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(get_current_user)
-):
-    repo = ExpenseRepository(db)
-    report = await repo.get_report_by_id(report_id)
-    if not report:
-        raise HTTPException(status_code=404, detail="Report not found")
-        
-    if report.status != "Pending Finance Verification":
-        raise HTTPException(status_code=400, detail="Report is not pending finance verification")
-        
-    report.status = "Payment Requested"
-    report.payment_status = "Pending Payment"
-    await repo.update_report(report)
-    await db.commit()
-    return {"status": "Finance Verified"}
 
 @router.post("/{report_id}/pay")
 async def pay_expense(

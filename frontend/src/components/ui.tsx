@@ -114,7 +114,7 @@ export const Select: React.FC<SelectProps> = ({
 
 // --- Card Components ---
 export const Card: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className = "", children, ...props }) => (
-  <div className={`rounded-[18px] border border-border bg-card text-foreground shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md ${className}`} {...props}>
+  <div className={`rounded-lg border border-border bg-card text-foreground transition-all duration-200 ${className}`} {...props}>
     {children}
   </div>
 );

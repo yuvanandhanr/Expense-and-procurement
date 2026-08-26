@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import List, Optional
 from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Numeric, String, Text, func
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.database.base import Base
 
@@ -191,10 +191,10 @@ class OrgSettings(Base):
         Date, nullable=True, comment="End date of fiscal year"
     )
     approval_thresholds: Mapped[Optional[dict]] = mapped_column(
-        JSONB, nullable=True, comment="Threshold configuration mapping roles to approval limits"
+        JSON, nullable=True, comment="Threshold configuration mapping roles to approval limits"
     )
     password_policy: Mapped[Optional[dict]] = mapped_column(
-        JSONB, nullable=True, comment="Password validation constraints policy"
+        JSON, nullable=True, comment="Password validation constraints policy"
     )
     session_timeout_minutes: Mapped[int] = mapped_column(
         BigInteger, default=30, nullable=True, comment="Inactivity duration threshold before logout"

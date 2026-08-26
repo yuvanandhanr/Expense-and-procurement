@@ -4,15 +4,15 @@
 
 @layer base {
   :root {
-    --bg: #FBFAFF;
+    --bg: #f8f9ff;
     --card: #FFFFFF;
-    --card-2: #FDFCFF;
-    --line: rgba(20,10,40,0.08);
-    --line-2: rgba(20,10,40,0.14);
+    --card-2: #f8f9ff;
+    --line: #cbdbf5;
+    --line-2: #a9c0e6;
     --text: #17132A;
     --text-dim: #625C7A;
     --text-faint: #938DAE;
-    --violet: #7C3AED;
+    --violet: #797bff;
     --pink: #DB2777;
     --lime: #4D8B1F;
     --cyan: #0E8FA3;

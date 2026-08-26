@@ -115,3 +115,30 @@ class AssetSchema(BaseModel):
     assignments: List[AssetAssignmentSchema] = []
     history: List[AssetHistorySchema] = []
     documents: List[AssetDocumentSchema] = []
+
+
+class AssetIncidentCreate(BaseModel):
+    asset_id: int
+    description: str
+    incident_type: str # Damage, Loss, Theft
+
+
+class AssetIncidentAction(BaseModel):
+    action: str # Approve, Reject, Repair, Replace
+    resolution: Optional[str] = None
+
+
+class AssetIncidentSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    incident_id: Optional[int] = None
+    asset_id: int
+    reporter_id: Optional[int] = None
+    description: str
+    incident_date: Optional[date] = None
+    incident_type: str
+    status: str
+    resolution: Optional[str] = None
+    linked_pr_id: Optional[int] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None

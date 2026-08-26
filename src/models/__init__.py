@@ -84,7 +84,9 @@ from src.models.assets import (
     AssetAssignment,
     AssetHistory,
     AssetDocument,
+    AssetIncident,
 )
+from src.models.offboarding import OffboardingTask
 from src.models.invoice import (
     VendorInvoice,
     InvoiceItem,

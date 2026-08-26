@@ -61,24 +61,33 @@ class ApprovalService:
             if not report:
                 raise ValueError("Expense report not found")
                 
-            query_user = select(User).where(User.user_id == report.employee_id)
+            query_user = select(User).options(selectinload(User.roles)).where(User.user_id == report.employee_id)
             user_result = await self.db.execute(query_user)
             employee = user_result.scalar_one_or_none()
-            manager_id = employee.manager_id if employee else None
+            
+            is_manager = any(r.role_name == "Manager" for r in employee.roles) if employee else False
+            if is_manager:
+                from src.models.auth import Role
+                query_admin = select(User).join(User.roles).where(Role.role_name == "Admin")
+                admin_result = await self.db.execute(query_admin)
+                admin = admin_result.scalars().first()
+                approver_id = admin.user_id if admin else None
+            else:
+                approver_id = employee.manager_id if employee else None
             
             manager_approval = ExpenseApproval(
                 expense_report_id=report.expense_report_id,
-                approver_id=manager_id,
+                approver_id=approver_id,
                 status="Pending"
             )
             self.db.add(manager_approval)
             
             report.status = "Pending Manager Approval"
             
-            if manager_id:
+            if approver_id:
                 try:
                     await self.notification_service.send_notification(
-                        user_id=manager_id,
+                        user_id=approver_id,
                         template_name="ExpenseApprovalRequestAlert",
                         context={"report_id": report.expense_report_id, "amount": str(report.total_amount)}
                     )

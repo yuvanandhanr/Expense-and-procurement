@@ -81,6 +81,61 @@ async def get_assets(
         
     return mapped_assets
 
+from src.schemas.assets import AssetCreate, AssetSchema
+from fastapi import status
+import uuid
+
+@router.post("", response_model=AssetSchema, status_code=status.HTTP_201_CREATED)
+async def create_asset(
+    data: AssetCreate,
+    session: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    # Verify Admin
+    user_roles = [r.role_name for r in current_user.roles]
+    if "Admin" not in user_roles:
+        raise HTTPException(status_code=403, detail="Only Admins can create assets manually")
+
+    new_asset = Asset(
+        asset_number=data.asset_number or str(uuid.uuid4())[:8].upper(),
+        asset_tag=data.asset_tag,
+        category_id=data.category_id,
+        po_id=data.po_id,
+        vendor_id=data.vendor_id,
+        serial_number=data.serial_number,
+        model=data.model,
+        manufacturer=data.manufacturer,
+        department_id=data.department_id,
+        purchase_date=data.purchase_date,
+        warranty_expiry=data.warranty_expiry,
+        amc_expiry=data.amc_expiry,
+        location=data.location,
+        status="Available"
+    )
+    
+    session.add(new_asset)
+    
+    history = AssetHistory(
+        asset=new_asset,
+        action_type="Manual Creation",
+        action_by=current_user.user_id,
+        details="Asset manually created by Admin."
+    )
+    session.add(history)
+    
+    await session.commit()
+    
+    # Reload with relationships
+    stmt = select(Asset).options(
+        selectinload(Asset.category),
+        selectinload(Asset.assigned_employee),
+        selectinload(Asset.assignments),
+        selectinload(Asset.history),
+        selectinload(Asset.documents)
+    ).where(Asset.asset_id == new_asset.asset_id)
+    result = await session.execute(stmt)
+    return result.scalar_one()
+
 @router.post("/{asset_id}/transfer")
 async def transfer_asset(
     asset_id: int,

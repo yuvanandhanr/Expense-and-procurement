@@ -44,6 +44,7 @@ class Asset(Base):
     assignments: Mapped[List["AssetAssignment"]] = relationship("AssetAssignment", back_populates="asset", cascade="all, delete-orphan")
     history: Mapped[List["AssetHistory"]] = relationship("AssetHistory", back_populates="asset", cascade="all, delete-orphan")
     documents: Mapped[List["AssetDocument"]] = relationship("AssetDocument", back_populates="asset", cascade="all, delete-orphan")
+    incidents: Mapped[List["AssetIncident"]] = relationship("AssetIncident", back_populates="asset", cascade="all, delete-orphan")
 
 
 class AssetAssignment(Base):
@@ -91,3 +92,24 @@ class AssetDocument(Base):
 
     # Relationship
     asset: Mapped["Asset"] = relationship("Asset", back_populates="documents")
+
+
+class AssetIncident(Base):
+    __tablename__ = "asset_incidents"
+
+    incident_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    asset_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("assets.asset_id", ondelete="CASCADE"))
+    reporter_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    incident_date: Mapped[date] = mapped_column(Date, default=date.today)
+    incident_type: Mapped[str] = mapped_column(String(100), nullable=False) # Damage, Loss, Theft
+    status: Mapped[str] = mapped_column(String(50), default="Reported") # Reported, Inspection Pending, Repair, Replacement, Closed
+    resolution: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    linked_pr_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("purchase_requisitions.pr_id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    asset: Mapped["Asset"] = relationship("Asset", back_populates="incidents")
+    reporter: Mapped[Optional["User"]] = relationship("User")
+    linked_pr = relationship("PurchaseRequisition", foreign_keys=[linked_pr_id])

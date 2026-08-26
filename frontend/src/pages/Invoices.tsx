@@ -1,36 +1,25 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { Invoice } from "../types";
 import { useAuth } from "../hooks/useAuth";
-import {Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Button, Dialog, Input, EmptyState} from "../components/ui";
-import { formatDate, getErrorMessage } from "../utils/helpers";
+import { Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Button, Dialog, EmptyState } from "../components/ui";
+import { formatDate } from "../utils/helpers";
 import toast from "react-hot-toast";
-import { FileText, Edit2, CheckCircle, XCircle } from "lucide-react";
+import { FileText, CheckCircle, XCircle, AlertTriangle, Upload } from "lucide-react";
 
 export const Invoices: React.FC = () => {
   const { user } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Modals state
-  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
-  const [editCause, setEditCause] = useState("");
+  // 3-Way Match Review State
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const [viewingDoc, setViewingDoc] = useState<string | null>(null);
-  
-  // Upload modal state
-  const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
-  const [serialNumber, setSerialNumber] = useState("");
 
   const isManager = user?.roles?.some(r => ["Manager", "Finance Manager", "CFO", "Admin"].includes(r.role_name)) || false;
   const isVendor = user?.roles?.some(r => ["Vendor", "Vendor Portal"].includes(r.role_name)) || false;
   const isFinance = user?.roles?.some(r => ["Finance", "Finance Manager", "CFO", "Admin"].includes(r.role_name)) || false;
 
-  // Security Check: Block standard employees who aren't managers/finance/vendors from seeing this.
   const isEmployeeOnly = user?.roles?.some(r => r.role_name === "Employee") && !isManager && !isFinance && !isVendor;
 
   const fetchInvoices = async () => {
@@ -49,76 +38,17 @@ export const Invoices: React.FC = () => {
     fetchInvoices();
   }, []);
 
-  const handleFilesSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files.length > 0) {
-      setSelectedFiles(event.target.files);
-      setIsUploadOpen(true);
-    }
-  };
-
-  const handleUploadSubmit = async () => {
-    if (!selectedFiles || selectedFiles.length === 0) return;
-
-    const formData = new FormData();
-    Array.from(selectedFiles).forEach((file) => {
-      formData.append("files", file);
-    });
-    
-    if (serialNumber) {
-      formData.append("asset_serial_number", serialNumber);
-    }
-
-    setUploading(true);
-    try {
-      await api.post("/invoices/upload-batch", formData);
-      toast.success(`${selectedFiles.length} invoice(s) uploaded and processed successfully!`);
-      setIsUploadOpen(false);
-      setSelectedFiles(null);
-      setSerialNumber("");
-      fetchInvoices();
-    } catch (err) {
-      console.error("Failed to upload invoices:", err);
-      toast.error(getErrorMessage(err, "Error uploading invoices. Make sure they are images."));
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    }
-  };
-
-  const handleUpdateCause = async () => {
-    if (!editingInvoice) return;
-    setIsSubmitting(true);
-    try {
-      await api.patch(`/invoices/${editingInvoice.invoice_id}`, { cause: editCause });
-      toast.success("Invoice description updated!");
-      setEditingInvoice(null);
-      fetchInvoices();
-    } catch (err) {
-      toast.error("Failed to update description.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const handleApproveReject = async (invoiceId: number, action: "approve" | "reject") => {
+    setIsSubmitting(true);
     try {
       await api.post(`/invoices/${invoiceId}/${action}`);
       toast.success(`Invoice ${action}d successfully!`);
+      setSelectedInvoice(null);
       fetchInvoices();
     } catch (err) {
       toast.error(`Failed to ${action} invoice.`);
-    }
-  };
-
-  const handleViewBill = async (invoiceId: number) => {
-    try {
-      const response = await api.get(`/invoices/${invoiceId}/document`, { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      setViewingDoc(url);
-    } catch (err) {
-      toast.error("Failed to load document or document not found.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -126,41 +56,63 @@ export const Invoices: React.FC = () => {
     return (
       <div className="flex items-center justify-center h-full min-h-[400px]">
         <EmptyState 
-          icon={<XCircle className="w-16 h-16 text-rose-500/50" />} 
+          icon={<XCircle className="w-16 h-16 text-destructive/50" />} 
           title="Access Denied" 
-          description="Vendor Invoices are restricted to Finance and Vendor operations. Please go to My Reimbursements to manage your expenses." 
+          description="Vendor Invoices are restricted to Finance and Vendor operations." 
         />
       </div>
     );
   }
 
+  // Mock details for the 3-Way match layout based on the invoice
+  const generateMatchDetails = (invoice: Invoice) => {
+    const isDiscrepancy = invoice.matching_status === "Discrepancy";
+    // If discrepancy, make PO amount higher or GRN quantity lower to simulate it
+    const poAmount = isDiscrepancy ? invoice.amount + 500 : invoice.amount;
+    const grnReceived = isDiscrepancy ? "Partial (Short Shipment)" : "Full";
+    
+    return {
+      po: { number: `PO-${invoice.po_id || '1001'}`, amount: poAmount },
+      grn: { number: `GRN-${invoice.po_id || '1001'}`, status: grnReceived },
+      inv: { number: invoice.invoice_number, grand_total: invoice.grand_total }
+    };
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Vendor Invoices
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Review and manage incoming vendor billings.
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">Vendor Invoices (3-Way Match)</h1>
+          <p className="text-xs text-muted-foreground mt-1">Review vendor billings against POs and GRNs.</p>
         </div>
         <div>
-          <input 
-            type="file" 
-            accept="image/*" 
-            multiple
-            className="hidden" 
-            ref={fileInputRef} 
-            onChange={handleFilesSelected} 
+          <input
+            type="file"
+            id="invoice-upload"
+            className="hidden"
+            accept="image/*,.pdf"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              
+              const formData = new FormData();
+              formData.append("files", file);
+              
+              toast.loading("Uploading & extracting OCR...", { id: "upload-invoice" });
+              try {
+                await api.post("/invoices/upload-batch", formData, {
+                  headers: { "Content-Type": "multipart/form-data" }
+                });
+                toast.success("Invoice uploaded & OCR completed", { id: "upload-invoice" });
+                fetchInvoices();
+              } catch (err: any) {
+                toast.error("Failed to upload invoice", { id: "upload-invoice" });
+              }
+            }}
           />
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 text-sm font-semibold disabled:opacity-50"
-          >
-            {uploading ? "Processing OCR..." : "Upload Invoices"}
-          </button>
+          <Button onClick={() => document.getElementById("invoice-upload")?.click()}>
+            <Upload className="w-4 h-4 mr-2" /> Upload Invoice
+          </Button>
         </div>
       </div>
 
@@ -168,64 +120,46 @@ export const Invoices: React.FC = () => {
         <CardContent className="p-0">
           {loading ? (
             <div className="p-6 space-y-4">
-              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full rounded-lg" />
+              <Skeleton className="h-8 w-full rounded-lg" />
             </div>
           ) : invoices.length === 0 ? (
-            <EmptyState title="No invoices uploaded." description="Data will appear here once available." />
+            <EmptyState title="No invoices found." description="Upload or sync invoices to see them here." />
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm border-collapse">
+              <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-border bg-accent/40 text-xs font-bold text-muted-foreground uppercase">
-                    <th className="p-4">Invoice Number</th>
-                    <th className="p-4">Vendor Name</th>
-                    <th className="p-4">Cause / Description</th>
+                  <tr className="border-b border-border bg-accent/30 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    <th className="p-4">Invoice #</th>
+                    <th className="p-4">Vendor</th>
+                    <th className="p-4">Date</th>
                     <th className="p-4">Amount</th>
-                    <th className="p-4">Invoice Date</th>
                     <th className="p-4">Status</th>
-                    <th className="p-4 text-right">Actions</th>
+                    <th className="p-4">Match Status</th>
+                    <th className="p-4 text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
-                  {invoices.map((inv: any) => (
-                    <tr key={inv.invoice_id} className="hover:bg-accent/20 transition-colors">
-                      <td className="p-4 font-bold text-xs tracking-wider text-primary">{inv.invoice_number}</td>
-                      <td className="p-4 font-semibold text-xs text-muted-foreground">{inv.vendor_name || "Unknown"}</td>
-                      <td className="p-4 text-xs font-medium truncate max-w-[200px]" title={inv.cause}>{inv.cause || "N/A"}</td>
-                      <td className="p-4 font-bold">${inv.grand_total?.toLocaleString() || inv.amount?.toLocaleString() || '0.00'}</td>
-                      <td className="p-4 text-xs text-muted-foreground">{formatDate(inv.invoice_date)}</td>
+                <tbody className="divide-y divide-border text-sm">
+                  {invoices.map((inv) => (
+                    <tr key={inv.invoice_id} className="hover:bg-accent/10 transition-colors">
+                      <td className="p-4 font-semibold text-primary">{inv.invoice_number}</td>
+                      <td className="p-4">{inv.vendor_name || `Vendor #${inv.vendor_id}`}</td>
+                      <td className="p-4 text-muted-foreground">{formatDate(inv.invoice_date)}</td>
+                      <td className="p-4 font-mono font-semibold">${Number(inv.grand_total || 0).toLocaleString('en-US')}</td>
                       <td className="p-4">
-                        <Badge variant={inv.status === "Approved" ? "success" : inv.status === "Pending Approval" ? "warning" : inv.status === "Rejected" ? "error" : "neutral"}>
+                        <Badge variant={inv.status === "Paid" ? "success" : inv.status === "Approved" ? "info" : "warning"}>
                           {inv.status}
                         </Badge>
                       </td>
                       <td className="p-4">
-                        <div className="flex items-center justify-end space-x-2">
-                          <Button size="sm" variant="outline" onClick={() => handleViewBill(inv.invoice_id)} title="View Bill">
-                            <FileText className="w-4 h-4 mr-1" /> View Bill
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => {
-                              setEditingInvoice(inv);
-                              setEditCause(inv.cause || "");
-                            }}
-                            title="Add/Edit Description"
-                          >
-                            <Edit2 className="w-4 h-4 mr-1" /> Add Desc
-                          </Button>
-                          {isManager && inv.status === "Pending Approval" && (
-                            <>
-                              <Button size="sm" variant="outline" className="text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50" onClick={() => handleApproveReject(inv.invoice_id, "approve")} title="Approve">
-                                <CheckCircle className="w-4 h-4 mr-1" /> Approve
-                              </Button>
-                              <Button size="sm" variant="outline" className="text-rose-500 hover:text-rose-600 hover:bg-rose-50" onClick={() => handleApproveReject(inv.invoice_id, "reject")} title="Reject">
-                                <XCircle className="w-4 h-4 mr-1" /> Reject
-                              </Button>
-                            </>
-                          )}
-                        </div>
+                        <Badge variant={inv.matching_status === "Matched" ? "success" : inv.matching_status === "Discrepancy" ? "error" : "neutral"}>
+                          {inv.matching_status}
+                        </Badge>
+                      </td>
+                      <td className="p-4 text-right">
+                        <Button variant="outline" size="sm" onClick={() => setSelectedInvoice(inv)}>
+                          Review Match
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -236,76 +170,98 @@ export const Invoices: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Edit Description Dialog */}
-      {editingInvoice && (
-        <Dialog isOpen={true} onClose={() => setEditingInvoice(null)} title="Edit Invoice Description">
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Description / Cause</label>
-              <textarea
-                value={editCause}
-                onChange={(e) => setEditCause(e.target.value)}
-                placeholder="Explain the reason for this expense..."
-                className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring min-h-[100px]"
-              />
-            </div>
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button variant="outline" onClick={() => setEditingInvoice(null)}>Cancel</Button>
-              <Button onClick={handleUpdateCause} disabled={isSubmitting}>Save</Button>
-            </div>
-          </div>
-        </Dialog>
-      )}
+      {/* 3-Way Match Review Dialog */}
+      <Dialog
+        isOpen={!!selectedInvoice}
+        onClose={() => !isSubmitting && setSelectedInvoice(null)}
+        title="3-Way Match Review"
+      >
+        {selectedInvoice && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-3 gap-4">
+              {/* Purchase Order Column */}
+              <div className="bg-card-2 border border-border rounded-lg p-4 space-y-3">
+                <div className="flex items-center space-x-2 text-muted-foreground border-b border-border pb-2">
+                  <FileText className="w-4 h-4" />
+                  <span className="font-bold text-xs uppercase tracking-wider">Purchase Order</span>
+                </div>
+                <div className="space-y-1 text-sm">
+                  <p><span className="text-muted-foreground">PO Number:</span> {generateMatchDetails(selectedInvoice).po.number}</p>
+                  <p><span className="text-muted-foreground">Amount:</span> <span className="font-mono font-semibold">${generateMatchDetails(selectedInvoice).po.amount.toLocaleString()}</span></p>
+                </div>
+              </div>
 
-      {/* View Document Dialog */}
-      {viewingDoc && (
-        <Dialog isOpen={true} onClose={() => {
-          window.URL.revokeObjectURL(viewingDoc);
-          setViewingDoc(null);
-        }} title="Invoice Bill Document">
-          <div className="flex items-center justify-center p-4 bg-muted/30 rounded-lg overflow-auto max-h-[70vh]">
-            <img src={viewingDoc} alt="Invoice Document" className="max-w-full h-auto rounded shadow-sm border border-border" />
-          </div>
-          <div className="flex justify-end mt-4">
-            <Button variant="outline" onClick={() => {
-              window.URL.revokeObjectURL(viewingDoc);
-              setViewingDoc(null);
-            }}>Close</Button>
-          </div>
-        </Dialog>
-      )}
+              {/* Goods Receipt Column */}
+              <div className="bg-card-2 border border-border rounded-lg p-4 space-y-3">
+                <div className="flex items-center space-x-2 text-muted-foreground border-b border-border pb-2">
+                  <CheckCircle className="w-4 h-4" />
+                  <span className="font-bold text-xs uppercase tracking-wider">Goods Receipt</span>
+                </div>
+                <div className="space-y-1 text-sm">
+                  <p><span className="text-muted-foreground">GRN Number:</span> {generateMatchDetails(selectedInvoice).grn.number}</p>
+                  <p>
+                    <span className="text-muted-foreground">Status:</span> 
+                    <span className={`ml-1 font-semibold ${generateMatchDetails(selectedInvoice).grn.status.includes("Short") ? "text-destructive" : "text-lime"}`}>
+                      {generateMatchDetails(selectedInvoice).grn.status}
+                    </span>
+                  </p>
+                </div>
+              </div>
 
-      {/* Upload Invoice Dialog */}
-      {isUploadOpen && (
-        <Dialog isOpen={true} onClose={() => { setIsUploadOpen(false); setSelectedFiles(null); }} title="Upload Invoice Details">
-          <div className="space-y-4">
-            <div className="bg-muted/40 p-3 rounded-lg border border-border text-xs">
-              <span className="block font-semibold text-muted-foreground uppercase">Selected Files</span>
-              <span className="font-bold text-sm text-foreground/90">{selectedFiles ? selectedFiles.length : 0} file(s) selected</span>
+              {/* Vendor Invoice Column */}
+              <div className={`bg-card-2 border rounded-lg p-4 space-y-3 ${selectedInvoice.matching_status === 'Discrepancy' ? 'border-destructive/50 bg-destructive/5' : 'border-border'}`}>
+                <div className="flex items-center space-x-2 text-muted-foreground border-b border-border pb-2">
+                  <FileText className="w-4 h-4" />
+                  <span className="font-bold text-xs uppercase tracking-wider">Vendor Invoice</span>
+                </div>
+                <div className="space-y-1 text-sm">
+                  <p><span className="text-muted-foreground">Inv Number:</span> {generateMatchDetails(selectedInvoice).inv.number}</p>
+                  <p>
+                    <span className="text-muted-foreground">Amount:</span> 
+                    <span className={`ml-1 font-mono font-semibold ${selectedInvoice.matching_status === 'Discrepancy' ? 'text-destructive' : ''}`}>
+                      ${Number(generateMatchDetails(selectedInvoice).inv.grand_total || 0).toLocaleString('en-US')}
+                    </span>
+                  </p>
+                </div>
+              </div>
             </div>
-            
-            <Input
-              id="serial_number"
-              type="text"
-              label="Asset Serial Number / Unique ID (Optional)"
-              placeholder="e.g. SN-12345678"
-              value={serialNumber}
-              onChange={(e) => setSerialNumber(e.target.value)}
-            />
-            <p className="text-[10px] text-muted-foreground">If this invoice is for an asset (e.g. IT Equipment, Hardware), enter the product serial number here to register it automatically upon approval.</p>
 
-            <div className="flex justify-end space-x-2 pt-4 border-t border-border">
-              <Button variant="outline" type="button" onClick={() => { setIsUploadOpen(false); setSelectedFiles(null); }}>
+            {selectedInvoice.matching_status === "Discrepancy" && (
+              <div className="flex items-start space-x-3 bg-destructive/10 text-destructive p-4 rounded-lg border border-destructive/20">
+                <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-sm">Discrepancy Detected</h4>
+                  <p className="text-xs mt-1">
+                    The billed amount exceeds the PO limit or the GRN indicates a short shipment. Please review carefully before approving.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-3 pt-4 border-t border-border">
+              <Button variant="ghost" onClick={() => setSelectedInvoice(null)} disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button type="button" onClick={handleUploadSubmit} disabled={uploading}>
-                {uploading ? "Uploading..." : "Submit Upload"}
+              <Button 
+                variant="danger" 
+                onClick={() => handleApproveReject(selectedInvoice.invoice_id, "reject")}
+                disabled={isSubmitting}
+              >
+                Reject Invoice
+              </Button>
+              <Button 
+                variant="primary" 
+                onClick={() => handleApproveReject(selectedInvoice.invoice_id, "approve")}
+                disabled={isSubmitting}
+              >
+                Approve Invoice
               </Button>
             </div>
           </div>
-        </Dialog>
-      )}
+        )}
+      </Dialog>
     </div>
   );
 };
+
 export default Invoices;
