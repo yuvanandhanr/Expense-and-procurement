@@ -10,7 +10,15 @@ export const Quotations: React.FC = () => {
   const [quotes, setQuotes] = useState<Quotation[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedQuoteId, setExpandedQuoteId] = useState<number | null>(null);
+  const [expandedRfqId, setExpandedRfqId] = useState<number | null>(null);
+
+  const groupedQuotes = React.useMemo(() => {
+    return quotes.reduce((acc: Record<number, Quotation[]>, q) => {
+      if (!acc[q.rfq_id]) acc[q.rfq_id] = [];
+      acc[q.rfq_id].push(q);
+      return acc;
+    }, {});
+  }, [quotes]);
 
   const fetchData = async () => {
     try {
@@ -41,9 +49,9 @@ export const Quotations: React.FC = () => {
       toast.success("Quotation approved and Purchase Order auto-generated!");
       // Refetch both quotes and POs to get the newly generated PO
       fetchData();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error("Failed to approve quotation.");
+      toast.error(err.response?.data?.detail || "Failed to approve quotation.");
     }
   };
 
@@ -69,113 +77,141 @@ export const Quotations: React.FC = () => {
               <table className="w-full text-left text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-border bg-accent/40 text-xs font-bold text-muted-foreground uppercase">
-                    <th className="p-4">Quotation ID</th>
                     <th className="p-4">RFQ ID</th>
-                    <th className="p-4">Total Price</th>
-                    <th className="p-4">Timeline (Days)</th>
-                    <th className="p-4">Matching Status</th>
+                    <th className="p-4">Total Bids</th>
+                    <th className="p-4">Status</th>
                     <th className="p-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {quotes.map((q) => (
-                    <React.Fragment key={q.quotation_id}>
-                      <tr className="hover:bg-accent/20">
-                        <td className="p-4 font-bold text-xs tracking-wider text-primary">
-                          <button
-                            type="button"
-                            className="mr-2 text-muted-foreground hover:text-foreground font-mono"
-                            onClick={() => setExpandedQuoteId(expandedQuoteId === q.quotation_id ? null : q.quotation_id)}
-                          >
-                            {expandedQuoteId === q.quotation_id ? "▼" : "▶"}
-                          </button>
-                          #QT-{q.quotation_id}
-                        </td>
-                        <td className="p-4">#RFQ-{q.rfq_id}</td>
-                        <td className="p-4 font-bold">${q.total_amount?.toLocaleString()}</td>
-                        <td className="p-4">{q.lead_time_days} days</td>
-                        <td className="p-4">
-                          <Badge variant={q.is_selected || q.status === "Selected" ? "success" : "neutral"}>
-                            {q.is_selected || q.status === "Selected" ? "Selected" : "Under Review"}
-                          </Badge>
-                        </td>
-                        <td className="p-4 text-right">
-                          {isFinanceManager && (!q.is_selected && q.status !== "Selected") && (
-                            <Button size="sm" onClick={() => handleApprove(q)}>Approve & Gen PO</Button>
-                          )}
-                        </td>
-                      </tr>
-                      {expandedQuoteId === q.quotation_id && q.items && q.items.length > 0 && (
-                        <tr className="bg-accent/5">
-                          <td colSpan={6} className="p-4">
-                            <div className="bg-background rounded-lg border border-border overflow-hidden">
-                              <table className="w-full text-left text-xs border-collapse">
-                                <thead>
-                                  <tr className="bg-accent/30 text-muted-foreground uppercase border-b border-border">
-                                    <th className="p-2 pl-4">Item Ref</th>
-                                    <th className="p-2">Unit Price</th>
-                                    <th className="p-2">Tax</th>
-                                    <th className="p-2 font-bold text-primary">Total Price</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border">
-                                  {q.items.map((item) => (
-                                    <tr key={item.quotation_item_id} className="hover:bg-accent/10">
-                                      <td className="p-2 pl-4 font-mono text-muted-foreground">#Item-{item.rfq_item_id}</td>
-                                      <td className="p-2">${Number(item.unit_price).toFixed(2)}</td>
-                                      <td className="p-2">${Number(item.tax_amount || 0).toFixed(2)}</td>
-                                      <td className="p-2 font-bold text-primary">${Number(item.total_price || 0).toFixed(2)}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                            
-                            {/* Embed Auto-Generated Purchase Order Details if this quote is selected */}
-                            {(q.is_selected || q.status === "Selected") && (
-                              (() => {
-                                const linkedPo = purchaseOrders.find(
-                                  po => po.rfq_id === q.rfq_id && po.vendor_id === q.vendor_id
-                                );
-                                if (!linkedPo) return null;
-                                return (
-                                  <div className="mt-4 p-4 bg-primary/5 border-l-4 border-primary rounded-r-lg">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <h4 className="font-bold text-sm text-foreground">Auto-Generated Purchase Order</h4>
-                                      <Badge variant="neutral">{linkedPo.status}</Badge>
-                                    </div>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                                      <div>
-                                        <p className="text-muted-foreground mb-1">PO Number</p>
-                                        <p className="font-mono font-bold text-primary">{linkedPo.po_number}</p>
-                                      </div>
-                                      <div>
-                                        <p className="text-muted-foreground mb-1">Grand Total</p>
-                                        <p className="font-bold">${linkedPo.grand_total?.toLocaleString()}</p>
-                                      </div>
-                                      <div>
-                                        <p className="text-muted-foreground mb-1">Delivery Date</p>
-                                        <p className="font-medium">{new Date(linkedPo.delivery_date || linkedPo.created_at).toLocaleDateString()}</p>
-                                      </div>
-                                      <div>
-                                        <p className="text-muted-foreground mb-1">Generated On</p>
-                                        <p className="font-medium">{new Date(linkedPo.created_at).toLocaleDateString()}</p>
-                                      </div>
-                                    </div>
-                                    <div className="mt-3 flex justify-end">
-                                      <Button variant="outline" size="sm" onClick={() => window.location.href='/purchase-orders'}>
-                                        View Full PO
-                                      </Button>
-                                    </div>
-                                  </div>
-                                );
-                              })()
-                            )}
+                  {Object.entries(groupedQuotes).map(([rfqIdStr, rfqQuotes]) => {
+                    const rfqId = Number(rfqIdStr);
+                    const isExpanded = expandedRfqId === rfqId;
+                    const hasSelected = rfqQuotes.some(q => q.is_selected || q.status === "Selected");
+
+                    return (
+                      <React.Fragment key={rfqId}>
+                        <tr className="hover:bg-accent/20 cursor-pointer" onClick={() => setExpandedRfqId(isExpanded ? null : rfqId)}>
+                          <td className="p-4 font-bold text-xs tracking-wider text-primary">
+                            <span className="mr-2 text-muted-foreground font-mono">
+                              {isExpanded ? "▼" : "▶"}
+                            </span>
+                            #RFQ-{rfqId}
+                          </td>
+                          <td className="p-4 font-medium">{rfqQuotes.length} Bid{rfqQuotes.length !== 1 ? 's' : ''}</td>
+                          <td className="p-4">
+                            <Badge variant={hasSelected ? "success" : "neutral"}>
+                              {hasSelected ? "Awarded" : "Under Review"}
+                            </Badge>
+                          </td>
+                          <td className="p-4 text-right">
+                            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setExpandedRfqId(isExpanded ? null : rfqId); }}>
+                              {isExpanded ? "Close" : "Review Bids"}
+                            </Button>
                           </td>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  ))}
+                        {isExpanded && (
+                          <tr className="bg-accent/5">
+                            <td colSpan={4} className="p-4">
+                              <div className="bg-background rounded-lg border border-border overflow-hidden">
+                                <table className="w-full text-left text-xs border-collapse">
+                                  <thead>
+                                    <tr className="bg-accent/30 text-muted-foreground uppercase border-b border-border">
+                                      <th className="p-3 pl-4">Vendor</th>
+                                      <th className="p-3">Quotation Ref</th>
+                                      <th className="p-3">Total Price</th>
+                                      <th className="p-3">Timeline</th>
+                                      <th className="p-3">Status</th>
+                                      <th className="p-3 text-right">Action</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-border">
+                                    {rfqQuotes.map((q) => {
+                                      // Display "Rejected" dynamically if another quote is selected but not saved to db yet, 
+                                      // though the backend should handle setting it to Rejected now.
+                                      let statusDisplay = q.status;
+                                      let variant = "neutral";
+                                      if (q.status === "Selected" || q.is_selected) {
+                                        statusDisplay = "Selected";
+                                        variant = "success";
+                                      } else if (q.status === "Rejected") {
+                                        variant = "destructive";
+                                      } else if (hasSelected) {
+                                        statusDisplay = "Rejected";
+                                        variant = "destructive";
+                                      }
+
+                                      return (
+                                        <React.Fragment key={q.quotation_id}>
+                                          <tr className="hover:bg-accent/10">
+                                            <td className="p-3 pl-4 font-medium">{(q as any).vendor?.vendor_name || `Vendor #${q.vendor_id}`}</td>
+                                            <td className="p-3 font-mono text-muted-foreground">#QT-{q.quotation_id}</td>
+                                            <td className="p-3 font-bold text-primary">${Number(q.total_amount).toLocaleString()}</td>
+                                            <td className="p-3">{q.lead_time_days} days</td>
+                                            <td className="p-3">
+                                              <Badge variant={variant as any}>{statusDisplay}</Badge>
+                                            </td>
+                                            <td className="p-3 text-right">
+                                              {isFinanceManager && !hasSelected && (
+                                                <Button size="sm" onClick={() => handleApprove(q)}>Approve</Button>
+                                              )}
+                                            </td>
+                                          </tr>
+                                          
+                                          {/* Auto-Generated Purchase Order Details if this quote is selected */}
+                                          {(q.is_selected || q.status === "Selected") && (
+                                            (() => {
+                                              const linkedPo = purchaseOrders.find(
+                                                po => po.rfq_id === q.rfq_id && po.vendor_id === q.vendor_id
+                                              );
+                                              if (!linkedPo) return null;
+                                              return (
+                                                <tr className="bg-primary/5">
+                                                  <td colSpan={6} className="p-4 border-l-4 border-primary">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                      <h4 className="font-bold text-sm text-foreground">Auto-Generated Purchase Order</h4>
+                                                      <Badge variant="neutral">{linkedPo.status}</Badge>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                                                      <div>
+                                                        <p className="text-muted-foreground mb-1">PO Number</p>
+                                                        <p className="font-mono font-bold text-primary">{linkedPo.po_number}</p>
+                                                      </div>
+                                                      <div>
+                                                        <p className="text-muted-foreground mb-1">Grand Total</p>
+                                                        <p className="font-bold">${linkedPo.grand_total?.toLocaleString()}</p>
+                                                      </div>
+                                                      <div>
+                                                        <p className="text-muted-foreground mb-1">Delivery Date</p>
+                                                        <p className="font-medium">{new Date(linkedPo.delivery_date || linkedPo.created_at).toLocaleDateString()}</p>
+                                                      </div>
+                                                      <div>
+                                                        <p className="text-muted-foreground mb-1">Generated On</p>
+                                                        <p className="font-medium">{new Date(linkedPo.created_at).toLocaleDateString()}</p>
+                                                      </div>
+                                                    </div>
+                                                    <div className="mt-3 flex justify-end">
+                                                      <Button variant="outline" size="sm" onClick={() => window.location.href='/purchase-orders'}>
+                                                        View Full PO
+                                                      </Button>
+                                                    </div>
+                                                  </td>
+                                                </tr>
+                                              );
+                                            })()
+                                          )}
+                                        </React.Fragment>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

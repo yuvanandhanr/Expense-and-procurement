@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from typing import List
 from datetime import datetime
 
@@ -24,8 +25,12 @@ async def trigger_offboarding(
     if not emp:
         raise HTTPException(status_code=404, detail="Employee not found")
 
+    # Instantly revoke system access
+    emp.status = "Inactive"
+    emp.is_locked = True
+
     # Find active asset assignments
-    stmt = select(AssetAssignment).where(
+    stmt = select(AssetAssignment).options(selectinload(AssetAssignment.asset)).where(
         AssetAssignment.assigned_to == employee_id,
         AssetAssignment.status == "Active"
     )
@@ -43,7 +48,7 @@ async def trigger_offboarding(
     session.add(mgr_task)
     tasks.append(mgr_task)
 
-    # Create Retrieve Asset tasks
+    # Create Retrieve Asset tasks and unassign assets
     for assignment in assignments:
         task = OffboardingTask(
             employee_id=employee_id,
@@ -53,6 +58,15 @@ async def trigger_offboarding(
         )
         session.add(task)
         tasks.append(task)
+
+        # Unassign the asset instantly
+        assignment.status = "Returned"
+        assignment.return_date = datetime.utcnow().date()
+        
+        # Mark the asset itself as Available
+        if assignment.asset:
+            assignment.asset.status = "Available"
+            assignment.asset.assigned_employee_id = None
         
     # Create generic Revoke IT Access task
     it_task = OffboardingTask(

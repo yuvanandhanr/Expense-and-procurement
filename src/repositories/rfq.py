@@ -10,6 +10,20 @@ class RFQRepository(BaseRepository[RequestForQuotation]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(RequestForQuotation, session)
 
+    async def list_all(self, skip: int = 0, limit: int = 100) -> List[RequestForQuotation]:
+        query = (
+            select(self.model)
+            .options(
+                selectinload(self.model.items),
+                selectinload(self.model.rfq_vendors),
+                selectinload(self.model.quotations)
+            )
+            .offset(skip)
+            .limit(limit)
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
     async def get_by_id(self, entity_id: int) -> Optional[RequestForQuotation]:
         query = (
             select(self.model)

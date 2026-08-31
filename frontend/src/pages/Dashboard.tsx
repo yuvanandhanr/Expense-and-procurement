@@ -39,23 +39,9 @@ export const Dashboard: React.FC = () => {
     );
   }
 
-  // Fallback mocks for the required widgets if API is missing them
-  const myAssets = data?.widgets?.my_assets || [
-    { id: 1, name: "MacBook Pro 16", tag: "AST-2034", status: "Active" },
-    { id: 2, name: "Dell U2720Q Monitor", tag: "AST-3011", status: "Active" }
-  ];
-
-  const recentExpenses = data?.widgets?.recent_expenses || [
-    { id: 101, title: "Client Dinner", amount: 150.00, date: new Date().toISOString(), status: "Approved" },
-    { id: 102, title: "Uber to Airport", amount: 45.50, date: new Date().toISOString(), status: "Pending" },
-    { id: 103, title: "Office Supplies", amount: 25.00, date: new Date(Date.now() - 86400000).toISOString(), status: "Rejected" },
-  ];
-
-  const myRequisitions = data?.widgets?.my_requisitions || [
-    { id: "PR-5001", title: "New Developer Laptop", amount: 2500, status: "Pending" },
-    { id: "PR-5002", title: "Figma License (Yearly)", amount: 144, status: "Approved" },
-    { id: "PR-4920", title: "Ergonomic Chair", amount: 350, status: "Fulfilled" },
-  ];
+  const myAssets = data?.widgets?.my_assets || [];
+  const recentExpenses = data?.widgets?.recent_expenses || [];
+  const myRequisitions = data?.widgets?.my_requisitions || [];
 
   return (
     <div className="space-y-6">
@@ -65,7 +51,7 @@ export const Dashboard: React.FC = () => {
           <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.first_name || "Employee"}</h1>
           <p className="text-sm text-muted-foreground mt-1">Here is an overview of your active requests and assets.</p>
         </div>
-        <HeroTimestamp staticDate={data?.timestamp} />
+        <HeroTimestamp />
       </div>
 
       {/* Main Grid */}

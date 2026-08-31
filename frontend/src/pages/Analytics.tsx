@@ -34,19 +34,22 @@ export const Analytics: React.FC = () => {
   const [spendData, setSpendData] = useState<any>(null);
   const [vendorData, setVendorData] = useState<any>(null);
   const [budgetData, setBudgetData] = useState<any>(null);
+  const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
-        const [spendRes, vendorRes, budgetRes] = await Promise.all([
+        const [spendRes, vendorRes, budgetRes, dashboardRes] = await Promise.all([
           api.get("/analytics/spend"),
           api.get("/analytics/vendors"),
           api.get("/analytics/budgets"),
+          api.get("/dashboard"),
         ]);
         setSpendData(spendRes.data);
         setVendorData(vendorRes.data);
         setBudgetData(budgetRes.data);
+        setDashboardData(dashboardRes.data);
       } catch (err) {
         console.error("Failed to load analytics trends:", err);
       } finally {
@@ -68,13 +71,19 @@ export const Analytics: React.FC = () => {
     );
   }
 
-  // --- Common Chart Data ---
+  const monthsList = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const mappedMonthlySpend = monthsList.map((m, i) => {
+    // API returns month as "YYYY-MM"
+    const match = spendData?.monthly_trends?.find((t: any) => parseInt(t.month.split("-")[1]) === i + 1);
+    return match ? match.spend : 0;
+  });
+
   const lineChartData = {
-    labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+    labels: monthsList,
     datasets: [
       {
         label: "Operational Spend ($)",
-        data: spendData?.monthly_trend || [12000, 19000, 3000, 5000, 2000, 3000, 20000, 14000, 9000, 12000, 25000, 18000],
+        data: mappedMonthlySpend,
         borderColor: "rgba(59, 130, 246, 1)",
         backgroundColor: "rgba(59, 130, 246, 0.1)",
         tension: 0.4,
@@ -83,12 +92,15 @@ export const Analytics: React.FC = () => {
     ],
   };
 
+  const deptLabels = spendData?.department_spend?.length ? spendData.department_spend.map((d: any) => d.department) : ["No Data"];
+  const deptAmounts = spendData?.department_spend?.length ? spendData.department_spend.map((d: any) => d.spend) : [0];
+
   const doughnutChartData = {
-    labels: spendData?.departments?.map((d: any) => d.name) || ["Engineering", "Sales", "HR", "Marketing", "Legal"],
+    labels: deptLabels,
     datasets: [
       {
         label: "Spend Share",
-        data: spendData?.departments?.map((d: any) => d.total) || [45000, 25000, 10000, 15000, 8000],
+        data: deptAmounts,
         backgroundColor: [
           "rgba(59, 130, 246, 0.75)",
           "rgba(16, 185, 129, 0.75)",
@@ -204,20 +216,26 @@ export const Analytics: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-primary/10 border-primary/20">
              <CardContent className="p-6">
-               <h3 className="text-sm font-bold text-primary uppercase tracking-wider mb-2">Total Financial Exposure</h3>
-               <p className="text-4xl font-bold text-foreground">$1,245,000</p>
+               <h3 className="text-sm font-bold text-primary uppercase tracking-wider mb-2">Total Budget Allocation</h3>
+               <p className="text-4xl font-bold text-foreground">
+                 ${(budgetData?.reduce((acc: number, b: any) => acc + (b.allocated || 0), 0) || 0).toLocaleString()}
+               </p>
              </CardContent>
           </Card>
           <Card className="bg-amber-500/10 border-amber-500/20">
              <CardContent className="p-6">
                <h3 className="text-sm font-bold text-amber-700 uppercase tracking-wider mb-2">Pending Reimbursements</h3>
-               <p className="text-4xl font-bold text-foreground">$42,500</p>
+               <p className="text-4xl font-bold text-foreground">
+                 ${(dashboardData?.widgets?.employee_reimbursements?.amount || 0).toLocaleString()}
+               </p>
              </CardContent>
           </Card>
           <Card className="bg-emerald-500/10 border-emerald-500/20">
              <CardContent className="p-6">
-               <h3 className="text-sm font-bold text-emerald-700 uppercase tracking-wider mb-2">Total Paid (YTD)</h3>
-               <p className="text-4xl font-bold text-foreground">$8.4M</p>
+               <h3 className="text-sm font-bold text-emerald-700 uppercase tracking-wider mb-2">Total Spend (YTD)</h3>
+               <p className="text-4xl font-bold text-foreground">
+                 ${(spendData?.yearly_trends?.reduce((acc: number, y: any) => acc + y.spend, 0) || 0).toLocaleString()}
+               </p>
              </CardContent>
           </Card>
         </div>
@@ -279,17 +297,17 @@ export const Analytics: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {(vendorData?.top_vendors || [
-                  { name: "Acme Corp", pos: 12, total: 85000 },
-                  { name: "Global Logistics", pos: 8, total: 42000 },
-                  { name: "Apex Technologies", pos: 5, total: 31000 },
-                ]).map((v: any, idx: number) => (
+                {spendData?.vendor_spend?.length > 0 ? spendData.vendor_spend.map((v: any, idx: number) => (
                   <tr key={idx} className="hover:bg-accent/20">
-                    <td className="p-4 font-bold">{v.name}</td>
-                    <td className="p-4">{v.pos}</td>
-                    <td className="p-4 font-semibold">${v.total?.toLocaleString()}</td>
+                    <td className="p-4 font-bold">{v.vendor}</td>
+                    <td className="p-4">-</td>
+                    <td className="p-4 font-semibold">${v.spend?.toLocaleString()}</td>
                   </tr>
-                ))}
+                )) : (
+                  <tr>
+                    <td colSpan={3} className="p-4 text-center text-muted-foreground">No vendor spend data available.</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </CardContent>
@@ -300,18 +318,14 @@ export const Analytics: React.FC = () => {
             <CardTitle>Budget Utilisation Index</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {(budgetData?.allocations || [
-              { code: "DEPT-ENG-2026", spent: 45000, limit: 100000 },
-              { code: "DEPT-SLS-2026", spent: 25000, limit: 50000 },
-              { code: "DEPT-MKT-2026", spent: 15000, limit: 20000 },
-            ]).map((b: any, idx: number) => {
-              const rate = (b.spent / b.limit) * 100;
+            {budgetData?.length > 0 ? budgetData.map((b: any, idx: number) => {
+              const rate = b.percentage || 0;
               return (
                 <div key={idx} className="space-y-1">
                   <div className="flex items-center justify-between text-xs font-semibold">
-                    <span className="font-bold text-primary">{b.code}</span>
+                    <span className="font-bold text-primary">{b.budget_code}</span>
                     <span className="text-muted-foreground">
-                      ${b.spent?.toLocaleString()} / ${b.limit?.toLocaleString()} ({rate.toFixed(0)}%)
+                      ${b.utilized?.toLocaleString()} / ${b.allocated?.toLocaleString()} ({rate.toFixed(0)}%)
                     </span>
                   </div>
                   <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden border border-border">
@@ -324,7 +338,9 @@ export const Analytics: React.FC = () => {
                   </div>
                 </div>
               );
-            })}
+            }) : (
+              <div className="text-center text-sm text-muted-foreground pt-4">No budget data available.</div>
+            )}
           </CardContent>
         </Card>
       </div>

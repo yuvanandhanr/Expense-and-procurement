@@ -373,16 +373,12 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
               )}
             </div>
 
-            {/* Role Switcher */}
+            {/* Role Display */}
             <div className="hidden md:flex items-center border border-border rounded-lg bg-card overflow-hidden">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-3 border-r border-border bg-accent/30 flex items-center h-full">Role</span>
-              <select className="bg-transparent text-xs font-semibold py-1.5 px-2 outline-none cursor-pointer">
-                <option>Employee</option>
-                <option>Manager</option>
-                <option>Admin</option>
-                <option>Finance</option>
-                <option>Vendor</option>
-              </select>
+              <span className="bg-transparent text-xs font-semibold py-1.5 px-3">
+                {user?.roles && user.roles.length > 0 ? user.roles[0].role_name : "User"}
+              </span>
             </div>
 
             {/* User Profile Menu */}

@@ -2,7 +2,7 @@ import requests
 import json
 import uuid
 
-API_BASE = "http://localhost:8000/api/v1"
+API_BASE = "http://localhost:8080/api/v1"
 
 def run_tests():
     print("Running E2E automated API loop tests...")

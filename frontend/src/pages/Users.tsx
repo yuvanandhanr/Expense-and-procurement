@@ -193,10 +193,10 @@ export const Users: React.FC = () => {
                         </div>
                       </td>
                       <td className="p-4">
-                        {user.is_locked ? (
-                          <Badge variant="error">Locked</Badge>
-                        ) : !user.is_active ? (
-                          <Badge variant="warning">Inactive</Badge>
+                        {user.status !== "Active" ? (
+                          <Badge variant="danger">Inactive</Badge>
+                        ) : user.is_locked ? (
+                          <Badge variant="warning">Locked</Badge>
                         ) : (
                           <Badge variant="success">Active</Badge>
                         )}
@@ -220,7 +220,7 @@ export const Users: React.FC = () => {
                           variant="danger"
                           size="sm"
                           onClick={() => handleOffboard(user)}
-                          disabled={!user.is_active}
+                          disabled={user.status !== "Active"}
                         >
                           Offboard
                         </Button>

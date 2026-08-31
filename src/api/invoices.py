@@ -79,35 +79,60 @@ async def get_invoices(
 async def upload_invoice_batch(
     files: List[UploadFile] = File(...),
     asset_serial_number: Optional[str] = Form(None),
+    po_id: Optional[int] = Form(None),
+    grn_id: Optional[int] = Form(None),
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
+    # Resolve vendor_id if user is a Vendor
+    from src.models.vendor import Vendor
+    vendor_id_val = None
+    if current_user.roles and any(r.role_name in ["Vendor Portal", "Vendor"] for r in current_user.roles):
+        stmt = select(Vendor.vendor_id).where(Vendor.email == current_user.email)
+        result = await session.execute(stmt)
+        vendor_id_val = result.scalar_one_or_none()
+        if not vendor_id_val:
+            raise HTTPException(status_code=403, detail="Vendor profile not found.")
+    else:
+        vendor_id_val = 1 # Fallback for internal employees
+
     saved_invoices = []
     
     for file in files:
-        if not file.content_type.startswith("image/"):
+        if not (file.content_type.startswith("image/") or "pdf" in file.content_type):
             continue
 
         content = await file.read()
-        ocr_result = OCRService.process_invoice_image(content)
-        grand_total = ocr_result.get("total", Decimal("0.00"))
-        cause = ocr_result.get("cause", "General Expense")
-        invoice_date_str = ocr_result.get("date")
         
-        from datetime import date
-        try:
-            if invoice_date_str:
-                invoice_date = date.fromisoformat(invoice_date_str)
-            else:
-                invoice_date = date.today()
-        except Exception:
+        # Simple fallback for OCR if it's a PDF (since OCR might only support images)
+        # Ideally, we would process the PDF, but for now we fallback to 0.00 if it fails.
+        if "pdf" in file.content_type:
+            grand_total = Decimal("0.00")
+            cause = "Invoice PDF"
+            from datetime import date
             invoice_date = date.today()
+        else:
+            ocr_result = OCRService.process_invoice_image(content)
+            grand_total = ocr_result.get("total", Decimal("0.00"))
+            cause = ocr_result.get("cause", "General Expense")
+            invoice_date_str = ocr_result.get("date")
+            
+            from datetime import date
+            try:
+                if invoice_date_str:
+                    invoice_date = date.fromisoformat(invoice_date_str)
+                else:
+                    invoice_date = date.today()
+            except Exception:
+                invoice_date = date.today()
         
         invoice_number = f"INV-{uuid.uuid4().hex[:6].upper()}"
         
         invoice = VendorInvoice(
             invoice_number=invoice_number,
-            vendor_id=1,
+            vendor_id=vendor_id_val,
+            po_id=po_id,
+            grn_id=grn_id,
             cause=cause,
             invoice_date=invoice_date,
             subtotal=grand_total,

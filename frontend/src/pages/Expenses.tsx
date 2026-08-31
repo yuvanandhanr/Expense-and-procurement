@@ -402,7 +402,7 @@ const Expenses: React.FC = () => {
                   )}
                   
                   {/* Manager Review */}
-                  {report.status === "Pending Manager Approval" && (hasRole("Manager") || hasRole("Admin")) && (
+                  {(report.status === "Pending Manager Approval" || report.status === "Pending Finance Manager Approval") && (hasRole("Manager") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin")) && (
                     <div className="flex flex-col gap-3 p-4 bg-amber-500/10 rounded-xl border border-amber-500/20">
                       <h4 className="font-semibold text-amber-800 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> Manager Review Required</h4>
                       <div className="flex gap-2">
@@ -450,7 +450,10 @@ const Expenses: React.FC = () => {
                         return (
                           <div key={receipt.receipt_id} className={`flex flex-col md:flex-row gap-4 p-4 border rounded-xl shadow-sm transition-all ${alert && report.status === "Draft" ? 'border-amber-300 bg-amber-50 dark:bg-amber-950/20' : 'bg-card hover:shadow-md'}`}>
                             {/* Preview */}
-                            <div className="w-full md:w-24 h-24 shrink-0 rounded overflow-hidden bg-muted flex items-center justify-center border group relative cursor-pointer">
+                            <div 
+                              className="w-full md:w-24 h-24 shrink-0 rounded overflow-hidden bg-muted flex items-center justify-center border group relative cursor-pointer"
+                              onClick={() => receipt.image_path && window.open(`http://localhost:8000${receipt.image_path}`, '_blank')}
+                            >
                                {receipt.image_path ? (
                                  <img src={`http://localhost:8000${receipt.image_path}`} alt="Receipt" className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity" />
                                ) : (

@@ -244,10 +244,15 @@ class RFQService:
         rfq.closing_date = datetime.utcnow()
         await self.rfq_repo.update(rfq)
 
-        # Update quotation status
-        quote = await self.quote_repo.get_by_id(selected_quotation_id)
-        quote.status = "Selected"
-        await self.quote_repo.update(quote)
+        # Update quotation statuses
+        quotes = await self.quote_repo.list_by_rfq(rfq_id)
+        for quote in quotes:
+            if quote.quotation_id == selected_quotation_id:
+                quote.status = "Selected"
+                selected_quote = quote
+            else:
+                quote.status = "Rejected"
+            await self.quote_repo.update(quote)
 
         # Auto-generate Purchase Order
         from src.services.po_service import POService
@@ -255,7 +260,7 @@ class RFQService:
         po_service = POService(self.db)
         
         po_items = []
-        for item in quote.items:
+        for item in selected_quote.items:
             po_items.append(POItemCreate(
                 item_name=item.rfq_item.item_name if item.rfq_item else "Item",
                 specification=item.rfq_item.specification if item.rfq_item else None,
@@ -274,7 +279,7 @@ class RFQService:
             rfq_id=rfq_id,
             pr_id=rfq.pr_id,
             department_id=pr_dept_id,
-            currency=quote.currency,
+            currency=selected_quote.currency,
             items=po_items
         )
         await po_service.create_po(po_data, user_id)

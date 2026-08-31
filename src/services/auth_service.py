@@ -22,12 +22,23 @@ async def verify_google_id_token(credential: str) -> dict:
                 return jwt.decode(credential, options={"verify_signature": False})
             except Exception:
                 email = credential.replace("mock_google_", "") if "@" in credential else "test@dataeko.ai"
+                
+                name_map = {
+                    "y.raja@dataeko.ai": ("Alex", "Rivera"),
+                    "ceo@dataeko.ai": ("Sarah", "Chen"),
+                    "cfo@dataeko.ai": ("Marcus", "Johnson"),
+                    "finance@dataeko.ai": ("Elena", "Rodriguez"),
+                    "manager@dataeko.ai": ("David", "Kim"),
+                    "employee@dataeko.ai": ("Rachel", "Foster"),
+                }
+                given_name, family_name = name_map.get(email, ("Test", "User"))
+                
                 return {
                     "email": email,
                     "email_verified": True,
                     "sub": f"mock_sub_{email}",
-                    "given_name": "Test",
-                    "family_name": "User",
+                    "given_name": given_name,
+                    "family_name": family_name,
                     "picture": "https://example.com/photo.jpg"
                 }
 
@@ -665,7 +676,9 @@ class UserService:
                 if role:
                     user.roles.append(role)
 
-        return await self.user_repo.create(user)
+        new_user = await self.user_repo.create(user)
+        await self.user_repo.session.refresh(new_user, attribute_names=['created_at', 'updated_at'])
+        return new_user
 
     async def get_user(self, user_id: int) -> User:
         user = await self.user_repo.get_by_id(user_id)
@@ -732,7 +745,9 @@ class UserService:
                 if role:
                     user.roles.append(role)
 
-        return await self.user_repo.update(user)
+        updated_user = await self.user_repo.update(user)
+        await self.user_repo.session.refresh(updated_user, attribute_names=['updated_at'])
+        return updated_user
 
     async def delete_user(self, user_id: int) -> None:
         user = await self.get_user(user_id)

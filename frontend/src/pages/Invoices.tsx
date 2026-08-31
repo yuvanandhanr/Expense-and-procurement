@@ -15,6 +15,12 @@ export const Invoices: React.FC = () => {
   // 3-Way Match Review State
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Upload State
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [availablePOs, setAvailablePOs] = useState<any[]>([]);
+  const [selectedPO, setSelectedPO] = useState<string>("");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
 
   const isManager = user?.roles?.some(r => ["Manager", "Finance Manager", "CFO", "Admin"].includes(r.role_name)) || false;
   const isVendor = user?.roles?.some(r => ["Vendor", "Vendor Portal"].includes(r.role_name)) || false;
@@ -52,6 +58,47 @@ export const Invoices: React.FC = () => {
     }
   };
 
+  const handleOpenUploadModal = async () => {
+    setIsUploadModalOpen(true);
+    setUploadFile(null);
+    setSelectedPO("");
+    try {
+      const response = await api.get("/purchase-orders");
+      // Filter only approved POs if we are strict, or just show all
+      setAvailablePOs(response.data);
+    } catch (err) {
+      console.error("Failed to load POs:", err);
+    }
+  };
+
+  const handleUploadInvoice = async () => {
+    if (!uploadFile) {
+      toast.error("Please select a file to upload.");
+      return;
+    }
+    
+    const formData = new FormData();
+    formData.append("files", uploadFile);
+    if (selectedPO) {
+      formData.append("po_id", selectedPO);
+    }
+    
+    setIsSubmitting(true);
+    toast.loading("Uploading & extracting OCR...", { id: "upload-invoice" });
+    try {
+      await api.post("/invoices/upload-batch", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      toast.success("Invoice uploaded & OCR completed", { id: "upload-invoice" });
+      setIsUploadModalOpen(false);
+      fetchInvoices();
+    } catch (err: any) {
+      toast.error("Failed to upload invoice", { id: "upload-invoice" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (isEmployeeOnly) {
     return (
       <div className="flex items-center justify-center h-full min-h-[400px]">
@@ -72,8 +119,8 @@ export const Invoices: React.FC = () => {
     const grnReceived = isDiscrepancy ? "Partial (Short Shipment)" : "Full";
     
     return {
-      po: { number: `PO-${invoice.po_id || '1001'}`, amount: poAmount },
-      grn: { number: `GRN-${invoice.po_id || '1001'}`, status: grnReceived },
+      po: { number: invoice.po_id ? `PO-${invoice.po_id}` : 'Unlinked', amount: poAmount },
+      grn: { number: invoice.po_id ? `GRN-${invoice.po_id}` : 'Unlinked', status: invoice.po_id ? grnReceived : 'N/A' },
       inv: { number: invoice.invoice_number, grand_total: invoice.grand_total }
     };
   };
@@ -86,31 +133,7 @@ export const Invoices: React.FC = () => {
           <p className="text-xs text-muted-foreground mt-1">Review vendor billings against POs and GRNs.</p>
         </div>
         <div>
-          <input
-            type="file"
-            id="invoice-upload"
-            className="hidden"
-            accept="image/*,.pdf"
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              
-              const formData = new FormData();
-              formData.append("files", file);
-              
-              toast.loading("Uploading & extracting OCR...", { id: "upload-invoice" });
-              try {
-                await api.post("/invoices/upload-batch", formData, {
-                  headers: { "Content-Type": "multipart/form-data" }
-                });
-                toast.success("Invoice uploaded & OCR completed", { id: "upload-invoice" });
-                fetchInvoices();
-              } catch (err: any) {
-                toast.error("Failed to upload invoice", { id: "upload-invoice" });
-              }
-            }}
-          />
-          <Button onClick={() => document.getElementById("invoice-upload")?.click()}>
+          <Button onClick={handleOpenUploadModal}>
             <Upload className="w-4 h-4 mr-2" /> Upload Invoice
           </Button>
         </div>
@@ -169,6 +192,55 @@ export const Invoices: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Upload Invoice Dialog */}
+      <Dialog
+        isOpen={isUploadModalOpen}
+        onClose={() => !isSubmitting && setIsUploadModalOpen(false)}
+        title="Upload Invoice"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Link to Purchase Order (Optional)</label>
+            <select
+              className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              value={selectedPO}
+              onChange={(e) => setSelectedPO(e.target.value)}
+              disabled={isSubmitting}
+            >
+              <option value="">-- No PO Linked --</option>
+              {availablePOs.map((po) => (
+                <option key={po.po_id} value={po.po_id}>
+                  {po.po_number} - ${Number(po.total_amount).toLocaleString()}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-1">Invoice Document</label>
+            <input
+              type="file"
+              accept="image/*,.pdf"
+              className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) setUploadFile(file);
+              }}
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4 border-t border-border">
+            <Button variant="ghost" onClick={() => setIsUploadModalOpen(false)} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleUploadInvoice} disabled={isSubmitting || !uploadFile}>
+              {isSubmitting ? "Uploading..." : "Submit Invoice"}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
 
       {/* 3-Way Match Review Dialog */}
       <Dialog

@@ -54,8 +54,9 @@ async def list_pos(
         result = await db.execute(stmt)
         vendor_id = result.scalar_one_or_none()
         if vendor_id:
-            # list_by_vendor needs to exist in po_repo
-            return await service.po_repo.list_by_vendor(vendor_id)
+            # Vendors should not see Draft POs
+            pos = await service.po_repo.list_by_vendor(vendor_id)
+            return [po for po in pos if po.status != "Draft"]
         return []
 
     # If the user is just an Employee or Manager, restrict to their PRs

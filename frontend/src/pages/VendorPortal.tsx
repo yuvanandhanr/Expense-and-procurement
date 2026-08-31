@@ -195,9 +195,20 @@ export const VendorPortal: React.FC = () => {
                         <td className="p-4 font-bold text-primary">${q.total_amount?.toLocaleString()}</td>
                         <td className="p-4 text-xs">{q.lead_time_days} days</td>
                         <td className="p-4">
-                          <Badge variant={q.is_selected ? "success" : "neutral"}>
-                            {q.is_selected ? "Accepted" : "Under Evaluation"}
+                          <Badge 
+                            variant={
+                              (q.is_selected || q.status === "Selected") ? "success" : 
+                              (q.status === "Rejected") ? "destructive" : "neutral"
+                            }
+                          >
+                            {(q.is_selected || q.status === "Selected") ? "Pending PO" : 
+                             (q.status === "Rejected") ? "Bid Lost" : "Under Evaluation"}
                           </Badge>
+                          {(q.is_selected || q.status === "Selected") && (
+                            <div className="text-[10px] text-primary mt-1 font-semibold">
+                              Awaiting PO Generation
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}

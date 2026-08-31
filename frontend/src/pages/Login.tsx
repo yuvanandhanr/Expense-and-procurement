@@ -48,9 +48,11 @@ export const Login: React.FC = () => {
 
   React.useEffect(() => {
     const initializeGoogle = () => {
-      if (window.google && activeTab === "employee") {
+      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "placeholder";
+      
+      if (window.google && activeTab === "employee" && clientId !== "placeholder" && clientId.length > 20) {
         window.google.accounts.id.initialize({
-          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || "542387192661-placeholder.apps.googleusercontent.com",
+          client_id: clientId,
           callback: handleCredentialResponse,
         });
         window.google.accounts.id.renderButton(
@@ -192,7 +194,7 @@ export const Login: React.FC = () => {
                     onClick={() => handleCredentialResponse({ credential: "mock_google_y.raja@dataeko.ai" })}
                     disabled={isSubmitting}
                   >
-                    Admin
+                    Alex Rivera (Admin)
                   </Button>
                   <Button
                     type="button"
@@ -201,7 +203,7 @@ export const Login: React.FC = () => {
                     onClick={() => handleCredentialResponse({ credential: "mock_google_ceo@dataeko.ai" })}
                     disabled={isSubmitting}
                   >
-                    CEO
+                    Sarah Chen (CEO)
                   </Button>
                   <Button
                     type="button"
@@ -210,7 +212,7 @@ export const Login: React.FC = () => {
                     onClick={() => handleCredentialResponse({ credential: "mock_google_cfo@dataeko.ai" })}
                     disabled={isSubmitting}
                   >
-                    CFO
+                    Marcus Johnson (CFO)
                   </Button>
                   <Button
                     type="button"
@@ -219,7 +221,7 @@ export const Login: React.FC = () => {
                     onClick={() => handleCredentialResponse({ credential: "mock_google_finance@dataeko.ai" })}
                     disabled={isSubmitting}
                   >
-                    Finance Mgr
+                    Elena Rodriguez (Fin. Mgr)
                   </Button>
                   <Button
                     type="button"
@@ -228,7 +230,7 @@ export const Login: React.FC = () => {
                     onClick={() => handleCredentialResponse({ credential: "mock_google_manager@dataeko.ai" })}
                     disabled={isSubmitting}
                   >
-                    Manager
+                    David Kim (Manager)
                   </Button>
                   <Button
                     type="button"
@@ -237,7 +239,7 @@ export const Login: React.FC = () => {
                     onClick={() => handleCredentialResponse({ credential: "mock_google_employee@dataeko.ai" })}
                     disabled={isSubmitting}
                   >
-                    Employee
+                    Rachel Foster (Employee)
                   </Button>
                 </div>
               </div>
@@ -314,24 +316,55 @@ export const Login: React.FC = () => {
                   : "Continue"}
               </Button>
               
-              <Button 
-                type="button"
-                variant="outline" 
-                className="w-full" 
-                onClick={async () => {
-                  try {
-                    // Mock bypass for E2E tests
-                    await vendorLogin("vendor@example.com", "123456");
-                    setTimeout(() => {
-                      navigate("/vendor-portal");
-                    }, 100);
-                  } catch (err) {
-                    console.error("Mock Vendor Login failed:", err);
-                  }
-                }}
-              >
-                Mock Vendor Access (Test)
-              </Button>
+              <div className="space-y-2">
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  className="w-full text-xs py-2" 
+                  onClick={async () => {
+                    try {
+                      await vendorLogin("vendor@example.com", "123456");
+                      setTimeout(() => navigate("/vendor-portal"), 100);
+                    } catch (err) {
+                      console.error("Mock Vendor Login failed:", err);
+                    }
+                  }}
+                >
+                  Mock Vendor (Apex Systems)
+                </Button>
+                
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  className="w-full text-xs py-2" 
+                  onClick={async () => {
+                    try {
+                      await vendorLogin("vendor2@example.com", "123456");
+                      setTimeout(() => navigate("/vendor-portal"), 100);
+                    } catch (err) {
+                      console.error("Mock Vendor Login failed:", err);
+                    }
+                  }}
+                >
+                  Mock Vendor (Nexus Tech Solutions)
+                </Button>
+
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  className="w-full text-xs py-2" 
+                  onClick={async () => {
+                    try {
+                      await vendorLogin("vendor3@example.com", "123456");
+                      setTimeout(() => navigate("/vendor-portal"), 100);
+                    } catch (err) {
+                      console.error("Mock Vendor Login failed:", err);
+                    }
+                  }}
+                >
+                  Mock Vendor (Global Supply Co)
+                </Button>
+              </div>
 
               {otpSent && (
                 <button

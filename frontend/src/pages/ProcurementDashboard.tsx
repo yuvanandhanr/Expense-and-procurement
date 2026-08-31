@@ -53,30 +53,24 @@ export const ProcurementDashboard: React.FC = () => {
   const [data, setData] = useState<any>(null);
 
   useEffect(() => {
-    // Simulating fetching procurement specific dashboard metrics
     const fetchDashboard = async () => {
       try {
-        // Fallback to static mock data if backend isn't ready
-        setTimeout(() => {
-          setData({
-            timestamp: new Date().toISOString(),
-            metrics: {
-              active_vendors: 42,
-              pending_rfqs: 15,
-              open_pos: 28,
-              active_contracts: 12
-            },
-            vendor_scores: [
-              { name: "TechCorp", score: 95 },
-              { name: "OfficeSupplies Inc", score: 88 },
-              { name: "Global Logistics", score: 92 },
-              { name: "CloudServices LLC", score: 98 },
-            ]
-          });
-          setLoading(false);
-        }, 800);
+        const response = await api.get("/dashboard");
+        const dashData = response.data;
+        
+        setData({
+          timestamp: dashData.timestamp,
+          metrics: dashData.widgets?.procurement_metrics || {
+            active_vendors: 0,
+            pending_rfqs: 0,
+            open_pos: 0,
+            active_contracts: 0
+          },
+          vendor_scores: dashData.widgets?.vendor_performance || []
+        });
       } catch (err) {
         console.error("Failed to load dashboard metrics:", err);
+      } finally {
         setLoading(false);
       }
     };
@@ -113,7 +107,7 @@ export const ProcurementDashboard: React.FC = () => {
             Supplier and Contract health overview for: <Badge variant="info" className="ml-1">{role}</Badge>
           </p>
         </div>
-        <HeroTimestamp staticDate={data?.timestamp} />
+        <HeroTimestamp />
       </div>
 
       {/* KPI Cards Grid */}

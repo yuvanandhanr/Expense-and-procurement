@@ -262,18 +262,17 @@ export const Skeleton: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ class
   <div className={`animate-pulse rounded bg-muted/60 ${className}`} {...props} />
 );
 
-export const HeroTimestamp: React.FC<{ staticDate?: string }> = ({ staticDate }) => {
+export const HeroTimestamp: React.FC = () => {
   const [time, setTime] = React.useState(new Date());
   
   React.useEffect(() => {
-    if (staticDate) return;
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
-  }, [staticDate]);
+  }, []);
 
   return (
     <div className="text-[10px] font-mono text-muted-foreground font-semibold uppercase tracking-[1.6px] border border-border px-3 py-1.5 rounded-lg bg-card-2/50 shadow-sm whitespace-nowrap">
-      AS OF {staticDate ? new Date(staticDate).toLocaleString() : time.toLocaleString()}
+      AS OF {time.toLocaleString()}
     </div>
   );
 };

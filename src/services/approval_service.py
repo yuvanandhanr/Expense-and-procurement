@@ -303,7 +303,7 @@ class ApprovalService:
 
                 pending_workflows.append({
                     "workflow_id": workflow.workflow_id,
-                    "entity_type": "Purchase Requisition",
+                    "entity_type": "PurchaseRequisition",
                     "entity_id": pr.pr_id,
                     "current_step_sequence": current_step_sequence,
                     "status": workflow.status,

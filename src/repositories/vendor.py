@@ -17,6 +17,22 @@ class VendorRepository(BaseRepository[Vendor]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(Vendor, session)
 
+    async def list_all(self, skip: int = 0, limit: int = 100) -> List[Vendor]:
+        query = (
+            select(self.model)
+            .options(
+                selectinload(self.model.contacts),
+                selectinload(self.model.documents),
+                selectinload(self.model.categories),
+                selectinload(self.model.performance),
+                selectinload(self.model.blacklist_records)
+            )
+            .offset(skip)
+            .limit(limit)
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
     async def get_by_id(self, entity_id: int) -> Optional[Vendor]:
         query = (
             select(self.model)

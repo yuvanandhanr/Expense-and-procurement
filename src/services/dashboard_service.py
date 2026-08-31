@@ -12,6 +12,7 @@ from src.models.vendor import Vendor, VendorPerformance
 from src.models.contract import Contract
 from src.models.assets import Asset
 from src.models.invoice import VendorInvoice
+from src.models.rfq import RequestForQuotation
 from src.models.payments import PaymentRequest
 from src.models.organization import Department, BudgetCode
 from src.models.platform_services import ActivityLog, DashboardWidget
@@ -53,7 +54,7 @@ class DashboardService:
 
         # Compile specific metrics based on role
         role_upper = role.upper()
-        if role_upper in ("CEO", "CFO", "FINANCE", "ADMIN"):
+        if role_upper in ("CEO", "CFO", "FINANCE", "FINANCE MANAGER", "ADMIN"):
             data["widgets"]["pending_approvals"] = await self._get_pending_approvals_count()
             data["widgets"]["department_spend"] = await self._get_department_spend()
             data["widgets"]["budget_utilization"] = await self._get_budget_utilization()
@@ -62,14 +63,15 @@ class DashboardService:
             data["widgets"]["payment_status"] = await self._get_payment_status_counts()
             data["widgets"]["top_vendors"] = await self._get_top_vendors()
 
-        if role_upper in ("CFO", "PROCUREMENT", "ADMIN"):
+        if role_upper in ("CFO", "FINANCE MANAGER", "PROCUREMENT", "ADMIN"):
             data["widgets"]["purchase_orders"] = await self._get_po_summary()
             data["widgets"]["vendor_performance"] = await self._get_vendor_performance_summary()
             data["widgets"]["monthly_procurement"] = await self._get_monthly_procurement_trends()
             data["widgets"]["contract_expiry"] = await self._get_expiring_contracts_count()
             data["widgets"]["open_requests"] = await self._get_open_procurement_requests()
+            data["widgets"]["procurement_metrics"] = await self._get_procurement_metrics()
 
-        if role_upper in ("IT", "FINANCE", "ADMIN"):
+        if role_upper in ("IT", "FINANCE", "FINANCE MANAGER", "ADMIN"):
             data["widgets"]["asset_summary"] = await self._get_asset_summary()
             data["widgets"]["amc_expiry"] = await self._get_expiring_amc_count()
 
@@ -83,6 +85,9 @@ class DashboardService:
             data["widgets"]["my_purchase_requests"] = await self._get_employee_pr_summary(user_id)
             data["widgets"]["my_reimbursements"] = await self._get_reimbursements_summary(employee_id=user_id)
             data["widgets"]["my_monthly_trend"] = await self._get_employee_monthly_trend(employee_id=user_id)
+            data["widgets"]["my_requisitions"] = await self._get_employee_my_requisitions(user_id)
+            data["widgets"]["my_assets"] = await self._get_employee_my_assets(user_id)
+            data["widgets"]["recent_expenses"] = await self._get_employee_recent_expenses(user_id)
 
         # Cache data for 5 minutes
         await self.cache.set(cache_key, data, expire_seconds=300)
@@ -342,6 +347,24 @@ class DashboardService:
         )
         result = await self.db.execute(query)
         return result.scalar() or 0
+        
+    async def _get_procurement_metrics(self) -> Dict[str, int]:
+        vendors_query = select(func.count(Vendor.vendor_id)).where(Vendor.status == "Active")
+        rfqs_query = select(func.count(RequestForQuotation.rfq_id)).where(RequestForQuotation.status == "Open")
+        pos_query = select(func.count(PurchaseOrder.po_id)).where(PurchaseOrder.status.in_(["Issued", "Processing", "Delivered", "Billed"]))
+        contracts_query = select(func.count(Contract.contract_id)).where(Contract.status == "Active")
+        
+        vendors_count = (await self.db.execute(vendors_query)).scalar() or 0
+        rfqs_count = (await self.db.execute(rfqs_query)).scalar() or 0
+        pos_count = (await self.db.execute(pos_query)).scalar() or 0
+        contracts_count = (await self.db.execute(contracts_query)).scalar() or 0
+        
+        return {
+            "active_vendors": vendors_count,
+            "pending_rfqs": rfqs_count,
+            "open_pos": pos_count,
+            "active_contracts": contracts_count
+        }
 
     async def _get_asset_summary(self) -> Dict[str, int]:
         query = select(
@@ -370,6 +393,55 @@ class DashboardService:
         ).group_by(PurchaseRequisition.status)
         result = await self.db.execute(query)
         return {row[0]: row[1] for row in result.all()}
+
+    async def _get_employee_my_requisitions(self, user_id: int) -> List[Dict[str, Any]]:
+        query = select(PurchaseRequisition).where(
+            PurchaseRequisition.requestor_id == user_id
+        ).order_by(desc(PurchaseRequisition.created_at)).limit(5)
+        result = await self.db.execute(query)
+        prs = result.scalars().all()
+        return [
+            {
+                "id": pr.pr_number,
+                "title": pr.title or "N/A",
+                "amount": float(pr.total_estimated_amount or 0.0),
+                "status": pr.status
+            }
+            for pr in prs
+        ]
+
+    async def _get_employee_my_assets(self, user_id: int) -> List[Dict[str, Any]]:
+        query = select(Asset).where(
+            Asset.assigned_employee_id == user_id
+        ).limit(5)
+        result = await self.db.execute(query)
+        assets = result.scalars().all()
+        return [
+            {
+                "id": asset.asset_id,
+                "name": asset.model or asset.manufacturer or "Asset",
+                "tag": asset.asset_tag or asset.asset_number,
+                "status": asset.status
+            }
+            for asset in assets
+        ]
+
+    async def _get_employee_recent_expenses(self, user_id: int) -> List[Dict[str, Any]]:
+        query = select(VendorInvoice).where(
+            VendorInvoice.employee_id == user_id
+        ).order_by(desc(VendorInvoice.created_at)).limit(5)
+        result = await self.db.execute(query)
+        expenses = result.scalars().all()
+        return [
+            {
+                "id": exp.invoice_id,
+                "title": exp.description or exp.invoice_number,
+                "amount": float(exp.grand_total or 0.0),
+                "date": exp.created_at.isoformat() if exp.created_at else None,
+                "status": exp.status
+            }
+            for exp in expenses
+        ]
 
     async def _get_category_spend(self) -> List[Dict[str, Any]]:
         # Hardcoded mockup categories or group by purchase type

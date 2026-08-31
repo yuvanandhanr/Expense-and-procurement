@@ -9,7 +9,7 @@ export default defineConfig({
   reporter: 'html',
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:3001',
-    trace: 'on-first-retry',
+    trace: 'on',
     video: 'retain-on-failure',
     bypassCSP: true,
   },

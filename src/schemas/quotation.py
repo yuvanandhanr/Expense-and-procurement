@@ -1,7 +1,13 @@
-from typing import Optional, List
+from typing import Optional, List, Any
 from datetime import datetime
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict
+
+
+class VendorBasicSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    vendor_id: int
+    vendor_name: str
 
 
 class QuotationItemCreate(BaseModel):
@@ -39,6 +45,7 @@ class QuotationSchema(BaseModel):
     quotation_number: str
     rfq_id: int
     vendor_id: int
+    vendor: Optional[VendorBasicSchema] = None
     total_amount: Decimal
     currency: str
     lead_time_days: Optional[int] = None

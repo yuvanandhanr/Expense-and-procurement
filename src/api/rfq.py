@@ -13,7 +13,7 @@ router = APIRouter(prefix="/rfq", tags=["RFQ Management"])
 
 def enforce_procurement_officer_or_creator(rfq, current_user: User) -> None:
     user_roles = [role.role_name for role in current_user.roles]
-    if "Admin" in user_roles or "Procurement Officer" in user_roles or "Procurement Manager" in user_roles:
+    if any(role in ("Admin", "Procurement Officer", "Procurement Manager", "Finance Manager", "CFO", "CEO") for role in user_roles):
         return
     
     if rfq.created_by != current_user.user_id:
@@ -48,7 +48,7 @@ async def list_rfqs(
     service = RFQService(db)
     user_roles = [role.role_name for role in current_user.roles]
 
-    if any(role in ("Admin", "Procurement Officer", "Procurement Manager") for role in user_roles):
+    if any(role in ("Admin", "Procurement Officer", "Procurement Manager", "Finance Manager", "CFO", "CEO") for role in user_roles):
         return await service.rfq_repo.list_all()
     elif "Vendor Portal" in user_roles:
         from sqlalchemy import select

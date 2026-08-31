@@ -50,17 +50,17 @@ export const Vendors: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {vendors.map((v) => (
+                  {vendors.map((v: any) => (
                     <tr key={v.vendor_id} className="hover:bg-accent/20">
                       <td className="p-4 font-bold text-xs tracking-wider text-primary">{v.vendor_code}</td>
-                      <td className="p-4 font-semibold">{v.company_name}</td>
-                      <td className="p-4">{v.email}</td>
+                      <td className="p-4 font-semibold">{v.vendor_name}</td>
+                      <td className="p-4">{v.email || "N/A"}</td>
                       <td className="p-4">
-                        <Badge variant={v.compliance_status === "Compliant" ? "success" : "error"}>
-                          {v.compliance_status}
+                        <Badge variant={v.status === "Active" ? "success" : "error"}>
+                          {v.status === "Active" ? "Compliant" : "Non-Compliant"}
                         </Badge>
                       </td>
-                      <td className="p-4 font-bold">{v.scoreCard || "90"} / 100</td>
+                      <td className="p-4 font-bold">{v.performance?.quality_score || "90"} / 100</td>
                     </tr>
                   ))}
                 </tbody>

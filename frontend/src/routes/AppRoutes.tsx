@@ -32,11 +32,12 @@ const ProcurementDashboard = lazy(() => import("../pages/ProcurementDashboard"))
 const MyAssets = lazy(() => import("../pages/MyAssets"));
 
 // Protected Route Guard
-const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: string; allowedRoles?: string[]; requiredPermission?: string }> = ({
+const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: string; allowedRoles?: string[]; requiredPermission?: string; allowVendor?: boolean }> = ({
   children,
   requiredRole,
   allowedRoles,
   requiredPermission,
+  allowVendor = false,
 }) => {
   const { isAuthenticated, isLoading, hasRole, hasPermission } = useAuth();
 
@@ -57,7 +58,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: strin
   }
 
   // Cross-role redirect guards
-  if ((hasRole("Vendor Portal") || hasRole("Vendor")) && requiredRole !== "Vendor") {
+  if ((hasRole("Vendor Portal") || hasRole("Vendor")) && requiredRole !== "Vendor" && !allowVendor) {
     return <Navigate to="/vendor-portal" replace />;
   }
 
@@ -145,7 +146,7 @@ export const AppRoutes: React.FC = () => {
         <Route
           path="/rfqs"
           element={
-            <ProtectedRoute requiredPermission="manage_rfq">
+            <ProtectedRoute allowVendor={true}>
               <RFQs />
             </ProtectedRoute>
           }
@@ -161,7 +162,7 @@ export const AppRoutes: React.FC = () => {
         <Route
           path="/pos"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowVendor={true}>
               <PurchaseOrders />
             </ProtectedRoute>
           }
@@ -209,7 +210,7 @@ export const AppRoutes: React.FC = () => {
         <Route
           path="/invoices"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowVendor={true}>
               <Invoices />
             </ProtectedRoute>
           }
