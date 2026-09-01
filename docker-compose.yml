@@ -1,22 +1,7 @@
 version: '3.8'
 
 services:
-  db:
-    image: postgres:15-alpine
-    container_name: enterprise_db
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+
 
   app:
     build:
@@ -27,12 +12,8 @@ services:
       - "8080:8000"
     env_file:
       - .env
-    environment:
-      # Override DB url to point to the docker container service name instead of localhost
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/postgres
-    depends_on:
-      db:
-        condition: service_healthy
+
+
     volumes:
       - .:/app
       # Anonymous volume to protect container site-packages in case of local overrides
@@ -50,5 +31,3 @@ services:
       - app
     restart: unless-stopped
 
-volumes:
-  pgdata:
