@@ -109,15 +109,15 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       {
         title: "My Requests",
         items: [
-          { label: isManager ? "Team Reimbursements" : "Employee Reimbursements", path: "/expenses", icon: FileText, show: isEmployee || isManager || isAdmin },
-          { label: "Purchase Requisitions", path: "/prs", icon: FileText, show: isEmployee || isManager || isAdmin },
-          { label: "My Assets", path: "/my-assets", icon: HardDrive, show: isEmployee || isManager || isAdmin },
+          { label: (isManager || isCEO) ? "Team Reimbursements" : "Employee Reimbursements", path: "/expenses", icon: FileText, show: isEmployee || isManager || isAdmin || isFinance || isCEO },
+          { label: "Purchase Requisitions", path: "/prs", icon: FileText, show: isEmployee || isManager || isAdmin || isFinance || isCEO },
+          { label: "My Assets", path: "/my-assets", icon: HardDrive, show: isEmployee || isManager || isAdmin || isFinance || isCEO },
         ]
       },
       {
         title: "Approvals",
         items: [
-          { label: isCFO ? "Approval Queue" : "Pending Approvals", path: "/approvals", icon: CheckSquare, show: isManager || isFinance || isCFO || isAdmin },
+          { label: isCFO ? "Approval Queue" : "Pending Approvals", path: "/approvals", icon: CheckSquare, show: isManager || isFinance || isCFO || isAdmin || isCEO },
         ]
       },
       {
@@ -126,14 +126,14 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
           { label: "Expense Verification", path: "/expenses", icon: FileText, show: isFinance && !isAdmin },
           { label: "Reimbursements", path: "/expenses", icon: FileText, show: isCFO || isAdmin },
           { label: isCFO ? "Vendor Payments" : "Vendor Invoices", path: "/invoices", icon: CreditCard, show: isFinance || isCFO || isAdmin },
-          { label: "Financial Analytics", path: "/analytics", icon: TrendingUp, show: isFinance || isCFO || isAdmin },
-          { label: "Reports", path: "/reports", icon: FileSpreadsheet, show: isFinance || isCFO || isAdmin },
+          { label: "Financial Analytics", path: "/analytics", icon: TrendingUp, show: isFinance || isCFO || isAdmin || isCEO },
+          { label: "Reports", path: "/reports", icon: FileSpreadsheet, show: isFinance || isCFO || isAdmin || isCEO },
         ]
       },
       {
         title: "Procurement Cycle",
         items: [
-          { label: "Cycle Dashboard", path: "/procurement-dashboard", icon: LayoutDashboard, show: isProcurement || isFinance || isCFO || isAdmin },
+          { label: "Cycle Dashboard", path: "/procurement-dashboard", icon: LayoutDashboard, show: isProcurement || isFinance || isCFO || isAdmin || isCEO },
           { label: "Vendors & Scores", path: "/vendors", icon: Users, show: isProcurement || isFinance || isCFO || isAdmin },
           { label: "RFQs & Invitations", path: "/rfqs", icon: Briefcase, show: isProcurement || isFinance || isCFO || isAdmin },
           { label: "Quotations Inbox", path: "/quotations", icon: Layers, show: isProcurement || isFinance || isCFO || isAdmin },

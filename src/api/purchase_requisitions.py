@@ -20,7 +20,7 @@ def check_pr_access(pr, current_user: User) -> None:
     """
     # Check full access roles
     user_roles = [role.role_name for role in current_user.roles]
-    if any(role in user_roles for role in ["Admin", "CFO", "Finance Manager", "Finance", "Manager"]):
+    if any(role in user_roles for role in ["Admin", "CFO", "Finance Manager", "Finance", "Manager", "CEO"]):
         return
 
     # Check Procurement role
@@ -63,7 +63,7 @@ async def list_prs(
     service = PRService(db)
     user_roles = [role.role_name for role in current_user.roles]
 
-    if any(role in user_roles for role in ["Admin", "CFO", "Finance Manager", "Finance", "Procurement"]):
+    if any(role in user_roles for role in ["Admin", "CFO", "Finance Manager", "Finance", "Procurement", "CEO"]):
         return await service.pr_repo.list_all()
     elif "Manager" in user_roles and current_user.department_id:
         return await service.pr_repo.list_by_department(current_user.department_id)

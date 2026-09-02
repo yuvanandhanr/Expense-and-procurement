@@ -51,29 +51,37 @@ class ApprovalService:
             if not pr:
                 raise ValueError("PR not found")
             return await self.generate_workflow(pr)
-        elif document_type == "ExpenseReport":
+        if document_type == "ExpenseReport":
             from src.models.expense import ExpenseReport, ExpenseApproval
-            from src.models.auth import User
+            from src.models.auth import User, Role
             
             query = select(ExpenseReport).where(ExpenseReport.expense_report_id == document_id)
             result = await self.db.execute(query)
             report = result.scalar_one_or_none()
+            
             if not report:
                 raise ValueError("Expense report not found")
                 
-            query_user = select(User).options(selectinload(User.roles)).where(User.user_id == report.employee_id)
-            user_result = await self.db.execute(query_user)
-            employee = user_result.scalar_one_or_none()
+            query_user = select(User).where(User.user_id == report.employee_id).options(selectinload(User.roles))
+            result_user = await self.db.execute(query_user)
+            requestor = result_user.scalar_one_or_none()
+            manager_id = requestor.manager_id if requestor else None
             
-            is_manager = any(r.role_name == "Manager" for r in employee.roles) if employee else False
-            if is_manager:
-                from src.models.auth import Role
-                query_admin = select(User).join(User.roles).where(Role.role_name == "Admin")
-                admin_result = await self.db.execute(query_admin)
-                admin = admin_result.scalars().first()
-                approver_id = admin.user_id if admin else None
-            else:
-                approver_id = employee.manager_id if employee else None
+            approver_id = manager_id
+            
+            # Prevent self-approval if the user is their own manager
+            if approver_id == report.employee_id:
+                approver_id = None
+            
+            # If no manager_id is set (or was self), fallback to a Finance Manager
+            if not approver_id:
+                query_finance = select(User).join(User.roles).where(
+                    Role.role_name.in_(["Finance Manager", "Finance", "CFO"]),
+                    User.status == "Active",
+                )
+                finance_result = await self.db.execute(query_finance)
+                fallback_approver = finance_result.scalars().first()
+                approver_id = fallback_approver.user_id if fallback_approver else None
             
             manager_approval = ExpenseApproval(
                 expense_report_id=report.expense_report_id,
@@ -82,7 +90,8 @@ class ApprovalService:
             )
             self.db.add(manager_approval)
             
-            report.status = "Pending Manager Approval"
+            # Set status based on whether it went to a manager or finance
+            report.status = "Pending Manager Approval" if (manager_id and manager_id != report.employee_id) else "Pending Finance Approval"
             
             if approver_id:
                 try:
@@ -137,7 +146,7 @@ class ApprovalService:
             cfo_role_id = await self.get_role_id_by_name("CFO", 4)
 
             # Rule 1: Always Manager (Role-based)
-            steps_to_create.append({"step_number": 1, "approver_role_id": manager_role_id, "approver_id": None})
+            steps_to_create.append({"step_number": 1, "approver_role_id": manager_role_id, "approver_id": manager_id})
 
             # Rule 2: > $500 requires Finance Manager
             if pr.total_estimated_amount > Decimal("500.00"):
@@ -212,7 +221,7 @@ class ApprovalService:
             select(ApprovalWorkflow, PurchaseRequisition, UserModel)
             .join(PurchaseRequisition, ApprovalWorkflow.pr_id == PurchaseRequisition.pr_id)
             .join(UserModel, PurchaseRequisition.requestor_id == UserModel.user_id)
-            .where(ApprovalWorkflow.status.in_(["Under Review", "Approved"]))
+            .where(ApprovalWorkflow.status.in_(["Pending", "Under Review"]))
             .order_by(ApprovalWorkflow.created_at.desc())
         )
 

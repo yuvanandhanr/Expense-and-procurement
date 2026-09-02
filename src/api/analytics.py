@@ -6,8 +6,8 @@ from src.services.dashboard_service import DashboardService
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
-# RBAC protection: Only CEO, CFO, Finance, or Procurement roles can view analytics
-rbac_dependency = Depends(RoleChecker(["CEO", "CFO", "Finance", "Procurement"]))
+# RBAC protection: Only CEO, CFO, Finance, Finance Manager, Admin, or Procurement roles can view analytics
+rbac_dependency = Depends(RoleChecker(["CEO", "CFO", "Finance", "Finance Manager", "Admin", "Procurement"]))
 
 
 @router.get("/spend", dependencies=[rbac_dependency])

@@ -46,8 +46,8 @@ export const PurchaseRequisitions: React.FC = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !estimatedCost) {
-      toast.error("Title and estimated cost are required.");
+    if (!title || !estimatedCost || !description.trim()) {
+      toast.error("Title, estimated cost, and justification are required.");
       return;
     }
 
@@ -55,9 +55,9 @@ export const PurchaseRequisitions: React.FC = () => {
     try {
       const res = await api.post("/pr", {
         title,
-        justification: description || "No justification provided",
+        justification: description,
         priority,
-        department_id: 1,
+        department_id: user?.department_id || null,
         items: [
           {
             category: "Standard",
@@ -93,7 +93,12 @@ export const PurchaseRequisitions: React.FC = () => {
     setIsSubmitting(true);
     try {
       if (action === "cancel") {
-        await api.post(`/pr/${selectedPr.pr_id}/cancel`);
+        if (!comment.trim()) {
+          toast.error("Please provide a reason for cancellation.");
+          setIsSubmitting(false);
+          return;
+        }
+        await api.post(`/pr/${selectedPr.pr_id}/cancel`, { comments: comment });
         toast.success(`Purchase Requisition successfully cancelled!`);
       } else {
         await api.post(`/pr/${selectedPr.pr_id}/${action}`, {
@@ -131,6 +136,10 @@ export const PurchaseRequisitions: React.FC = () => {
 
   const filteredPrs = prs.filter((pr) => {
     if (statusFilter === "All") return true;
+    if (statusFilter === "Submitted") {
+      const s = pr.status.toLowerCase();
+      return s.includes("pending") || s === "submitted" || s === "under review";
+    }
     return pr.status.toLowerCase() === statusFilter.toLowerCase();
   });
 
@@ -265,12 +274,13 @@ export const PurchaseRequisitions: React.FC = () => {
             </select>
           </div>
           <div className="space-y-1">
-            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">Justification / Details</label>
+            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">Justification / Details <span className="text-red-500">*</span></label>
             <textarea
               placeholder="Provide context for approval"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring min-h-[80px]"
+              required
             />
           </div>
           <div className="flex justify-end space-x-2 pt-4">
@@ -300,9 +310,11 @@ export const PurchaseRequisitions: React.FC = () => {
             </div>
 
             <div className="space-y-1">
-              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">Comments / Decision Notes</label>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {selectedPr.requestor_id === user?.user_id || selectedPr.requested_by === user?.user_id ? "Reason for Cancellation *" : "Comments / Decision Notes"}
+              </label>
               <textarea
-                placeholder="Include details explaining your decision (required if rejecting)"
+                placeholder={selectedPr.requestor_id === user?.user_id || selectedPr.requested_by === user?.user_id ? "Provide a reason for canceling this request..." : "Include details explaining your decision (required if rejecting)"}
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring min-h-[80px]"

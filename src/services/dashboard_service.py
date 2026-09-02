@@ -12,6 +12,7 @@ from src.models.vendor import Vendor, VendorPerformance
 from src.models.contract import Contract
 from src.models.assets import Asset
 from src.models.invoice import VendorInvoice
+from src.models.expense import ExpenseReport
 from src.models.rfq import RequestForQuotation
 from src.models.payments import PaymentRequest
 from src.models.organization import Department, BudgetCode
@@ -427,16 +428,17 @@ class DashboardService:
         ]
 
     async def _get_employee_recent_expenses(self, user_id: int) -> List[Dict[str, Any]]:
-        query = select(VendorInvoice).where(
-            VendorInvoice.employee_id == user_id
-        ).order_by(desc(VendorInvoice.created_at)).limit(5)
+        query = select(ExpenseReport).where(
+            ExpenseReport.employee_id == user_id,
+            ExpenseReport.status.in_(["Approved", "Finance Verified", "Payment Requested", "Closed"])
+        ).order_by(desc(ExpenseReport.created_at)).limit(5)
         result = await self.db.execute(query)
         expenses = result.scalars().all()
         return [
             {
-                "id": exp.invoice_id,
-                "title": exp.description or exp.invoice_number,
-                "amount": float(exp.grand_total or 0.0),
+                "id": exp.expense_report_id,
+                "title": exp.purpose,
+                "amount": float(exp.total_amount or 0.0),
                 "date": exp.created_at.isoformat() if exp.created_at else None,
                 "status": exp.status
             }

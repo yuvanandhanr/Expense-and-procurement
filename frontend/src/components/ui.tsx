@@ -172,14 +172,15 @@ interface DialogProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  maxWidthClass?: string;
 }
 
-export const Dialog: React.FC<DialogProps> = ({ isOpen, onClose, title, children }) => {
+export const Dialog: React.FC<DialogProps> = ({ isOpen, onClose, title, children, maxWidthClass = "max-w-lg" }) => {
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-lg bg-card text-card-foreground rounded-xl border border-border shadow-2xl p-6 overflow-hidden animate-slide-up">
+      <div className={`relative w-full ${maxWidthClass} bg-card text-card-foreground rounded-xl border border-border shadow-2xl p-6 overflow-hidden animate-slide-up`}>
         <div className="flex items-center justify-between pb-4 border-b border-border/40">
           <h2 className="text-lg font-bold font-display tracking-tight">{title}</h2>
           <button

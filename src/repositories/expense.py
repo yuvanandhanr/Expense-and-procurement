@@ -57,6 +57,14 @@ class ExpenseRepository:
         stmt = select(Receipt).where(Receipt.receipt_id == receipt_id)
         result = await self.db.execute(stmt)
         return result.scalars().first()
+
+    async def get_receipt_by_content_hash(self, report_id: int, content_hash: str) -> Optional[Receipt]:
+        stmt = select(Receipt).where(
+            Receipt.expense_report_id == report_id,
+            Receipt.content_hash == content_hash,
+        )
+        result = await self.db.execute(stmt)
+        return result.scalars().first()
         
     async def get_receipts_by_report(self, report_id: int) -> Sequence[Receipt]:
         stmt = select(Receipt).where(Receipt.expense_report_id == report_id)

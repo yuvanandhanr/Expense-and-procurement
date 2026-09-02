@@ -335,6 +335,8 @@ export interface ExpenseReport {
   status: string;
   currency: string;
   total_amount: number;
+  duplicate_flag?: boolean;
+  policy_flags?: string;
   created_at: string;
   updated_at: string;
   receipts?: Receipt[];

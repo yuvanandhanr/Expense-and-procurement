@@ -4,7 +4,7 @@ import { ApprovalWorkflow } from "../types";
 import { Button, Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Dialog, Input, EmptyState } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
-import { formatDate } from "../utils/helpers";
+import { formatDate, getErrorMessage } from "../utils/helpers";
 import { Check, X as XIcon } from "lucide-react";
 
 type TabType = "Requisitions" | "Expenses" | "Asset Incidents" | "Resignations";
@@ -50,7 +50,7 @@ export const Approvals: React.FC = () => {
         endpoint = `/pr/${selectedWorkflow.entity_id}/${actionType}`;
       }
       
-      const payload = selectedWorkflow.entity_type === "ExpenseReport" ? { comments: comment } : { action: actionType, comment };
+      const payload = { comments: comment };
       
       await api.post(endpoint, payload);
       toast.success(`Workflow successfully ${actionType}d!`);
@@ -60,7 +60,7 @@ export const Approvals: React.FC = () => {
       setComment("");
       fetchWorkflows();
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || "Failed to process workflow action.");
+      toast.error(getErrorMessage(err, "Failed to process workflow action."));
     } finally {
       setIsSubmitting(false);
     }
@@ -126,38 +126,55 @@ export const Approvals: React.FC = () => {
                   </span>
                   <CardTitle className="text-base">{wf.workflow_step} Step</CardTitle>
                 </div>
-                <Badge variant={wf.status === "Pending" ? "warning" : "neutral"}>{wf.status}</Badge>
+                <Badge variant={
+                  wf.status === 'Approved' ? 'success' : 
+                  wf.status === 'Rejected' ? 'error' : 
+                  (wf.status === 'Pending' || wf.status === 'Under Review') ? 'info' : 
+                  'neutral'
+                }>{wf.status}</Badge>
               </CardHeader>
               <CardContent className="flex-1 flex flex-col justify-between pt-0 space-y-4">
-                <div className="text-sm space-y-2 mt-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Requested By:</span>
-                    <span className="font-semibold">User {wf.requester_id}</span>
+                <div className="text-sm space-y-3 mt-2">
+                  <div>
+                    <span className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Title</span>
+                    <span className="font-semibold text-foreground">{wf.title || "Untitled Request"}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Date:</span>
-                    <span>{formatDate(wf.created_at)}</span>
+                  {wf.justification && (
+                    <div>
+                      <span className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Justification / Reason</span>
+                      <p className="text-muted-foreground italic line-clamp-2">{wf.justification}</p>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center bg-muted/40 p-2 rounded-lg border">
+                    <span className="text-muted-foreground text-xs">Requested By:</span>
+                    <span className="font-semibold text-xs">{wf.requestor_name || `User ${wf.requester_id}`}</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-muted/40 p-2 rounded-lg border">
+                    <span className="text-muted-foreground text-xs">Date:</span>
+                    <span className="text-xs">{formatDate(wf.created_at)}</span>
                   </div>
                 </div>
                 
-                <div className="flex space-x-2 pt-4 border-t border-border">
-                  <Button 
-                    variant="primary" 
-                    className="flex-1 flex items-center justify-center space-x-2"
-                    onClick={() => { setSelectedWorkflow(wf); setActionType("approve"); }}
-                  >
-                    <Check className="w-4 h-4" />
-                    <span>Approve</span>
-                  </Button>
-                  <Button 
-                    variant="danger" 
-                    className="flex-1 flex items-center justify-center space-x-2 bg-pink hover:bg-pink/90 text-white shadow-sm"
-                    onClick={() => { setSelectedWorkflow(wf); setActionType("reject"); }}
-                  >
-                    <XIcon className="w-4 h-4" />
-                    <span>Reject</span>
-                  </Button>
-                </div>
+                {(wf.status === "Pending" || wf.status === "Under Review") && (
+                  <div className="flex space-x-2 pt-4 border-t border-border">
+                    <Button 
+                      variant="primary" 
+                      className="flex-1 flex items-center justify-center space-x-2"
+                      onClick={() => { setSelectedWorkflow(wf); setActionType("approve"); }}
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>Approve</span>
+                    </Button>
+                    <Button 
+                      variant="danger" 
+                      className="flex-1 flex items-center justify-center space-x-2 bg-pink hover:bg-pink/90 text-white shadow-sm"
+                      onClick={() => { setSelectedWorkflow(wf); setActionType("reject"); }}
+                    >
+                      <XIcon className="w-4 h-4" />
+                      <span>Reject</span>
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -171,18 +188,22 @@ export const Approvals: React.FC = () => {
         title={`${actionType === 'approve' ? 'Approve' : 'Reject'} ${selectedWorkflow?.entity_type} #${selectedWorkflow?.entity_id}`}
       >
         <div className="space-y-4">
-          <Input 
-            label="Comments (Optional)" 
-            value={comment} 
-            onChange={(e) => setComment(e.target.value)} 
-            placeholder="Add a note..." 
-          />
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Comments {actionType === 'reject' && <span className="text-red-500">*</span>}
+            </label>
+            <Input 
+              value={comment} 
+              onChange={(e) => setComment(e.target.value)} 
+              placeholder={actionType === 'reject' ? "Reason for rejection (required)..." : "Add a note..."} 
+            />
+          </div>
           <div className="flex justify-end space-x-2">
             <Button variant="ghost" onClick={() => { setSelectedWorkflow(null); setActionType(null); }}>Cancel</Button>
             <Button 
               variant={actionType === "approve" ? "primary" : "danger"} 
               onClick={handleAction} 
-              disabled={isSubmitting}
+              disabled={isSubmitting || (actionType === 'reject' && !comment.trim())}
             >
               {isSubmitting ? "Processing..." : `Confirm ${actionType}`}
             </Button>
