@@ -283,12 +283,13 @@ const Expenses: React.FC = () => {
   const getActionConfig = (report: any) => {
     const isMgr = hasRole("Manager") || hasRole("Admin") || hasRole("CEO");
     const isFin = hasRole("Finance Manager") || hasRole("Finance") || hasRole("CFO") || hasRole("Admin") || hasRole("CEO");
+    const owner = isOwner(report);
     
     const isPendingMgr = report.status === "Pending Manager Approval" || report.status === "Pending Approval" || report.status === "Corrected Claim";
     const isPendingFin = report.status === "Pending Finance Manager Approval" || report.status === "Pending Finance Approval" || report.status === "Pending Finance Verification";
     
-    // When action is required by the active user role
-    if (isMgr && isPendingMgr) {
+    // When action is required by the active user role (and NOT the user's own claim)
+    if (!owner && isMgr && isPendingMgr) {
       return {
         label: "Need Approval",
         variant: "primary" as const,
@@ -297,7 +298,7 @@ const Expenses: React.FC = () => {
       };
     }
     
-    if (isFin && isPendingFin) {
+    if (!owner && isFin && isPendingFin) {
       return {
         label: "Need Approval",
         variant: "primary" as const,
@@ -317,7 +318,7 @@ const Expenses: React.FC = () => {
     
     if (report.status === "Returned for Correction") {
       return {
-        label: isOwner(report) ? "Review & Fix" : "Review",
+        label: owner ? "Review & Fix" : "Review",
         variant: "outline" as const,
         className: "border-amber-500/50 text-amber-600 hover:bg-amber-50",
         icon: null
@@ -326,7 +327,7 @@ const Expenses: React.FC = () => {
     
     if (report.status.includes("Pending")) {
       return {
-        label: isOwner(report) ? "Review" : "View",
+        label: owner ? "Review" : "View",
         variant: "ghost" as const,
         className: "text-muted-foreground hover:text-foreground",
         icon: Eye
@@ -556,9 +557,11 @@ const Expenses: React.FC = () => {
 
             const isPendingManager = report.status === "Pending Manager Approval" || report.status === "Pending Approval" || report.status === "Corrected Claim";
             const isPendingFinance = report.status === "Pending Finance Manager Approval" || report.status === "Pending Finance Approval" || report.status === "Pending Finance Verification";
+            const owner = isOwner(report);
 
-            const canManagerAct = isPendingManager && (hasRole("Manager") || hasRole("Admin") || hasRole("CEO"));
-            const canFinanceAct = isPendingFinance && (hasRole("Finance Manager") || hasRole("Finance") || hasRole("CFO") || hasRole("Admin") || hasRole("CEO"));
+            // Cannot approve own claim
+            const canManagerAct = !owner && isPendingManager && (hasRole("Manager") || hasRole("Admin") || hasRole("CEO"));
+            const canFinanceAct = !owner && isPendingFinance && (hasRole("Finance Manager") || hasRole("Finance") || hasRole("CFO") || hasRole("Admin") || hasRole("CEO"));
 
             const steps = [
               { name: "Draft", key: "draft" },
@@ -669,11 +672,6 @@ const Expenses: React.FC = () => {
                     "{report.justification}"
                   </div>
                 )}
-                
-                <div className="flex flex-wrap gap-4 text-xs text-muted-foreground font-medium bg-muted/30 p-3.5 rounded-xl border border-border/50">
-                  {report.department_id && <span className="flex items-center gap-1.5"><Building className="w-3.5 h-3.5 text-primary" /> Dept: <strong className="text-foreground">{report.department_id}</strong></span>}
-                  {report.project_code && <span className="flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5 text-cyan" /> Project: <strong className="text-foreground">{report.project_code}</strong></span>}
-                </div>
 
                 {report.duplicate_flag && (
                   <div className="bg-rose-500/10 text-rose-500 text-xs p-3.5 rounded-xl border border-rose-500/20 flex items-center gap-2.5">

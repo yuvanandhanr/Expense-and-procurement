@@ -67,31 +67,37 @@ class ApprovalService:
             requestor = result_user.scalar_one_or_none()
             manager_id = requestor.manager_id if requestor else None
             
-            approver_id = manager_id
+            requestor_is_manager = False
+            if requestor:
+                requestor_is_manager = any(r.role_name in ["Manager", "Admin", "CEO", "Finance Manager", "CFO"] for r in requestor.roles)
             
-            # Prevent self-approval if the user is their own manager
-            if approver_id == report.employee_id:
-                approver_id = None
-            
-            # If no manager_id is set (or was self), assign to a user with Manager role
-            if not approver_id:
-                query_manager = select(User).join(User.roles).where(
-                    Role.role_name == "Manager",
+            # If the requestor is a Manager (or has no manager / is self), route directly to Finance Manager!
+            if requestor_is_manager or (manager_id is None or manager_id == report.employee_id):
+                query_finance = select(User).join(User.roles).where(
+                    Role.role_name.in_(["Finance Manager", "Finance", "CFO"]),
                     User.status == "Active",
                 )
-                manager_result = await self.db.execute(query_manager)
-                fallback_mgr = manager_result.scalars().first()
-                approver_id = fallback_mgr.user_id if fallback_mgr else None
-            
-            manager_approval = ExpenseApproval(
-                expense_report_id=report.expense_report_id,
-                approver_id=approver_id,
-                status="Pending"
-            )
-            self.db.add(manager_approval)
-            
-            # Workflow always starts at Manager Approval
-            report.status = "Pending Manager Approval"
+                finance_result = await self.db.execute(query_finance)
+                finance_mgr = finance_result.scalars().first()
+                approver_id = finance_mgr.user_id if finance_mgr else None
+                
+                approval_entry = ExpenseApproval(
+                    expense_report_id=report.expense_report_id,
+                    approver_id=approver_id,
+                    status="Pending"
+                )
+                self.db.add(approval_entry)
+                report.status = "Pending Finance Manager Approval"
+            else:
+                # Regular employee claim -> Manager Approval first
+                approver_id = manager_id
+                approval_entry = ExpenseApproval(
+                    expense_report_id=report.expense_report_id,
+                    approver_id=approver_id,
+                    status="Pending"
+                )
+                self.db.add(approval_entry)
+                report.status = "Pending Manager Approval"
             
             if approver_id:
                 try:
@@ -103,7 +109,7 @@ class ApprovalService:
                 except Exception:
                     pass
             
-            return manager_approval
+            return approval_entry
         else:
             raise ValueError(f"Unknown document type: {document_type}")
 

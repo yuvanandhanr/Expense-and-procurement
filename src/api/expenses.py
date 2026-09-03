@@ -66,10 +66,12 @@ def _can_access_report(report: ExpenseReport, user: User) -> bool:
 def _can_act_on_pending_report(report: ExpenseReport, user: User, explicit_approval: object | None) -> bool:
     """Whether a user may approve / reject / return a report awaiting review.
 
-    An explicit expense-approval assignment wins. Otherwise, any manager-level
-    approval role (Admin, Manager, Finance Manager, CFO) may act on a report they
-    are allowed to access, matching the controls presented in the UI.
+    Prevents self-approval of own reports.
     """
+    # Strict self-approval prevention: No user may approve/action their own expense claim!
+    if report.employee_id == user.user_id:
+        return False
+
     if explicit_approval is not None:
         return True
     if not _can_access_report(report, user):
