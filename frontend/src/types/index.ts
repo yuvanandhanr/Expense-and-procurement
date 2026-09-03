@@ -313,6 +313,7 @@ export interface Receipt {
   expense_report_id: number;
   merchant_name?: string;
   receipt_date?: string;
+  receipt_number?: string;
   category?: string;
   ocr_amount: number;
   verified_amount: number;

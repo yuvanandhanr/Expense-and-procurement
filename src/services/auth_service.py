@@ -307,10 +307,12 @@ class AuthenticationService:
         vendor = result.scalar_one_or_none()
 
         # Auto-provision vendor for E2E testing
-        if not vendor and email == "vendor@example.com":
+        if not vendor and email in ["vendor@example.com", "vendor2@example.com", "vendor3@example.com"]:
+            vendor_name = "Apex Systems" if email == "vendor@example.com" else "Nexus Tech Solutions" if email == "vendor2@example.com" else "Global Supply Co"
+            vendor_code = "VEND-001" if email == "vendor@example.com" else "VEND-002" if email == "vendor2@example.com" else "VEND-003"
             vendor = Vendor(
-                vendor_name="Test Vendor",
-                vendor_code="VEND-001",
+                vendor_name=vendor_name,
+                vendor_code=vendor_code,
                 email=email,
                 status="Active",
                 mfa_secret=pyotp.random_base32(),

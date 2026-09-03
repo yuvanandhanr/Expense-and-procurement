@@ -7,12 +7,20 @@ Configures the SQLAlchemy asynchronous database engine with enterprise connectio
 from sqlalchemy.ext.asyncio import create_async_engine
 from src.core.config import settings
 
-# Initialize asynchronous engine targeting Supabase PostgreSQL
+engine_kwargs = {
+    "echo": False
+}
+
+if "sqlite" not in settings.DATABASE_URL:
+    engine_kwargs.update({
+        "pool_size": 20,
+        "max_overflow": 10,
+        "pool_pre_ping": True,
+        "pool_recycle": 1800,
+    })
+
+# Initialize asynchronous engine targeting Supabase PostgreSQL or local SQLite
 async_engine = create_async_engine(
     url=settings.DATABASE_URL,
-    pool_size=20,            # Maintain up to 20 connections in pool
-    max_overflow=10,         # Allow temporary overflow up to 10 additional connections
-    pool_pre_ping=True,      # Verify connection is alive before lease
-    pool_recycle=1800,       # Recycle connection after 30 minutes to mitigate leaks
-    echo=False               # Query statement logging managed via LOG_LEVEL
+    **engine_kwargs
 )

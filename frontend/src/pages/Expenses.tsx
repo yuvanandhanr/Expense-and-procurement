@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Upload, CheckCircle, XCircle, FileText, AlertCircle, RefreshCw, DollarSign, Clock, CheckSquare, XOctagon, Trash2, ClipboardList, Building, Briefcase } from "lucide-react";
+import { Plus, Upload, CheckCircle, XCircle, FileText, AlertCircle, RefreshCw, DollarSign, Clock, CheckSquare, XOctagon, Trash2, ClipboardList, Building, Briefcase, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "../services/api";
 import { ExpenseReport, Receipt } from "../types";
@@ -276,7 +276,8 @@ const Expenses: React.FC = () => {
     const s = status.toLowerCase();
     if (s === "approved" || s === "closed" || s === "payment requested" || s === "finance verified") return <Badge variant="success">{status}</Badge>;
     if (s === "pending" || s.includes("pending") || s === "corrected claim") return <Badge variant="warning">{status}</Badge>;
-    if (s === "rejected" || s === "returned for correction") return <Badge variant="error">{status}</Badge>;
+    if (s === "rejected") return <Badge variant="error">{status}</Badge>;
+    if (s === "returned for correction") return <Badge variant="neutral">{status}</Badge>;
     return <Badge variant="neutral">{status}</Badge>;
   };
 
@@ -288,6 +289,23 @@ const Expenses: React.FC = () => {
     if (statusFilter === "Rejected") return r.status === "Rejected" || r.status === "Returned for Correction";
     return r.status === statusFilter;
   });
+
+  const getActionText = (report: any) => {
+    const isOwnerReport = user?.user_id === report.employee_id;
+    const s = report.status.toLowerCase();
+    
+    if (s === "rejected" || s === "returned for correction" || s === "closed" || s === "payment requested" || s === "finance verified" || s === "approved") {
+      return "View";
+    }
+    
+    if (!isOwnerReport) {
+      if ((s === "pending manager approval" || s === "corrected claim") && hasRole("Manager")) return "Need Approval";
+      if ((s === "pending finance approval" || s === "pending finance manager approval" || s === "pending finance verification") && (hasRole("Finance Manager") || hasRole("Finance") || hasRole("Admin") || hasRole("CFO"))) return "Need Approval";
+      return "View"; // It's a manager but not their turn yet (or already approved by them)
+    }
+    
+    return "Review"; // For employee owner
+  };
 
   return (
     <div className="space-y-6">
@@ -337,7 +355,7 @@ const Expenses: React.FC = () => {
             </div>
           ) : filteredExpenses.length === 0 ? (
             <EmptyState
-              icon={FileText}
+              icon={<FileText className="w-10 h-10" />}
               title="No Reimbursements Found"
               description={`There are no expense reports matching "${statusFilter}".`}
               actionLabel={(!isFinance && !hasRole("CFO")) ? "Create new reimbursement" : undefined}
@@ -389,7 +407,7 @@ const Expenses: React.FC = () => {
                           </Button>
                         )}
                         <Button size="sm" onClick={() => setSelectedReportId(report.expense_report_id)}>
-                          Review
+                          {getActionText(report)}
                         </Button>
                       </td>
                     </tr>
@@ -408,7 +426,7 @@ const Expenses: React.FC = () => {
             label="Business Purpose *" 
             placeholder="e.g. Q3 Sales Offsite in NYC" 
             value={newReport.purpose}
-            onChange={e => setNewReport({...newReport, purpose: e.target.value})}
+            onChange={e => setNewReport({...newReport, purpose: e.target.value.replace(/[^a-zA-Z0-9\s.,-]/g, '')})}
             required
           />
           <div className="grid grid-cols-2 gap-4">
@@ -449,7 +467,7 @@ const Expenses: React.FC = () => {
             label="Project Code" 
             placeholder="e.g. PRJ-2024-X"
             value={newReport.project_code}
-            onChange={e => setNewReport({...newReport, project_code: e.target.value})}
+            onChange={e => setNewReport({...newReport, project_code: e.target.value.replace(/[^a-zA-Z0-9\s-]/g, '')})}
           />
           <div>
             <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
@@ -460,7 +478,7 @@ const Expenses: React.FC = () => {
               rows={3}
               placeholder="Provide a detailed justification for this expense claim..."
               value={newReport.justification}
-              onChange={e => setNewReport({...newReport, justification: e.target.value})}
+              onChange={e => setNewReport({...newReport, justification: e.target.value.replace(/[^a-zA-Z0-9\s.,!?-]/g, '')})}
               required
             ></textarea>
           </div>
@@ -478,112 +496,114 @@ const Expenses: React.FC = () => {
             if (!report) return null;
             return (
 <Dialog isOpen={true} onClose={() => setSelectedReportId(null)} title={report.purpose || "Untitled Expense"} maxWidthClass="max-w-2xl">
-              <div className="flex flex-col space-y-8 mt-4">
+              <div className="flex flex-col space-y-6 mt-4">
                 {/* Header Section */}
-                <div className="flex items-center justify-between px-2">
-                  <div className="flex items-center gap-4">
-                    <Badge variant={
-                      report.status === 'Approved' || report.status === 'Closed' ? 'success' : 
-                      (report.status.includes('Rejected') || report.status.includes('Returned')) ? 'error' : 
-                      (report.status.includes('Pending') || report.status.includes('Review')) ? 'info' : 
-                      'neutral'
-                    }>{report.status}</Badge>
-                    <span className="text-sm text-muted-foreground font-medium">
-                      Created: {new Date(report.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">
-                      ${Number(report.total_amount).toFixed(2)}
+                <div>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span>Status: <strong className="text-foreground">{report.status}</strong></span>
+                      <span>Created: {new Date(report.created_at).toLocaleDateString()}</span>
                     </div>
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">Verified Total</div>
+                    <div className="text-right">
+                      <div className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#A78BFA] to-[#F472B6]">
+                        ${Number(report.total_amount).toFixed(2)}
+                      </div>
+                      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mt-0.5">Verified Total</div>
+                    </div>
                   </div>
+                  
+                  {report.justification && (
+                    <div className="text-[15px] text-foreground mt-2">
+                      {report.justification}
+                    </div>
+                  )}
                 </div>
 
                 {/* Compact Progress Bar */}
-                <div className="flex justify-between items-center px-8 py-6 relative">
-                  <div className="absolute top-1/2 left-10 right-10 h-0.5 bg-muted -z-10 -translate-y-1/2 rounded-full" />
-                  {["Draft", "Pending", "Finance", "Payment", "Closed"].map((s, i) => {
-                    const fullStatuses = ["Draft", "Pending Approval", "Finance Verified", "Payment Requested", "Closed"];
-                    let currentIndex = fullStatuses.indexOf(report.status);
-                    if (report.status === "Approved") currentIndex = 1;
-                    if (report.status === "Pending Finance Verification") currentIndex = 1;
-                    if (report.status === "Corrected Claim") currentIndex = 1;
+                <div className="flex justify-between items-center px-4 py-8 relative">
+                  <div className="absolute top-1/2 left-8 right-8 h-[2px] bg-[#333338] -z-10 -translate-y-1/2" />
+                  {["Draft", "Pending Approval", "Finance Verified", "Payment Requested", "Closed"].map((s, i) => {
+                    const stat = report.status.toLowerCase();
+                    let currentIndex = 0;
+                    if (stat === "draft") currentIndex = 0;
+                    else if (stat.includes("pending") || stat.includes("approval") || stat === "corrected claim" || stat === "approved" || stat === "returned for correction" || stat === "rejected") currentIndex = 1;
+                    else if (stat === "finance verified" || stat.includes("verification")) currentIndex = 2;
+                    else if (stat === "payment requested") currentIndex = 3;
+                    else if (stat === "closed") currentIndex = 4;
+                    else currentIndex = 1;
                     
                     const isCompleted = i <= currentIndex;
-                    const isRejected = report.status.includes("Reject") || report.status.includes("Return");
                     const isActive = i === currentIndex;
+                    const isRejectedWorkflow = stat === "rejected" || stat === "returned for correction";
+                    
+                    const completedColor = isRejectedWorkflow ? "bg-stone-600 text-white shadow-none" : "bg-[#A78BFA] text-white shadow-[0_0_15px_rgba(167,139,250,0.3)]";
+                    const lineColor = isRejectedWorkflow ? "bg-stone-600" : "bg-[#A78BFA]";
                     
                     return (
-                      <div key={s} className="flex flex-col items-center gap-2.5 relative group">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold z-10 transition-all shadow-sm
+                      <div key={s} className="flex flex-col items-center gap-3 relative group">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold z-10 transition-all
                           ${isCompleted 
-                            ? (isRejected && isActive ? 'bg-red-500 text-white shadow-red-500/20' : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-purple-500/20') 
-                            : 'bg-muted border border-border text-muted-foreground'}`}
+                            ? completedColor 
+                            : 'bg-[#333338] text-muted-foreground'}`}
                         >
                           {i + 1}
                         </div>
-                        <span className={`text-[10px] font-bold uppercase tracking-wider text-center w-20 leading-tight
+                        <span className={`text-[10px] font-bold uppercase tracking-wider text-center w-24 leading-tight
                           ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
                           {s}
                         </span>
                         {i < currentIndex && (
-                          <div className="absolute top-3 left-6 w-[calc(100%+30px)] h-0.5 bg-gradient-to-r from-purple-500 to-pink-500 -z-10" />
+                          <div className={`absolute top-4 left-1/2 w-full h-[2px] ${lineColor} -z-10`} />
                         )}
                       </div>
                     )
                   })}
                 </div>
 
-                {report.justification && (
-                  <div className="text-sm text-foreground/90 italic border-l-2 border-purple-500/50 pl-4 py-2 bg-muted/10 rounded-r-md mx-2">
-                    "{report.justification}"
-                  </div>
-                )}
-                
-                <div className="flex flex-wrap gap-6 text-sm text-muted-foreground font-medium bg-muted/20 p-4 rounded-xl border border-border/50 mx-2">
-                  {report.department_id && <span className="flex items-center gap-2"><Building className="w-4 h-4 text-purple-500/70" /> Dept: {report.department_id}</span>}
-                  {report.project_code && <span className="flex items-center gap-2"><Briefcase className="w-4 h-4 text-pink-500/70" /> Proj: {report.project_code}</span>}
-                </div>
-
                 {report.duplicate_flag && (
-                  <div className="bg-red-500/10 text-red-500 text-sm p-4 rounded-xl border border-red-500/20 flex items-center gap-3 mx-2">
+                  <div className="bg-red-500/10 text-red-500 text-sm p-4 rounded-xl border border-red-500/20 flex items-center gap-3">
                     <AlertCircle className="w-5 h-5 shrink-0" />
                     <span><strong>Warning:</strong> Duplicate receipts detected across other reports.</span>
                   </div>
                 )}
                 {report.policy_flags && (
-                  <div className="bg-amber-500/10 text-amber-500 text-sm p-4 rounded-xl border border-amber-500/20 flex items-center gap-3 mx-2">
+                  <div className="bg-amber-500/10 text-amber-500 text-sm p-4 rounded-xl border border-amber-500/20 flex items-center gap-3">
                     <AlertCircle className="w-5 h-5 shrink-0" />
                     <span><strong>Policy Flag:</strong> {report.policy_flags}</span>
                   </div>
                 )}
 
-                {/* Unified Action Area */}
+                {/* Upload & Actions Area */}
                 {(report.status === "Draft" || (report.status === "Returned for Correction" && isOwner(report))) && (
-                  <div className="flex flex-col md:flex-row gap-6 p-6 bg-gradient-to-br from-purple-500/5 to-pink-500/5 rounded-2xl border border-purple-500/20 shadow-sm items-center mx-2">
-                    <label htmlFor="receipt-upload" className="flex-1 flex items-center gap-4 w-full p-4 border border-dashed rounded-xl cursor-pointer bg-background/60 hover:bg-muted/60 border-purple-500/40 hover:border-purple-500/70 transition-all group overflow-hidden relative">
-                      <div className="p-3 bg-purple-500/10 rounded-lg group-hover:scale-105 transition-transform shrink-0">
-                        {uploading ? (
-                          <RefreshCw className="w-5 h-5 text-purple-500 animate-spin" />
-                        ) : (
-                          <Upload className="w-5 h-5 text-purple-500" />
-                        )}
+                  <div className="flex flex-col gap-6 pt-2">
+                    <div className="p-6 bg-transparent rounded-xl border border-[#3E3E4A] border-dashed">
+                      <div className="flex items-start gap-3 mb-4">
+                        <Upload className="w-5 h-5 text-[#A78BFA]" />
+                        <div>
+                          <h4 className="text-sm font-semibold text-foreground">Upload Receipts</h4>
+                          <p className="text-xs text-muted-foreground mt-1">Upload multiple receipts to build your report.</p>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-bold text-foreground">
-                          {uploading ? "Extracting OCR..." : "Upload receipts"}
-                        </p>
-                        <p className="text-xs text-muted-foreground font-medium mt-0.5">JPG, PNG, PDF</p>
+                      
+                      <div className="flex items-center gap-0 w-full mb-4">
+                        <label className="cursor-pointer bg-[#2A2A35] hover:bg-[#333338] border border-[#3E3E4A] border-r-0 rounded-l-md px-4 py-2.5 text-sm font-medium text-[#A78BFA] transition-colors">
+                          Choose File
+                          <input id="receipt-upload" type="file" multiple accept="image/*,.pdf" className="hidden" onChange={(e) => handleFileUpload(e, report.expense_report_id)} disabled={uploading} />
+                        </label>
+                        <div className="flex-1 bg-[#23232C] border border-[#3E3E4A] rounded-r-md px-4 py-2.5 text-sm text-muted-foreground flex items-center">
+                          {uploading ? "Extracting OCR..." : "No file chosen"}
+                          {uploading && <RefreshCw className="w-4 h-4 text-[#A78BFA] animate-spin ml-auto" />}
+                        </div>
                       </div>
-                      <input id="receipt-upload" type="file" multiple accept="image/*,.pdf" className="hidden" onChange={(e) => handleFileUpload(e, report.expense_report_id)} disabled={uploading} />
-                    </label>
+                      
+                      <p className="text-xs text-muted-foreground">Accepted formats: JPG, PNG, PDF (Max size: 10MB each)</p>
+                    </div>
 
-                    <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto shrink-0">
+                    <div className="flex justify-end gap-4 w-full">
                       <Button 
-                        size="lg" 
+                        size="default" 
                         variant="outline"
-                        className="w-full sm:w-auto text-sm font-semibold h-12 px-6 border-purple-500/20 hover:bg-purple-500/10 hover:text-purple-500 rounded-xl"
+                        className="text-sm font-semibold h-10 px-6 border-[#3E3E4A] hover:bg-[#2A2A35] rounded-md text-foreground"
                         onClick={() => {
                           setEditDetails({
                             purpose: report.purpose,
@@ -598,24 +618,23 @@ const Expenses: React.FC = () => {
                         Edit Details
                       </Button>
                       <Button 
-                        size="lg" 
+                        size="default" 
                         variant="primary"
-                        className="w-full sm:w-auto text-sm font-bold h-12 px-6 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 border-0 shadow-lg shadow-purple-500/20 rounded-xl"
+                        className="text-sm font-bold h-10 px-6 bg-gradient-to-r from-[#A78BFA] to-[#F472B6] hover:opacity-90 border-0 rounded-md text-white shadow-none"
                         onClick={() => setIsReviewOpen(true)}
-                        disabled={submitReportMutation.isPending || !report.receipts?.length}
+                        disabled={submitReportMutation.isPending || !report.receipts?.length || report.duplicate_flag}
                       >
-                        <CheckCircle className="w-5 h-5 mr-2" />
                         Review & Submit
                       </Button>
                     </div>
                   </div>
                 )}
                 {!isOwner(report) && report.status === "Draft" && (
-                  <div className="text-muted-foreground italic text-sm text-center p-4 bg-muted/30 rounded-xl mx-2">Draft report - Waiting for submission</div>
+                  <div className="text-muted-foreground italic text-sm text-center p-4 bg-muted/30 rounded-xl">Draft report - Waiting for submission</div>
                 )}</div>
                   
                   {/* Manager Review */}
-                  {(report.status === "Pending Manager Approval" || report.status === "Pending Finance Manager Approval" || report.status === "Corrected Claim") && (hasRole("Manager") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin")) && (
+                  {!isOwner(report) && (report.status === "Pending Manager Approval" || report.status === "Pending Finance Approval" || report.status === "Pending Finance Manager Approval" || report.status === "Corrected Claim") && (hasRole("Manager") || hasRole("Finance Manager") || hasRole("Finance") || hasRole("CFO") || hasRole("Admin")) && (
                     <div className="flex flex-col gap-3 p-4 bg-amber-500/10 rounded-xl border border-amber-500/20">
                       <h4 className="font-semibold text-amber-800 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> Manager Review Required</h4>
                       <div className="flex gap-2">
@@ -627,7 +646,7 @@ const Expenses: React.FC = () => {
                   )}
 
                   {/* Finance Review */}
-                  {report.status === "Pending Finance Verification" && (hasRole("Finance") || hasRole("Admin")) && (
+                  {!isOwner(report) && report.status === "Pending Finance Verification" && (hasRole("Finance") || hasRole("Admin")) && (
                     <div className="flex flex-col gap-3 p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
                        <h4 className="font-semibold text-blue-800 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> Finance Verification</h4>
                       <Button onClick={() => financeActionMutation.mutate({ reportId: report.expense_report_id, action: 'finance-verify' })} className="w-max bg-blue-600 hover:bg-blue-700 text-white">Verify All Receipts</Button>
@@ -635,7 +654,7 @@ const Expenses: React.FC = () => {
                   )}
 
                   {/* Payment */}
-                  {report.status === "Payment Requested" && (hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin")) && (
+                  {!isOwner(report) && report.status === "Payment Requested" && (hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin")) && (
                     <div className="flex flex-col gap-3 p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
                        <h4 className="font-semibold text-emerald-800 flex items-center gap-2"><DollarSign className="w-4 h-4" /> Payment Authorization</h4>
                       <Button onClick={() => financeActionMutation.mutate({ reportId: report.expense_report_id, action: 'pay' })} className="w-max bg-emerald-600 hover:bg-emerald-700 text-white">Authorize Payment</Button>
@@ -651,8 +670,10 @@ const Expenses: React.FC = () => {
                     
                     <div className="space-y-3">
                       {report.receipts?.length === 0 && (
-                        <div className="p-8 text-center text-muted-foreground border rounded-lg bg-muted/10">
-                          No receipts added yet. Upload receipts to build your report.
+                        <div className="flex flex-col items-center justify-center p-8 bg-transparent rounded-xl border border-[#3E3E4A] mt-2">
+                          <FileText className="w-6 h-6 text-muted-foreground mb-3" />
+                          <p className="text-sm text-foreground mb-1">No receipts added yet.</p>
+                          <p className="text-xs text-muted-foreground">Upload receipts to build your report.</p>
                         </div>
                       )}
                       {report.receipts?.map(receipt => {
@@ -668,9 +689,9 @@ const Expenses: React.FC = () => {
                             >
                                {receipt.image_path ? (
                                  <>
-                                   <img src={`http://localhost:8000${receipt.image_path}`} alt="Receipt" className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity" />
-                                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
-                                        onClick={() => window.open(`http://localhost:8000${receipt.image_path}`, '_blank')}>
+                                   <img src={receipt.image_path} alt="Receipt" className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity" />
+                                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer bg-black/30 backdrop-blur-sm"
+                                        onClick={() => window.open(receipt.image_path, '_blank')}>
                                      <Eye className="w-5 h-5 text-white" />
                                    </div>
                                  </>
@@ -687,6 +708,7 @@ const Expenses: React.FC = () => {
                               </div>
                               <div className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
                                 <span>Date: <strong className="text-foreground">{receipt.receipt_date || 'N/A'}</strong></span>
+                                <span>Receipt #: <strong className="text-foreground">{receipt.receipt_number || 'N/A'}</strong></span>
                                 <span>Category: <strong className="text-foreground">{receipt.category || 'Uncategorized'}</strong></span>
                                 <span className="flex items-center gap-1 bg-muted/50 px-2 py-0.5 rounded">
                                   OCR Confidence: <span className={lowConfidence ? "text-amber-600 font-semibold" : "text-green-600 font-medium"}>{receipt.ocr_confidence}%</span>
@@ -757,8 +779,7 @@ const Expenses: React.FC = () => {
                       })}
                     </div>
                   </div>
-                </div>
-                </div>
+
               </Dialog>
           );
         })()}
@@ -873,7 +894,7 @@ const Expenses: React.FC = () => {
           <Input 
             label="Business Purpose *" 
             value={editDetails.purpose}
-            onChange={e => setEditDetails({...editDetails, purpose: e.target.value})}
+            onChange={e => setEditDetails({...editDetails, purpose: e.target.value.replace(/[^a-zA-Z0-9\s.,-]/g, '')})}
             required
           />
           <div className="grid grid-cols-2 gap-4">
@@ -899,7 +920,7 @@ const Expenses: React.FC = () => {
           <Input 
             label="Project Code" 
             value={editDetails.project_code}
-            onChange={e => setEditDetails({...editDetails, project_code: e.target.value})}
+            onChange={e => setEditDetails({...editDetails, project_code: e.target.value.replace(/[^a-zA-Z0-9\s-]/g, '')})}
           />
           <div>
             <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
@@ -909,7 +930,7 @@ const Expenses: React.FC = () => {
               className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200"
               rows={3}
               value={editDetails.justification}
-              onChange={e => setEditDetails({...editDetails, justification: e.target.value})}
+              onChange={e => setEditDetails({...editDetails, justification: e.target.value.replace(/[^a-zA-Z0-9\s.,!?-]/g, '')})}
               required
             ></textarea>
           </div>

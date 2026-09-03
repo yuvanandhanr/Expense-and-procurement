@@ -44,6 +44,7 @@ class Receipt(Base):
     expense_report_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("expense_reports.expense_report_id", ondelete="CASCADE"))
     merchant_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     receipt_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    receipt_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True) # Travel, Meals, Office Supplies, etc.
     ocr_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0.00"))
     verified_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0.00"))

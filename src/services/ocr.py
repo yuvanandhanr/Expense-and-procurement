@@ -233,9 +233,19 @@ class OCRService:
             if total_amount > 0 and confidence < 50:
                 confidence = Decimal("50.00")
 
+            # Extract receipt number (e.g. Receipt #: 1234, Inv: 5678)
+            receipt_number = None
+            receipt_no_pattern = re.compile(r'(?:receipt|invoice|inv|bill)\s*(?:no|number|#)?\s*[:.-]?\s*([A-Za-z0-9_-]+)', re.IGNORECASE)
+            for line in lines:
+                match = receipt_no_pattern.search(line)
+                if match:
+                    receipt_number = match.group(1).strip()
+                    break
+
             return {
                 "merchant_name": merchant,
                 "date": extracted_date,
+                "receipt_number": receipt_number,
                 "category": category,
                 "total_amount": total_amount,
                 "confidence": min(confidence, Decimal("100.00")),
@@ -246,6 +256,7 @@ class OCRService:
             return {
                 "merchant_name": "Unknown",
                 "date": None,
+                "receipt_number": None,
                 "total_amount": Decimal("0.00"),
                 "confidence": Decimal("0.00"),
                 "raw_text": ""

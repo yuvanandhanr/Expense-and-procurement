@@ -7,6 +7,7 @@ from decimal import Decimal
 class ReceiptBase(BaseModel):
     merchant_name: Optional[str] = None
     receipt_date: Optional[date] = None
+    receipt_number: Optional[str] = None
     category: Optional[str] = None
     verified_amount: Decimal = Field(default=Decimal("0.00"))
     tax: Decimal = Field(default=Decimal("0.00"))
@@ -19,6 +20,7 @@ class ReceiptUpdate(BaseModel):
     # PATCH-style semantics: omitted fields must never overwrite OCR values.
     merchant_name: Optional[str] = None
     receipt_date: Optional[date] = None
+    receipt_number: Optional[str] = None
     category: Optional[str] = None
     verified_amount: Optional[Decimal] = None
     tax: Optional[Decimal] = None

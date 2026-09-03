@@ -92,14 +92,14 @@ export const PurchaseRequisitions: React.FC = () => {
     if (!selectedPr) return;
     setIsSubmitting(true);
     try {
-      if (action === "cancel") {
+      if (action === "cancel" || action === "reject") {
         if (!comment.trim()) {
-          toast.error("Please provide a reason for cancellation.");
+          toast.error(`Please provide a reason for ${action === "cancel" ? "cancellation" : "rejection"}.`);
           setIsSubmitting(false);
           return;
         }
-        await api.post(`/pr/${selectedPr.pr_id}/cancel`, { comments: comment });
-        toast.success(`Purchase Requisition successfully cancelled!`);
+        await api.post(`/pr/${selectedPr.pr_id}/${action}`, { comments: comment });
+        toast.success(`Purchase Requisition successfully ${action === "cancel" ? "cancelled" : "rejected"}!`);
       } else {
         await api.post(`/pr/${selectedPr.pr_id}/${action}`, {
           comments: comment,
@@ -136,11 +136,11 @@ export const PurchaseRequisitions: React.FC = () => {
 
   const filteredPrs = prs.filter((pr) => {
     if (statusFilter === "All") return true;
+    const currentStatus = (pr.status || "Unknown").toLowerCase();
     if (statusFilter === "Submitted") {
-      const s = pr.status.toLowerCase();
-      return s.includes("pending") || s === "submitted" || s === "under review";
+      return currentStatus.includes("pending") || currentStatus === "submitted" || currentStatus === "under review";
     }
-    return pr.status.toLowerCase() === statusFilter.toLowerCase();
+    return currentStatus === statusFilter.toLowerCase();
   });
 
   return (

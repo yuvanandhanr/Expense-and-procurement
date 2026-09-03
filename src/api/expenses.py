@@ -74,6 +74,8 @@ def _can_act_on_pending_report(report: ExpenseReport, user: User, explicit_appro
     approval role (Admin, Manager, Finance Manager, CFO) may act on a report they
     are allowed to access, matching the controls presented in the UI.
     """
+    if report.employee_id == user.user_id:
+        return False
     if explicit_approval is not None:
         return True
     if not _can_access_report(report, user):
@@ -213,6 +215,7 @@ async def upload_receipts(
         ocr_amount = ocr_result.get("total_amount", Decimal("0.00"))
         parsed_date = parse_ocr_date(ocr_result.get("date"))
         merchant = ocr_result.get("merchant_name")
+        receipt_number = ocr_result.get("receipt_number")
         
         # Keep the OCR-based comparison as a second line of defence for legacy
         # receipts uploaded before content hashes were available.
@@ -236,6 +239,32 @@ async def upload_receipts(
                     status_code=400,
                     detail=f"Duplicate receipt error: Receipt from '{merchant}' dated {parsed_date} for ${ocr_amount} already exists on this report."
                 )
+                
+        # Global duplicate check across all reports for this user
+        if merchant and merchant != "Unknown Merchant" and merchant != "Unknown" and parsed_date and ocr_amount > Decimal("0.00"):
+            from sqlalchemy import select, or_, and_
+            
+            # Check by matching merchant + date + amount
+            conditions = [
+                and_(
+                    Receipt.merchant_name == merchant,
+                    Receipt.receipt_date == parsed_date,
+                    or_(Receipt.ocr_amount == ocr_amount, Receipt.verified_amount == ocr_amount)
+                )
+            ]
+            
+            # Or check by matching receipt_number
+            if receipt_number:
+                conditions.append(and_(Receipt.receipt_number == receipt_number, Receipt.merchant_name == merchant))
+            
+            query_dup = select(Receipt).join(ExpenseReport).where(
+                ExpenseReport.employee_id == current_user.user_id,
+                ExpenseReport.status != "Rejected",
+                or_(*conditions)
+            )
+            result_dup = await db.execute(query_dup)
+            if result_dup.scalars().first():
+                raise HTTPException(status_code=409, detail=f"Duplicate receipt detected across reports (Merchant: {merchant}, Date: {parsed_date}, Amount: {ocr_amount}, Receipt #: {receipt_number or 'N/A'}).")
 
         # If low confidence, employee must manually verify. Default to 0.00 so report cannot be submitted blindly.
         verified_amount = ocr_amount if confidence > Decimal("50.00") else Decimal("0.00")
@@ -251,6 +280,7 @@ async def upload_receipts(
             expense_report_id=report_id,
             merchant_name=merchant,
             receipt_date=parsed_date,
+            receipt_number=receipt_number,
             category=ocr_result.get("category"),
             ocr_amount=ocr_amount,
             verified_amount=verified_amount,
@@ -369,10 +399,11 @@ async def delete_receipt(
         raise HTTPException(status_code=404, detail="Receipt not found")
         
     report.total_amount -= receipt.verified_amount
+    image_path = receipt.image_path
     await repo.delete_receipt(receipt)
     await repo.update_report(report)
     await db.commit()
-    _remove_uploaded_file(receipt.image_path)
+    _remove_uploaded_file(image_path)
     _log_action(current_user, "receipt_ocr_deleted", receipt_id)
     return {"status": "success"}
 
@@ -431,6 +462,9 @@ async def submit_report(
     report.duplicate_flag = duplicates_found
     report.policy_flags = ", ".join(policy_issues) if policy_issues else None
     
+    if duplicates_found:
+        raise HTTPException(status_code=400, detail="Duplicate receipts detected. Remove them before submitting.")
+    
     is_manager = any(r.role_name == "Manager" for r in current_user.roles)
     if is_manager and policy_issues and not report.justification:
         _log_action(current_user, "expense_submission_validation_failed", report_id, level=logging.WARNING)
@@ -477,7 +511,7 @@ async def approve_expense(
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
         
-    if report.status not in ["Pending Manager Approval", "Pending Finance Manager Approval", "Corrected Claim"]:
+    if report.status not in ["Pending Manager Approval", "Pending Finance Manager Approval", "Pending Finance Approval", "Corrected Claim"]:
         raise HTTPException(status_code=400, detail="Report is not pending approval")
         
     query = select(ExpenseApproval).where(
@@ -498,24 +532,20 @@ async def approve_expense(
         approval.actioned_at = datetime.utcnow()
         
     if report.status in ["Pending Manager Approval", "Corrected Claim"]:
-        if report.total_amount > Decimal("1000.00"):
-            report.status = "Pending Finance Manager Approval"
-            
-            # Find a Finance Manager
-            fm_query = select(User).join(User.roles).where(Role.role_name == "Finance Manager", User.status == "Active")
-            fm_result = await db.execute(fm_query)
-            finance_manager = fm_result.scalars().first()
-            
-            fm_approval = ExpenseApproval(
-                expense_report_id=report.expense_report_id,
-                approver_id=finance_manager.user_id if finance_manager else None,
-                status="Pending"
-            )
-            db.add(fm_approval)
-        else:
-            report.status = "Payment Requested"
-            report.payment_status = "Pending Payment"
-    elif report.status == "Pending Finance Manager Approval":
+        report.status = "Pending Finance Approval"
+        
+        # Find a Finance Manager
+        fm_query = select(User).join(User.roles).where(Role.role_name.in_(["Finance Manager", "Finance", "CFO"]), User.status == "Active")
+        fm_result = await db.execute(fm_query)
+        finance_manager = fm_result.scalars().first()
+        
+        fm_approval = ExpenseApproval(
+            expense_report_id=report.expense_report_id,
+            approver_id=finance_manager.user_id if finance_manager else None,
+            status="Pending"
+        )
+        db.add(fm_approval)
+    elif report.status in ["Pending Finance Manager Approval", "Pending Finance Approval"]:
         report.status = "Payment Requested"
         report.payment_status = "Pending Payment"
         
