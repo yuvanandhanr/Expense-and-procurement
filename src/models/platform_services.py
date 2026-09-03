@@ -55,7 +55,7 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     audit_log_id: Mapped[int] = mapped_column(
-        BigInteger, primary_key=True, autoincrement=True
+        "log_id", BigInteger, primary_key=True, autoincrement=True
     )
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     user_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)

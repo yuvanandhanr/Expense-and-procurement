@@ -27,6 +27,17 @@ class GRNRepository(BaseRepository[GoodsReceipt]):
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
+    async def list_all(self, skip: int = 0, limit: int = 100) -> List[GoodsReceipt]:
+        query = (
+            select(self.model)
+            .options(selectinload(self.model.items), selectinload(self.model.po))
+            .order_by(self.model.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
 
 class GRNItemRepository(BaseRepository[GoodsReceiptItem]):
     def __init__(self, session: AsyncSession) -> None:
