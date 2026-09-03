@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Upload, CheckCircle, XCircle, FileText, AlertCircle, RefreshCw, DollarSign, Clock, CheckSquare, XOctagon, Trash2, ClipboardList, Building, Briefcase } from "lucide-react";
+import { Plus, Upload, CheckCircle, XCircle, FileText, AlertCircle, RefreshCw, DollarSign, Clock, CheckSquare, XOctagon, Trash2, ClipboardList, Building, Briefcase, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "../services/api";
 import { ExpenseReport, Receipt } from "../types";
@@ -612,7 +612,7 @@ const Expenses: React.FC = () => {
                 )}
                 {!isOwner(report) && report.status === "Draft" && (
                   <div className="text-muted-foreground italic text-sm text-center p-4 bg-muted/30 rounded-xl mx-2">Draft report - Waiting for submission</div>
-                )}</div>
+                )}
                   
                   {/* Manager Review */}
                   {(report.status === "Pending Manager Approval" || report.status === "Pending Finance Manager Approval" || report.status === "Corrected Claim") && (hasRole("Manager") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin")) && (
@@ -757,7 +757,6 @@ const Expenses: React.FC = () => {
                       })}
                     </div>
                   </div>
-                </div>
                 </div>
               </Dialog>
           );

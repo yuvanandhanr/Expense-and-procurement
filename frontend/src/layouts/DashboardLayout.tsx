@@ -79,6 +79,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     const isCFO = hasRole("CFO");
     const isCTO = hasRole("CTO");
     const isAdmin = hasRole("Admin") || hasRole("CEO");
+    const isCEO = hasRole("CEO");
     const isProcurement = hasRole("Procurement") || hasRole("Procurement Officer") || hasRole("Procurement Manager");
 
     if (isVendor) {
