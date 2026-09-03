@@ -511,32 +511,29 @@ async def approve_expense(
             unassigned.actioned_at = datetime.utcnow()
         
     roles = _roles(current_user)
-    if report.status in ["Pending Manager Approval", "Corrected Claim"]:
-        if report.total_amount > Decimal("1000.00") and not bool(roles & {"Finance Manager", "Finance", "CFO", "Admin"}):
-            report.status = "Pending Finance Manager Approval"
-            
-            # Find a Finance Manager
-            fm_query = select(User).join(User.roles).where(Role.role_name == "Finance Manager", User.status == "Active")
-            fm_result = await db.execute(fm_query)
-            finance_manager = fm_result.scalars().first()
-            
-            fm_approval = ExpenseApproval(
-                expense_report_id=report.expense_report_id,
-                approver_id=finance_manager.user_id if finance_manager else None,
-                status="Pending"
-            )
-            db.add(fm_approval)
-        else:
-            report.status = "Payment Requested"
-            report.payment_status = "Pending Payment"
+    if report.status in ["Pending Manager Approval", "Corrected Claim", "Pending Approval"]:
+        report.status = "Pending Finance Manager Approval"
+        
+        # Find a Finance Manager for next step
+        fm_query = select(User).join(User.roles).where(Role.role_name.in_(["Finance Manager", "Finance", "CFO"]), User.status == "Active")
+        fm_result = await db.execute(fm_query)
+        finance_manager = fm_result.scalars().first()
+        
+        fm_approval = ExpenseApproval(
+            expense_report_id=report.expense_report_id,
+            approver_id=finance_manager.user_id if finance_manager else None,
+            status="Pending"
+        )
+        db.add(fm_approval)
     else:
-        report.status = "Payment Requested"
-        report.payment_status = "Pending Payment"
+        # Final approval by Finance Manager / Finance / CFO / Admin
+        report.status = "Approved"
+        report.payment_status = "Payment Authorized"
         
     await repo.update_report(report)
     await db.commit()
     _log_action(current_user, "expense_approved", report_id)
-    return {"status": "Approved"}
+    return {"status": "Approved", "new_report_status": report.status}
 
 @router.post("/{report_id}/reject")
 async def reject_expense(

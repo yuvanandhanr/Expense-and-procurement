@@ -73,15 +73,15 @@ class ApprovalService:
             if approver_id == report.employee_id:
                 approver_id = None
             
-            # If no manager_id is set (or was self), fallback to a Finance Manager
+            # If no manager_id is set (or was self), assign to a user with Manager role
             if not approver_id:
-                query_finance = select(User).join(User.roles).where(
-                    Role.role_name.in_(["Finance Manager", "Finance", "CFO"]),
+                query_manager = select(User).join(User.roles).where(
+                    Role.role_name == "Manager",
                     User.status == "Active",
                 )
-                finance_result = await self.db.execute(query_finance)
-                fallback_approver = finance_result.scalars().first()
-                approver_id = fallback_approver.user_id if fallback_approver else None
+                manager_result = await self.db.execute(query_manager)
+                fallback_mgr = manager_result.scalars().first()
+                approver_id = fallback_mgr.user_id if fallback_mgr else None
             
             manager_approval = ExpenseApproval(
                 expense_report_id=report.expense_report_id,
@@ -90,8 +90,8 @@ class ApprovalService:
             )
             self.db.add(manager_approval)
             
-            # Set status based on whether it went to a manager or finance
-            report.status = "Pending Manager Approval" if (manager_id and manager_id != report.employee_id) else "Pending Finance Approval"
+            # Workflow always starts at Manager Approval
+            report.status = "Pending Manager Approval"
             
             if approver_id:
                 try:
