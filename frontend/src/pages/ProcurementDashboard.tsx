@@ -51,35 +51,59 @@ export const ProcurementDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  
-  // We mock the API call here for the new dashboard, 
-  // ideally this should fetch from a new backend endpoint
   const [data, setData] = useState<any>(null);
 
-  useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        const response = await api.get("/dashboard");
-        const dashData = response.data;
-        
-        setData({
-          timestamp: dashData.timestamp,
-          metrics: dashData.widgets?.procurement_metrics || {
-            active_vendors: 0,
-            pending_rfqs: 0,
-            open_pos: 0,
-            active_contracts: 0
-          },
-          vendor_scores: dashData.widgets?.vendor_performance || []
-        });
-      } catch (err) {
-        console.error("Failed to load dashboard metrics:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchDashboard();
+  const fetchLiveData = React.useCallback(async (isInitial = false) => {
+    if (isInitial) setLoading(true);
+    try {
+      const [dashRes, vendorRes, rfqRes, poRes, contractRes, invoiceRes] = await Promise.all([
+        api.get("/dashboard").catch(() => ({ data: null })),
+        api.get("/vendors").catch(() => ({ data: [] })),
+        api.get("/rfq").catch(() => ({ data: [] })),
+        api.get("/purchase-orders").catch(() => ({ data: [] })),
+        api.get("/contracts").catch(() => ({ data: [] })),
+        api.get("/invoices").catch(() => ({ data: [] }))
+      ]);
+
+      const dashData = dashRes?.data || {};
+      const vendors = Array.isArray(vendorRes?.data) ? vendorRes.data : [];
+      const rfqs = Array.isArray(rfqRes?.data) ? rfqRes.data : [];
+      const pos = Array.isArray(poRes?.data) ? poRes.data : [];
+      const contracts = Array.isArray(contractRes?.data) ? contractRes.data : [];
+      const invoices = Array.isArray(invoiceRes?.data) ? invoiceRes.data : [];
+
+      setData({
+        timestamp: dashData.timestamp || new Date().toISOString(),
+        metrics: {
+          active_vendors: vendors.filter((v: any) => v?.status === "Active" || !v?.status).length || vendors.length,
+          pending_rfqs: rfqs.filter((r: any) => r?.status !== "Closed").length || rfqs.length,
+          open_pos: pos.filter((p: any) => p?.status !== "Completed" && p?.status !== "Cancelled").length || pos.length,
+          active_contracts: contracts.filter((c: any) => c?.status === "Active" || !c?.status).length || contracts.length,
+          pending_invoices: invoices.filter((i: any) => i?.status !== "Paid" && i?.status !== "Approved").length || invoices.length
+        },
+        vendor_scores: Array.isArray(dashData.widgets?.vendor_performance) ? dashData.widgets.vendor_performance : []
+      });
+    } catch (err) {
+      console.error("Failed to load real-time procurement metrics:", err);
+    } finally {
+      if (isInitial) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchLiveData(true);
+    const interval = setInterval(() => {
+      fetchLiveData(false);
+    }, 10000);
+
+    const onFocus = () => fetchLiveData(false);
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [fetchLiveData]);
 
   if (loading) {
     return (
@@ -99,14 +123,19 @@ export const ProcurementDashboard: React.FC = () => {
     );
   }
 
-  const role = user?.roles[0]?.role_name || "Manager";
+  const role = user?.roles?.[0]?.role_name || "Manager";
 
   return (
     <div className="space-y-6">
       {/* Welcome Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Procurement Cycle Dashboard</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold tracking-tight">Procurement Cycle Dashboard</h1>
+            <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping mr-0.5" /> Live Sync
+            </span>
+          </div>
           <p className="text-sm text-muted-foreground mt-1">
             Supplier and Contract health overview for: <Badge variant="info" className="ml-1">{role}</Badge>
           </p>

@@ -226,7 +226,10 @@ class ApprovalService:
             select(ApprovalWorkflow, PurchaseRequisition, UserModel)
             .join(PurchaseRequisition, ApprovalWorkflow.pr_id == PurchaseRequisition.pr_id)
             .join(UserModel, PurchaseRequisition.requestor_id == UserModel.user_id)
-            .where(ApprovalWorkflow.status.in_(["Pending", "Under Review"]))
+            .where(
+                ApprovalWorkflow.status.in_(["Pending", "Under Review"]),
+                PurchaseRequisition.total_estimated_amount > 0
+            )
             .order_by(ApprovalWorkflow.created_at.desc())
         )
 

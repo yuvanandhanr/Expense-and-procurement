@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { PurchaseRequisition } from "../types";
-import { Button, Input, Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Dialog, HeroTimestamp, EmptyState } from "../components/ui";
-import { ClipboardList } from "lucide-react";
+import { Button, Input, Card, CardHeader, CardTitle, CardContent, Badge, StatusBadge, Skeleton, Dialog, HeroTimestamp, EmptyState } from "../components/ui";
+import { ClipboardList, Plus, Eye, Send, Check, X, Ban } from "lucide-react";
 import toast from "react-hot-toast";
 import { formatDate, getErrorMessage } from "../utils/helpers";
 import { useAuth } from "../hooks/useAuth";
@@ -46,8 +46,8 @@ export const PurchaseRequisitions: React.FC = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !estimatedCost || !description.trim()) {
-      toast.error("Title, estimated cost, and justification are required.");
+    if (!title || !estimatedCost) {
+      toast.error("Please fill in all required fields.");
       return;
     }
 
@@ -55,8 +55,9 @@ export const PurchaseRequisitions: React.FC = () => {
     try {
       const res = await api.post("/pr", {
         title,
-        justification: description,
+        estimated_cost: parseFloat(estimatedCost),
         priority,
+        description,
         department_id: user?.department_id || null,
         items: [
           {
@@ -126,34 +127,43 @@ export const PurchaseRequisitions: React.FC = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const s = status.toLowerCase();
-    if (s === "approved" || s === "completed") return <Badge variant="success">{status}</Badge>;
-    if (s === "pending" || s === "under review" || s === "submitted" || s.includes("pending")) return <Badge variant="warning">{status}</Badge>;
-    if (s === "rejected" || s === "cancelled") return <Badge variant="error">{status}</Badge>;
-    return <Badge variant="neutral">{status}</Badge>;
-  };
+  const filteredPrs = prs
+    .filter((pr) => {
+      if (statusFilter === "All") return true;
+      if (statusFilter === "Submitted") {
+        const s = pr.status.toLowerCase();
+        return s === "submitted" || s.includes("pending") || s.includes("review");
+      }
+      return pr.status.toLowerCase() === statusFilter.toLowerCase();
+    })
+    .sort((a, b) => {
+      const sA = (a.status || "").toLowerCase();
+      const sB = (b.status || "").toLowerCase();
+      const costA = Number(a.total_estimated_amount || a.estimated_cost || 0);
+      const costB = Number(b.total_estimated_amount || b.estimated_cost || 0);
+      const isPendingA = (sA.includes("pending") || sA.includes("review")) && costA > 0;
+      const isPendingB = (sB.includes("pending") || sB.includes("review")) && costB > 0;
 
-  const filteredPrs = prs.filter((pr) => {
-    if (statusFilter === "All") return true;
-    if (statusFilter === "Submitted") {
-      const s = pr.status.toLowerCase();
-      return s.includes("pending") || s === "submitted" || s === "under review";
-    }
-    return pr.status.toLowerCase() === statusFilter.toLowerCase();
-  });
+      if (isPendingA && !isPendingB) return -1;
+      if (!isPendingA && isPendingB) return 1;
+
+      const timeA = new Date(a.created_at || 0).getTime();
+      const timeB = new Date(b.created_at || 0).getTime();
+      return timeB - timeA;
+    });
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header Banner */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Purchase Requisitions</h1>
           <p className="text-xs text-muted-foreground mt-1">Submit and track department purchase requests.</p>
         </div>
         <div className="flex items-center space-x-4">
           <HeroTimestamp />
-          <Button onClick={() => setIsCreateOpen(true)} className="font-bold text-xs uppercase tracking-wider">
-            New Requisition
+          <Button onClick={() => setIsCreateOpen(true)} className="font-bold text-xs uppercase tracking-wider gap-1.5 shadow-apple-glow">
+            <Plus className="w-4 h-4" /> New Requisition
           </Button>
         </div>
       </div>
@@ -198,38 +208,46 @@ export const PurchaseRequisitions: React.FC = () => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-border bg-accent/40 text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    <th className="p-4">PR Number</th>
-                    <th className="p-4">Requestor Name</th>
+                    <th className="p-4 whitespace-nowrap">PR Number</th>
+                    <th className="p-4 whitespace-nowrap">Requestor Name</th>
                     <th className="p-4">Title</th>
-                    <th className="p-4">Estimated Cost</th>
-                    <th className="p-4">Priority</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4">Date Created</th>
-                    <th className="p-4">Action</th>
+                    <th className="p-4 whitespace-nowrap">Estimated Cost</th>
+                    <th className="p-4 whitespace-nowrap">Priority</th>
+                    <th className="p-4 whitespace-nowrap">Status</th>
+                    <th className="p-4 whitespace-nowrap">Date Created</th>
+                    <th className="p-4 whitespace-nowrap">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border text-sm">
                   {filteredPrs.map((pr) => (
                     <tr key={pr.pr_id} className="hover:bg-accent/20 transition-colors">
-                      <td className="p-4 font-bold text-xs tracking-wider text-primary">{pr.pr_number}</td>
-                      <td className="p-4">{pr.requestor_name || "Unknown"}</td>
+                      <td className="p-4 font-bold text-xs tracking-wider text-primary whitespace-nowrap">{pr.pr_number}</td>
+                      <td className="p-4 whitespace-nowrap">{pr.requestor_name || "Unknown"}</td>
                       <td className="p-4 font-semibold">{pr.title}</td>
-                      <td className="p-4 font-bold">${pr.total_estimated_amount?.toLocaleString()}</td>
-                      <td className="p-4">
+                      <td className="p-4 font-bold whitespace-nowrap">${pr.total_estimated_amount?.toLocaleString()}</td>
+                      <td className="p-4 whitespace-nowrap">
                         <Badge variant={pr.priority === "High" ? "error" : pr.priority === "Medium" ? "warning" : "neutral"}>
                           {pr.priority}
                         </Badge>
                       </td>
-                      <td className="p-4">{getStatusBadge(pr.status)}</td>
-                      <td className="p-4 text-xs text-muted-foreground">{formatDate(pr.created_at)}</td>
-                      <td className="p-4">
+                      <td className="p-4 whitespace-nowrap">
+                        <StatusBadge status={pr.status} />
+                      </td>
+                      <td className="p-4 text-xs text-muted-foreground whitespace-nowrap">{formatDate(pr.created_at)}</td>
+                      <td className="p-4 whitespace-nowrap">
                         {pr.status === "Draft" && (
-                          <Button size="sm" variant="outline" onClick={() => handleSubmit(pr.pr_id)}>
-                            Submit
+                          <Button size="sm" variant="outline" onClick={() => handleSubmit(pr.pr_id)} className="gap-1.5">
+                            <Send className="w-3.5 h-3.5" /> Submit
                           </Button>
                         )}
                         {(["Pending", "Under Review", "Submitted", "Pending Manager Approval", "Pending Finance Approval", "Pending CFO Approval", "Approved", "Completed"].includes(pr.status)) && (
-                          <Button size="sm" onClick={() => setSelectedPr(pr)}>
+                          <Button
+                            size="sm"
+                            variant={["Approved", "Completed"].includes(pr.status) ? "secondary" : "primary"}
+                            onClick={() => setSelectedPr(pr)}
+                            className="gap-1.5 shadow-apple-sm"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
                             {["Approved", "Completed"].includes(pr.status) ? "View" : "Review"}
                           </Button>
                         )}
@@ -382,16 +400,16 @@ export const PurchaseRequisitions: React.FC = () => {
               </Button>
               {(!["Approved", "Completed", "Cancelled", "Rejected"].includes(selectedPr.status)) && (
                 selectedPr.requestor_id === user?.user_id || selectedPr.requested_by === user?.user_id ? (
-                  <Button variant="danger" disabled={isSubmitting} onClick={() => handleAction("cancel")}>
-                    Cancel Request
+                  <Button variant="danger" disabled={isSubmitting} onClick={() => handleAction("cancel")} className="gap-1.5 font-bold">
+                    <Ban className="w-4 h-4" /> Cancel Request
                   </Button>
                 ) : (
                   <>
-                    <Button variant="danger" disabled={isSubmitting} onClick={() => handleAction("reject")}>
-                      Reject
+                    <Button variant="danger" disabled={isSubmitting} onClick={() => handleAction("reject")} className="gap-1.5 font-bold">
+                      <X className="w-4 h-4" /> Reject
                     </Button>
-                    <Button disabled={isSubmitting} onClick={() => handleAction("approve")}>
-                      Approve
+                    <Button variant="success" disabled={isSubmitting} onClick={() => handleAction("approve")} className="gap-1.5 font-bold shadow-apple-sm">
+                      <Check className="w-4 h-4" /> Approve Requisition
                     </Button>
                   </>
                 )

@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../services/api";
-import { Card, CardHeader, CardTitle, CardContent, Skeleton, Badge, HeroTimestamp } from "../components/ui";
+import { Card, CardHeader, CardTitle, CardContent, Skeleton, Badge, HeroTimestamp, StatusBadge } from "../components/ui";
 import { formatDate } from "../utils/helpers";
 import { HardDrive, Receipt, FileText, CheckCircle, Clock, AlertCircle, TrendingUp, DollarSign, ShieldCheck, ArrowUpRight, ChevronRight, Info } from "lucide-react";
 
@@ -10,21 +10,52 @@ export const Dashboard: React.FC = () => {
   const { user, hasRole } = useAuth();
   const navigate = useNavigate();
   const [data, setData] = useState<any>(null);
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [prs, setPrs] = useState<any[]>([]);
+  const [approvals, setApprovals] = useState<any[]>([]);
+  const [myAssetsList, setMyAssetsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        const response = await api.get("/dashboard");
-        setData(response.data);
-      } catch (err) {
-        console.error("Failed to load dashboard metrics:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchDashboard();
+  const isApprover = hasRole("Manager") || hasRole("Finance") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin") || hasRole("CEO");
+
+  const fetchAllLiveData = useCallback(async (isInitial = false) => {
+    if (isInitial) setLoading(true);
+    try {
+      const [dashRes, expRes, prRes, appRes, astRes] = await Promise.all([
+        api.get("/dashboard").catch(() => ({ data: null })),
+        api.get("/expenses").catch(() => ({ data: [] })),
+        api.get("/pr").catch(() => ({ data: [] })),
+        api.get("/approvals").catch(() => ({ data: [] })),
+        api.get("/assets/my-assets").catch(() => api.get("/assets").catch(() => ({ data: [] })))
+      ]);
+
+      if (dashRes?.data) setData(dashRes.data);
+      if (expRes?.data) setExpenses(expRes.data);
+      if (prRes?.data) setPrs(prRes.data);
+      if (appRes?.data) setApprovals(appRes.data);
+      if (astRes?.data) setMyAssetsList(astRes.data);
+    } catch (err) {
+      console.error("Failed to load real-time dashboard data:", err);
+    } finally {
+      if (isInitial) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchAllLiveData(true);
+    // Real-time polling every 10 seconds
+    const interval = setInterval(() => {
+      fetchAllLiveData(false);
+    }, 10000);
+
+    const onFocus = () => fetchAllLiveData(false);
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [fetchAllLiveData]);
 
   if (loading) {
     return (
@@ -44,25 +75,62 @@ export const Dashboard: React.FC = () => {
     );
   }
 
-  const myAssets = data?.widgets?.my_assets || [];
-  const recentExpenses = data?.widgets?.recent_expenses || [];
-  const myRequisitions = data?.widgets?.my_requisitions || [];
+  // Real-time calculated live aggregates
+  const safeExpenses = Array.isArray(expenses) ? expenses : [];
+  const safePrs = Array.isArray(prs) ? prs : [];
+  const safeApprovals = Array.isArray(approvals) ? approvals : [];
+  const safeMyAssetsList = Array.isArray(myAssetsList) ? myAssetsList : [];
 
-  // Calculate dynamic stats
-  const totalSpend = recentExpenses.reduce((sum: number, e: any) => sum + (e.amount || 0), 0);
-  const pendingCount = recentExpenses.filter((e: any) => e.status?.includes("Pending")).length;
-  const isApprover = hasRole("Manager") || hasRole("Finance") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin") || hasRole("CEO");
+  const totalExpenseSpend = safeExpenses.reduce((sum: number, e: any) => sum + (Number(e?.total_amount) || 0), 0);
+  const pendingApprovalsCount = isApprover 
+    ? safeApprovals.filter((a: any) => {
+        const amt = Number(a?.amount || a?.total_amount || a?.estimated_cost || 0);
+        if (a?.entity_type === "ExpenseReport" || a?.entity_type === "PurchaseRequisition" || a?.entity_type === "VendorInvoice") {
+          if (amt <= 0) return false;
+        }
+        return a?.status === "Pending" || a?.status === "Under Review" || a?.status?.toLowerCase().includes("pending");
+      }).length
+    : safeExpenses.filter((e: any) => (Number(e?.total_amount || 0) > 0) && e?.status?.includes("Pending")).length + 
+      safePrs.filter((p: any) => (Number(p?.total_estimated_amount || p?.estimated_cost || 0) > 0) && (p?.status?.includes("Pending") || p?.status === "Submitted")).length;
+  
+  const assignedAssetsCount = safeMyAssetsList.length || (Array.isArray(data?.widgets?.my_assets) ? data.widgets.my_assets.length : 0);
+
+  // Real-time recent list with pending items prioritized on top by creation time
+  const recentPRs = [...safePrs].sort((a: any, b: any) => {
+    const isPendingA = (a.status?.toLowerCase().includes("pending") || a.status === "Submitted") && (Number(a.total_estimated_amount || a.estimated_cost || 0) > 0);
+    const isPendingB = (b.status?.toLowerCase().includes("pending") || b.status === "Submitted") && (Number(b.total_estimated_amount || b.estimated_cost || 0) > 0);
+    if (isPendingA && !isPendingB) return -1;
+    if (!isPendingA && isPendingB) return 1;
+    const timeA = new Date(a.created_at || 0).getTime();
+    const timeB = new Date(b.created_at || 0).getTime();
+    return timeB - timeA;
+  }).slice(0, 5);
+
+  const recentExpenseList = [...safeExpenses].sort((a: any, b: any) => {
+    const isPendingA = (a.status?.toLowerCase().includes("pending") || a.status?.toLowerCase().includes("corrected")) && (Number(a.total_amount || 0) > 0);
+    const isPendingB = (b.status?.toLowerCase().includes("pending") || b.status?.toLowerCase().includes("corrected")) && (Number(b.total_amount || 0) > 0);
+    if (isPendingA && !isPendingB) return -1;
+    if (!isPendingA && isPendingB) return 1;
+    const timeA = new Date(a.created_at || a.submission_date || a.date || 0).getTime();
+    const timeB = new Date(b.created_at || b.submission_date || b.date || 0).getTime();
+    return timeB - timeA;
+  }).slice(0, 5);
 
   return (
     <div className="space-y-7 animate-fade-in">
       {/* Apple Greeting Hero Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
-            Good day, {user?.first_name || "Team Member"}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
+              Good day, {user?.first_name || "Team Member"}
+            </h1>
+            <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping mr-0.5" /> Live Sync
+            </span>
+          </div>
           <p className="text-xs md:text-sm text-muted-foreground mt-1">
-            Enterprise procurement & expense intelligence at your fingertips.
+            Enterprise procurement & expense intelligence updating in real time.
           </p>
         </div>
         <HeroTimestamp />
@@ -90,13 +158,13 @@ export const Dashboard: React.FC = () => {
             </div>
             <div className="mt-3">
               <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-primary transition-colors">
-                ${totalSpend > 0 ? totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "124,560.00"}
+                ${totalExpenseSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-emerald-500">
                 <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-emerald-500/10">
-                  <ArrowUpRight className="w-3 h-3 mr-0.5" /> +2.4%
+                  {expenses.length} Records
                 </span>
-                <span className="text-muted-foreground">vs last month</span>
+                <span className="text-muted-foreground">in current ledger</span>
               </div>
             </div>
           </div>
@@ -115,7 +183,7 @@ export const Dashboard: React.FC = () => {
           <div>
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
-                Pending Claims
+                {isApprover ? "Pending Approvals" : "Pending Claims"}
               </span>
               <div className="flex items-center gap-1.5">
                 <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-amber-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
@@ -126,11 +194,11 @@ export const Dashboard: React.FC = () => {
             </div>
             <div className="mt-3">
               <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-amber-500 transition-colors">
-                {pendingCount || "18"}
+                {pendingApprovalsCount}
               </div>
               <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-amber-500">
                 <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-500/10">
-                  Action Required
+                  {pendingApprovalsCount > 0 ? "Action Required" : "All Caught Up"}
                 </span>
               </div>
             </div>
@@ -161,11 +229,11 @@ export const Dashboard: React.FC = () => {
             </div>
             <div className="mt-3">
               <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-cyan transition-colors">
-                1.8 <span className="text-base font-semibold text-muted-foreground">days</span>
+                1.4 <span className="text-base font-semibold text-muted-foreground">days</span>
               </div>
               <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-emerald-500">
                 <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-emerald-500/10">
-                  -18% faster
+                  Fast Turnaround
                 </span>
               </div>
             </div>
@@ -196,10 +264,10 @@ export const Dashboard: React.FC = () => {
             </div>
             <div className="mt-3">
               <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-purple-500 transition-colors">
-                {myAssets.length || "3"}
+                {assignedAssetsCount}
               </div>
               <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-muted-foreground">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1" /> All verified
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1" /> Verified Registry
               </div>
             </div>
           </div>
@@ -223,7 +291,7 @@ export const Dashboard: React.FC = () => {
                 <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                   <FileText className="w-3.5 h-3.5" />
                 </div>
-                <CardTitle>My Requisitions</CardTitle>
+                <CardTitle>Recent Requisitions</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -231,29 +299,25 @@ export const Dashboard: React.FC = () => {
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="border-b border-border/50 bg-muted/30 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                      <th className="py-3.5 px-5">Req #</th>
+                      <th className="py-3.5 px-5 whitespace-nowrap">Req #</th>
                       <th className="py-3.5 px-5">Description</th>
-                      <th className="py-3.5 px-5 text-right">Amount</th>
-                      <th className="py-3.5 px-5 text-center">Status</th>
+                      <th className="py-3.5 px-5 text-right whitespace-nowrap">Amount</th>
+                      <th className="py-3.5 px-5 text-center whitespace-nowrap">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
-                    {myRequisitions.length === 0 ? (
+                    {recentPRs.length === 0 ? (
                       <tr>
                         <td colSpan={4} className="py-6 text-center text-muted-foreground">No active requisitions.</td>
                       </tr>
                     ) : (
-                      myRequisitions.map((req: any, idx: number) => (
+                      recentPRs.map((req: any, idx: number) => (
                         <tr key={idx} className="hover:bg-muted/30 transition-colors">
-                          <td className="py-3.5 px-5 font-bold text-primary">{req.id}</td>
+                          <td className="py-3.5 px-5 font-bold text-primary whitespace-nowrap">{req.pr_number || req.id}</td>
                           <td className="py-3.5 px-5 font-medium">{req.title}</td>
-                          <td className="py-3.5 px-5 text-right font-mono font-semibold">${req.amount?.toLocaleString()}</td>
-                          <td className="py-3.5 px-5 text-center">
-                            <Badge 
-                              variant={req.status === "Approved" ? "success" : req.status === "Pending" ? "warning" : "neutral"}
-                            >
-                              {req.status}
-                            </Badge>
+                          <td className="py-3.5 px-5 text-right font-mono font-semibold whitespace-nowrap">${(Number(req.total_estimated_amount) || Number(req.amount) || 0).toLocaleString()}</td>
+                          <td className="py-3.5 px-5 text-center whitespace-nowrap">
+                            <StatusBadge status={req.status} />
                           </td>
                         </tr>
                       ))
@@ -276,10 +340,10 @@ export const Dashboard: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {recentExpenses.length === 0 ? (
+                {recentExpenseList.length === 0 ? (
                   <div className="py-6 text-center text-xs text-muted-foreground">No recent expenses found.</div>
                 ) : (
-                  recentExpenses.map((exp: any, idx: number) => (
+                  recentExpenseList.map((exp: any, idx: number) => (
                     <div key={idx} className="flex items-center justify-between p-3.5 rounded-xl border border-border/60 bg-card/60 backdrop-blur-sm hover:border-primary/40 transition-all duration-200 shadow-apple-sm">
                       <div className="flex items-center space-x-3.5">
                         <div className={`p-2 rounded-xl ${
@@ -290,15 +354,15 @@ export const Dashboard: React.FC = () => {
                            exp.status === 'Rejected' ? <AlertCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
                         </div>
                         <div>
-                          <p className="font-bold text-xs text-foreground">{exp.title}</p>
-                          <p className="text-[11px] text-muted-foreground mt-0.5">{formatDate(exp.date)}</p>
+                          <p className="font-bold text-xs text-foreground">{exp.purpose || exp.title}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">{formatDate(exp.created_at || exp.date)}</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-mono font-bold text-xs text-foreground">${exp.amount?.toFixed(2)}</p>
-                        <Badge variant={["Approved", "Closed"].includes(exp.status) ? "success" : "neutral"} className="mt-1">
-                          {exp.status}
-                        </Badge>
+                        <p className="font-mono font-bold text-xs text-foreground">${(Number(exp.total_amount) || Number(exp.amount) || 0).toFixed(2)}</p>
+                        <div className="mt-1">
+                          <StatusBadge status={exp.status} />
+                        </div>
                       </div>
                     </div>
                   ))
@@ -320,21 +384,21 @@ export const Dashboard: React.FC = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-3.5">
-              {myAssets.length === 0 ? (
+              {safeMyAssetsList.length === 0 ? (
                 <div className="py-8 text-center text-xs text-muted-foreground">No assets currently assigned.</div>
               ) : (
-                myAssets.map((asset: any, idx: number) => (
+                safeMyAssetsList.map((asset: any, idx: number) => (
                   <div key={idx} className="p-4 rounded-xl border border-border/60 bg-card/60 backdrop-blur-sm shadow-apple-sm flex flex-col space-y-2.5 relative overflow-hidden group hover:border-primary/40 transition-all duration-200">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">
-                        {asset.tag}
+                        {asset.tag || asset.asset_tag || "ASSET"}
                       </span>
                       <span className="flex items-center text-[11px] font-semibold text-emerald-500">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5" />
-                        {asset.status}
+                        {asset.status || "Assigned"}
                       </span>
                     </div>
-                    <h3 className="font-bold text-xs text-foreground pt-1">{asset.name}</h3>
+                    <h3 className="font-bold text-xs text-foreground pt-1">{asset.name || asset.asset_name}</h3>
                   </div>
                 ))
               )}

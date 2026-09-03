@@ -39,27 +39,40 @@ export const Analytics: React.FC = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [spendRes, vendorRes, budgetRes, dashRes] = await Promise.all([
-          api.get("/analytics/spending").catch(() => api.get("/analytics/spend").catch(() => ({ data: null }))),
-          api.get("/analytics/vendors").catch(() => ({ data: null })),
-          api.get("/analytics/budgets").catch(() => ({ data: null })),
-          api.get("/dashboard").catch(() => ({ data: null })),
-        ]);
-        setSpendData(spendRes?.data || null);
-        setVendorData(vendorRes?.data || null);
-        setBudgetData(budgetRes?.data || null);
-        setDashboardData(dashRes?.data || null);
-      } catch (err) {
-        console.error("Failed to load analytics:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+  const fetchAnalyticsData = React.useCallback(async (isInitial = false) => {
+    if (isInitial) setLoading(true);
+    try {
+      const [spendRes, vendorRes, budgetRes, dashRes] = await Promise.all([
+        api.get("/analytics/spending").catch(() => api.get("/analytics/spend").catch(() => ({ data: null }))),
+        api.get("/analytics/vendors").catch(() => ({ data: null })),
+        api.get("/analytics/budgets").catch(() => ({ data: null })),
+        api.get("/dashboard").catch(() => ({ data: null })),
+      ]);
+      setSpendData(spendRes?.data || null);
+      setVendorData(vendorRes?.data || null);
+      setBudgetData(budgetRes?.data || null);
+      setDashboardData(dashRes?.data || null);
+    } catch (err) {
+      console.error("Failed to load analytics:", err);
+    } finally {
+      if (isInitial) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchAnalyticsData(true);
+    const interval = setInterval(() => {
+      fetchAnalyticsData(false);
+    }, 15000);
+
+    const onFocus = () => fetchAnalyticsData(false);
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [fetchAnalyticsData]);
 
   if (loading) {
     return (

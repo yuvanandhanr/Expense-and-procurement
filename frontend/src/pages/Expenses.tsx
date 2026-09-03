@@ -4,7 +4,7 @@ import { Plus, Upload, CheckCircle, XCircle, FileText, AlertCircle, RefreshCw, D
 import toast from "react-hot-toast";
 import { api } from "../services/api";
 import { ExpenseReport, Receipt } from "../types";
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Skeleton, Badge, Dialog, HeroTimestamp, EmptyState } from "../components/ui";
+import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Skeleton, Badge, StatusBadge, Dialog, HeroTimestamp, EmptyState } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
 
 const Expenses: React.FC = () => {
@@ -273,23 +273,20 @@ const Expenses: React.FC = () => {
 
   
   const getStatusBadge = (status: string) => {
-    const s = status.toLowerCase();
-    if (s === "approved" || s === "closed" || s === "payment requested" || s === "finance verified") return <Badge variant="success">{status}</Badge>;
-    if (s === "pending" || s.includes("pending") || s === "corrected claim") return <Badge variant="warning">{status}</Badge>;
-    if (s === "rejected" || s === "returned for correction") return <Badge variant="error">{status}</Badge>;
-    return <Badge variant="neutral">{status}</Badge>;
+    return <StatusBadge status={status} />;
   };
 
   const getActionConfig = (report: any) => {
     const isMgr = hasRole("Manager") || hasRole("Admin") || hasRole("CEO");
     const isFin = hasRole("Finance Manager") || hasRole("Finance") || hasRole("CFO") || hasRole("Admin") || hasRole("CEO");
     const owner = isOwner(report);
+    const amount = Number(report.total_amount || 0);
     
     const isPendingMgr = report.status === "Pending Manager Approval" || report.status === "Pending Approval" || report.status === "Corrected Claim";
     const isPendingFin = report.status === "Pending Finance Manager Approval" || report.status === "Pending Finance Approval" || report.status === "Pending Finance Verification";
     
-    // When action is required by the active user role (and NOT the user's own claim)
-    if (!owner && isMgr && isPendingMgr) {
+    // When action is required by the active user role (and NOT the user's own claim and amount > 0)
+    if (!owner && amount > 0 && isMgr && isPendingMgr) {
       return {
         label: "Need Approval",
         variant: "primary" as const,
@@ -298,7 +295,7 @@ const Expenses: React.FC = () => {
       };
     }
     
-    if (!owner && isFin && isPendingFin) {
+    if (!owner && amount > 0 && isFin && isPendingFin) {
       return {
         label: "Need Approval",
         variant: "primary" as const,
@@ -309,7 +306,7 @@ const Expenses: React.FC = () => {
     
     if (report.status === "Draft") {
       return {
-        label: "Review",
+        label: amount <= 0 ? "Add Receipts" : "Review",
         variant: "outline" as const,
         className: "border-primary/40 text-primary hover:bg-primary/10",
         icon: null
@@ -343,15 +340,40 @@ const Expenses: React.FC = () => {
     };
   };
 
-  const filteredExpenses = expenses.filter((r: any) => {
-    const s = (r.status || "").toLowerCase();
-    if (statusFilter === "All") return true;
-    if (statusFilter === "Draft") return s === "draft" || s.includes("return");
-    if (statusFilter === "Submitted") return s.includes("pending") || s.includes("corrected");
-    if (statusFilter === "Approved") return s === "approved" || s === "closed" || s.includes("payment") || s.includes("verified");
-    if (statusFilter === "Rejected") return s.includes("reject") || s.includes("return");
-    return r.status === statusFilter;
-  });
+  const isPendingActionItem = (r: any) => {
+    const owner = isOwner(r);
+    const amount = Number(r.total_amount || 0);
+    if (amount <= 0) return false;
+    const isPendingMgr = r.status === "Pending Manager Approval" || r.status === "Pending Approval" || r.status === "Corrected Claim";
+    const isPendingFin = r.status === "Pending Finance Manager Approval" || r.status === "Pending Finance Approval" || r.status === "Pending Finance Verification";
+    const isMgr = hasRole("Manager") || hasRole("Admin") || hasRole("CEO");
+    const isFin = hasRole("Finance Manager") || hasRole("Finance") || hasRole("CFO") || hasRole("Admin") || hasRole("CEO");
+    if (!owner && isMgr && isPendingMgr) return true;
+    if (!owner && isFin && isPendingFin) return true;
+    return r.status?.toLowerCase().includes("pending");
+  };
+
+  const filteredExpenses = expenses
+    .filter((r: any) => {
+      const s = (r.status || "").toLowerCase();
+      if (statusFilter === "All") return true;
+      if (statusFilter === "Draft") return s === "draft" || s.includes("return");
+      if (statusFilter === "Submitted") return s.includes("pending") || s.includes("corrected");
+      if (statusFilter === "Approved") return s === "approved" || s === "closed" || s.includes("payment") || s.includes("verified");
+      if (statusFilter === "Rejected") return s.includes("reject") || s.includes("return");
+      return r.status === statusFilter;
+    })
+    .sort((a: any, b: any) => {
+      const aAction = isPendingActionItem(a);
+      const bAction = isPendingActionItem(b);
+      // Items requiring approval come first
+      if (aAction && !bAction) return -1;
+      if (!aAction && bAction) return 1;
+      // Then sort by creation time (newest first)
+      const timeA = new Date(a.created_at || a.submission_date || a.date || 0).getTime();
+      const timeB = new Date(b.created_at || b.submission_date || b.date || 0).getTime();
+      return timeB - timeA;
+    });
 
   return (
     <div className="space-y-6">
@@ -558,10 +580,11 @@ const Expenses: React.FC = () => {
             const isPendingManager = report.status === "Pending Manager Approval" || report.status === "Pending Approval" || report.status === "Corrected Claim";
             const isPendingFinance = report.status === "Pending Finance Manager Approval" || report.status === "Pending Finance Approval" || report.status === "Pending Finance Verification";
             const owner = isOwner(report);
+            const isZeroAmount = Number(report.total_amount || 0) <= 0;
 
-            // Cannot approve own claim
-            const canManagerAct = !owner && isPendingManager && (hasRole("Manager") || hasRole("Admin") || hasRole("CEO"));
-            const canFinanceAct = !owner && isPendingFinance && (hasRole("Finance Manager") || hasRole("Finance") || hasRole("CFO") || hasRole("Admin") || hasRole("CEO"));
+            // Cannot approve own claim and claim must have amount > 0
+            const canManagerAct = !owner && !isZeroAmount && isPendingManager && (hasRole("Manager") || hasRole("Admin") || hasRole("CEO"));
+            const canFinanceAct = !owner && !isZeroAmount && isPendingFinance && (hasRole("Finance Manager") || hasRole("Finance") || hasRole("CFO") || hasRole("Admin") || hasRole("CEO"));
 
             const steps = [
               { name: "Draft", key: "draft" },
@@ -686,6 +709,15 @@ const Expenses: React.FC = () => {
                   </div>
                 )}
 
+                {isZeroAmount && (isPendingManager || isPendingFinance) && (
+                  <div className="bg-muted/40 text-muted-foreground text-xs p-4 rounded-xl border border-border flex items-center gap-3">
+                    <AlertCircle className="w-5 h-5 shrink-0 text-amber-500" />
+                    <div>
+                      <strong>$0.00 Claim:</strong> This expense report has a total verified amount of $0.00 and does not require approval.
+                    </div>
+                  </div>
+                )}
+
                 {/* Employee Edit & Upload Actions */}
                 {(report.status === "Draft" || (report.status === "Returned for Correction" && isOwner(report))) && (
                   <div className="flex flex-col md:flex-row gap-6 p-6 bg-gradient-to-br from-purple-500/5 to-pink-500/5 rounded-2xl border border-purple-500/20 shadow-sm items-center mx-2">
@@ -729,7 +761,7 @@ const Expenses: React.FC = () => {
                         variant="primary"
                         className="w-full sm:w-auto text-sm font-bold h-12 px-6 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 border-0 shadow-lg shadow-purple-500/20 rounded-xl"
                         onClick={() => setIsReviewOpen(true)}
-                        disabled={submitReportMutation.isPending || !report.receipts?.length}
+                        disabled={submitReportMutation.isPending || !report.receipts?.length || Number(report.total_amount || 0) <= 0}
                       >
                         <CheckCircle className="w-5 h-5 mr-2" />
                         Review & Submit

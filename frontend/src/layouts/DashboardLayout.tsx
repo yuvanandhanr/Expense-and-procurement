@@ -866,7 +866,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
                     <p className="font-bold text-sm tracking-tight">{user?.first_name} {user?.last_name}</p>
                     <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                     <div className="mt-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/15 text-primary border border-primary/20">
-                      {user?.roles[0]?.role_name || "Employee"}
+                      {user?.roles?.[0]?.role_name || "Employee"}
                     </div>
                   </div>
                   <div className="p-1.5">

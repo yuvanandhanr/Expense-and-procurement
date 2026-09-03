@@ -72,3 +72,29 @@ def override_db(mock_db_session: AsyncMock) -> Generator[AsyncMock, None, None]:
     app.dependency_overrides[get_db_session] = _get_db_override
     yield mock_db_session
     app.dependency_overrides.pop(get_db_session, None)
+
+
+from unittest.mock import patch, MagicMock as MockMagicMock, AsyncMock as MockAsyncMock
+
+class MockerFixture:
+    def __init__(self):
+        self._patches = []
+        self.AsyncMock = MockAsyncMock
+        self.MagicMock = MockMagicMock
+
+    def patch(self, *args, **kwargs):
+        p = patch(*args, **kwargs)
+        mocked = p.start()
+        self._patches.append(p)
+        return mocked
+
+    def stopall(self):
+        for p in reversed(self._patches):
+            p.stop()
+
+@pytest.fixture
+def mocker():
+    m = MockerFixture()
+    yield m
+    m.stopall()
+

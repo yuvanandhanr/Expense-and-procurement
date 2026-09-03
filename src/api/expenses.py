@@ -127,7 +127,20 @@ async def list_expenses(
         reports = await repo.get_all_reports()
     else:
         reports = await repo.get_all_reports(employee_id=current_user.user_id)
-    return [_present_report(report) for report in reports if _can_access_report(report, current_user)]
+        
+    accessible_reports = [_present_report(report) for report in reports if _can_access_report(report, current_user)]
+    
+    # Priority sort: Items requiring approval come first, sorted by creation time (newest first)
+    def _sort_key(report: ExpenseReport):
+        status = report.status or ""
+        is_pending = "pending" in status.lower() or "corrected" in status.lower()
+        has_amount = (report.total_amount or Decimal("0.00")) > Decimal("0.00")
+        priority = 0 if (is_pending and has_amount) else 1
+        created_dt = report.created_at or datetime.min
+        return (priority, -created_dt.timestamp())
+        
+    accessible_reports.sort(key=_sort_key)
+    return accessible_reports
 
 @router.post("", response_model=ExpenseReportResponse)
 async def create_expense_report(
@@ -389,6 +402,9 @@ async def submit_report(
     if not report.justification or not report.justification.strip():
         _log_action(current_user, "expense_submission_validation_failed", report_id, level=logging.WARNING)
         raise HTTPException(status_code=400, detail="Description / Justification is required")
+    if not report.total_amount or report.total_amount <= Decimal("0.00"):
+        _log_action(current_user, "expense_submission_validation_failed", report_id, level=logging.WARNING)
+        raise HTTPException(status_code=400, detail="Cannot submit an expense claim with $0.00. Please upload and verify receipts with valid amounts.")
 
     # Validate that all receipts have been verified (no 0.00 amounts unless it's a legit 0 receipt)
     for r in report.receipts:
@@ -488,8 +504,15 @@ async def approve_expense(
         ExpenseApproval.status == "Pending"
     )
     result = await db.execute(query)
-    approval = result.scalar_one_or_none()
-    
+    approval = None
+    try:
+        approval = result.scalar_one_or_none()
+    except Exception:
+        try:
+            approval = result.scalars().first()
+        except Exception:
+            approval = None
+            
     if not _can_act_on_pending_report(report, current_user, approval):
         _log_action(current_user, "expense_approval_denied", report_id, level=logging.WARNING)
         raise HTTPException(status_code=403, detail="Not authorized to approve this report")
@@ -498,17 +521,29 @@ async def approve_expense(
         approval.status = "Approved"
         approval.comments = payload.comments
         approval.actioned_at = datetime.utcnow()
-    else:
-        # If acted on by manager/admin without explicit single-user assignment
-        unassigned_query = select(ExpenseApproval).where(
-            ExpenseApproval.expense_report_id == report_id,
-            ExpenseApproval.status == "Pending"
-        )
-        unassigned_res = await db.execute(unassigned_query)
-        unassigned = unassigned_res.scalar_one_or_none()
-        if unassigned:
+    
+    # Mark any pending approval records for this report as approved
+    unassigned_query = select(ExpenseApproval).where(
+        ExpenseApproval.expense_report_id == report_id,
+        ExpenseApproval.status == "Pending"
+    )
+    unassigned_res = await db.execute(unassigned_query)
+    unassigned_list = []
+    try:
+        unassigned_list = unassigned_res.scalars().all()
+    except Exception:
+        try:
+            one = unassigned_res.scalar_one_or_none()
+            if one:
+                unassigned_list = [one]
+        except Exception:
+            pass
+            
+    for unassigned in unassigned_list:
+        if isinstance(unassigned, ExpenseApproval):
             unassigned.status = "Approved"
-            unassigned.approver_id = current_user.user_id
+            if not unassigned.approver_id:
+                unassigned.approver_id = current_user.user_id
             unassigned.comments = payload.comments
             unassigned.actioned_at = datetime.utcnow()
         
@@ -561,26 +596,22 @@ async def reject_expense(
         ExpenseApproval.status == "Pending"
     )
     result = await db.execute(query)
-    approval = result.scalar_one_or_none()
+    approval = result.scalars().first()
     if not _can_act_on_pending_report(report, current_user, approval):
         _log_action(current_user, "expense_rejection_denied", report_id, level=logging.WARNING)
         raise HTTPException(status_code=403, detail="Not authorized to reject this report")
-    if approval:
-        approval.status = "Rejected"
-        approval.comments = payload.comments
-        approval.actioned_at = datetime.utcnow()
-    else:
-        unassigned_query = select(ExpenseApproval).where(
-            ExpenseApproval.expense_report_id == report_id,
-            ExpenseApproval.status == "Pending"
-        )
-        unassigned_res = await db.execute(unassigned_query)
-        unassigned = unassigned_res.scalar_one_or_none()
-        if unassigned:
-            unassigned.status = "Rejected"
+    
+    unassigned_query = select(ExpenseApproval).where(
+        ExpenseApproval.expense_report_id == report_id,
+        ExpenseApproval.status == "Pending"
+    )
+    unassigned_res = await db.execute(unassigned_query)
+    for unassigned in unassigned_res.scalars().all():
+        unassigned.status = "Rejected"
+        if not unassigned.approver_id:
             unassigned.approver_id = current_user.user_id
-            unassigned.comments = payload.comments
-            unassigned.actioned_at = datetime.utcnow()
+        unassigned.comments = payload.comments
+        unassigned.actioned_at = datetime.utcnow()
         
     report.status = "Rejected"
     await repo.update_report(report)
@@ -612,26 +643,22 @@ async def return_expense(
         ExpenseApproval.status == "Pending"
     )
     result = await db.execute(query)
-    approval = result.scalar_one_or_none()
+    approval = result.scalars().first()
     if not _can_act_on_pending_report(report, current_user, approval):
         _log_action(current_user, "expense_return_denied", report_id, level=logging.WARNING)
         raise HTTPException(status_code=403, detail="Not authorized to return this report")
-    if approval:
-        approval.status = "Returned"
-        approval.comments = payload.comments
-        approval.actioned_at = datetime.utcnow()
-    else:
-        unassigned_query = select(ExpenseApproval).where(
-            ExpenseApproval.expense_report_id == report_id,
-            ExpenseApproval.status == "Pending"
-        )
-        unassigned_res = await db.execute(unassigned_query)
-        unassigned = unassigned_res.scalar_one_or_none()
-        if unassigned:
-            unassigned.status = "Returned"
+    
+    unassigned_query = select(ExpenseApproval).where(
+        ExpenseApproval.expense_report_id == report_id,
+        ExpenseApproval.status == "Pending"
+    )
+    unassigned_res = await db.execute(unassigned_query)
+    for unassigned in unassigned_res.scalars().all():
+        unassigned.status = "Returned"
+        if not unassigned.approver_id:
             unassigned.approver_id = current_user.user_id
-            unassigned.comments = payload.comments
-            unassigned.actioned_at = datetime.utcnow()
+        unassigned.comments = payload.comments
+        unassigned.actioned_at = datetime.utcnow()
         
     report.status = "Returned for Correction"
     await repo.update_report(report)

@@ -211,18 +211,6 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 
-@app.get("/", tags=["system"])
-async def get_root():
-    """
-    Welcome endpoint returning basic api versioning and status info.
-    """
-    return {
-        "message": "Welcome to the Enterprise Expense & Procurement Workflow Platform API",
-        "version": settings.APP_VERSION,
-        "environment": settings.ENVIRONMENT
-    }
-
-
 @app.get("/health", tags=["system"])
 async def get_health():
     """
@@ -261,3 +249,40 @@ async def get_version():
     return {
         "version": settings.APP_VERSION
     }
+
+
+from fastapi.responses import FileResponse
+
+# Mount Frontend SPA Build if available
+FRONTEND_DIST = os.path.join(BASE_DIR, "frontend", "dist")
+if os.path.exists(FRONTEND_DIST):
+    STATIC_DIR = os.path.join(FRONTEND_DIST, "static")
+    if os.path.exists(STATIC_DIR):
+        app.mount("/static", StaticFiles(directory=STATIC_DIR), name="spa_static")
+
+    @app.get("/{full_path:path}", tags=["frontend"])
+    async def serve_spa(full_path: str = ""):
+        # Allow api, uploads, docs, redoc, openapi.json, health to bypass
+        if full_path and full_path.startswith(("api/", "uploads/", "docs", "redoc", "openapi.json", "health", "ready", "version")):
+            raise HTTPException(status_code=404, detail="Not Found")
+        
+        if full_path:
+            file_path = os.path.join(FRONTEND_DIST, full_path)
+            if os.path.isfile(file_path):
+                return FileResponse(file_path)
+        
+        index_file = os.path.join(FRONTEND_DIST, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        raise HTTPException(status_code=404, detail="Frontend build not found")
+else:
+    @app.get("/", tags=["system"])
+    async def get_root():
+        """
+        Welcome endpoint returning basic api versioning and status info.
+        """
+        return {
+            "message": "Welcome to the Enterprise Expense & Procurement Workflow Platform API",
+            "version": settings.APP_VERSION,
+            "environment": settings.ENVIRONMENT
+        }

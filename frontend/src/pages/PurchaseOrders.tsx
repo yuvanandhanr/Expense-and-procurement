@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { PurchaseOrder } from "../types";
-import {Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, EmptyState, Button, Dialog, Input} from "../components/ui";
+import { Card, CardHeader, CardTitle, CardContent, Badge, StatusBadge, Skeleton, EmptyState, Button, Dialog, Input } from "../components/ui";
 import { formatDate } from "../utils/helpers";
 import toast from "react-hot-toast";
 
@@ -76,12 +76,12 @@ export const PurchaseOrders: React.FC = () => {
               <table className="w-full text-left text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-border bg-accent/40 text-xs font-bold text-muted-foreground uppercase">
-                    <th className="p-4 w-8"></th>
-                    <th className="p-4">PO Number</th>
-                    <th className="p-4">PR Reference</th>
-                    <th className="p-4">Total Amount</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4">Date Created</th>
+                    <th className="p-4 w-8 whitespace-nowrap"></th>
+                    <th className="p-4 whitespace-nowrap">PO Number</th>
+                    <th className="p-4 whitespace-nowrap">PR Reference</th>
+                    <th className="p-4 whitespace-nowrap">Total Amount</th>
+                    <th className="p-4 whitespace-nowrap">Status</th>
+                    <th className="p-4 whitespace-nowrap">Date Created</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -91,15 +91,13 @@ export const PurchaseOrders: React.FC = () => {
                         <td className="p-4 text-muted-foreground">
                           {expandedPo === p.po_id ? "▼" : "▶"}
                         </td>
-                        <td className="p-4 font-bold text-xs tracking-wider text-primary">{p.po_number}</td>
-                        <td className="p-4">#PR-{p.pr_id}</td>
-                        <td className="p-4 font-bold">${p.total_amount?.toLocaleString()}</td>
-                        <td className="p-4">
-                          <Badge variant={p.status === "Approved" ? "success" : "neutral"}>
-                            {p.status}
-                          </Badge>
+                        <td className="p-4 font-bold text-xs tracking-wider text-primary whitespace-nowrap">{p.po_number}</td>
+                        <td className="p-4 whitespace-nowrap">#PR-{p.pr_id}</td>
+                        <td className="p-4 font-bold whitespace-nowrap">${p.total_amount?.toLocaleString()}</td>
+                        <td className="p-4 whitespace-nowrap">
+                          <StatusBadge status={p.status} />
                         </td>
-                        <td className="p-4 text-xs text-muted-foreground">{formatDate(p.created_at)}</td>
+                        <td className="p-4 text-xs text-muted-foreground whitespace-nowrap">{formatDate(p.created_at)}</td>
                       </tr>
                       
                       {/* Expanded Items Row */}
@@ -118,12 +116,7 @@ export const PurchaseOrders: React.FC = () => {
                                       </span>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                      <Badge variant={
-                                        item.delivery_verification_status === "Vendor Delivered" ? "warning" : 
-                                        item.delivery_verification_status === "Returned / Cancelled" ? "danger" : "neutral"
-                                      }>
-                                        {item.delivery_verification_status || "Pending"}
-                                      </Badge>
+                                      <StatusBadge status={item.delivery_verification_status || "Pending"} />
                                       
                                       {item.delivery_verification_status === "Vendor Delivered" && (
                                         <Button size="sm" onClick={() => {

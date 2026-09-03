@@ -1,8 +1,9 @@
 import React from "react";
+import { CheckCircle2, Clock, XCircle, AlertCircle, FileText, Check, ArrowUpRight } from "lucide-react";
 
 // --- Apple Button Component ---
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "danger" | "ghost" | "outline";
+  variant?: "primary" | "secondary" | "success" | "danger" | "ghost" | "outline";
   size?: "sm" | "md" | "lg";
 }
 
@@ -13,20 +14,21 @@ export const Button: React.FC<ButtonProps> = ({
   children,
   ...props
 }) => {
-  const baseStyle = "inline-flex items-center justify-center font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-1 disabled:opacity-40 disabled:pointer-events-none active:scale-[0.98] select-none";
+  const baseStyle = "inline-flex items-center justify-center font-semibold rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-1 disabled:opacity-40 disabled:pointer-events-none active:scale-[0.98] select-none whitespace-nowrap cursor-pointer";
   
   const variants = {
-    primary: "apple-button-primary bg-primary text-white hover:brightness-110 shadow-apple-sm",
-    secondary: "bg-card-2/80 hover:bg-card-2 text-foreground border border-border backdrop-blur-md shadow-apple-sm hover:border-line-2",
-    danger: "bg-pink text-white hover:brightness-110 shadow-apple-sm active:bg-pink/90",
-    outline: "border border-border bg-transparent text-foreground hover:bg-card/60 backdrop-blur-sm",
-    ghost: "bg-transparent text-foreground hover:bg-muted/40",
+    primary: "apple-button-primary bg-primary text-white hover:brightness-110 shadow-apple-sm hover:shadow-apple-md",
+    secondary: "bg-muted/70 hover:bg-muted text-foreground border border-border/80 backdrop-blur-md shadow-apple-sm hover:border-border",
+    success: "bg-emerald-600 hover:bg-emerald-500 text-white shadow-apple-sm hover:shadow-apple-md active:bg-emerald-700",
+    danger: "bg-rose-600 hover:bg-rose-500 text-white shadow-apple-sm hover:shadow-apple-md active:bg-rose-700",
+    outline: "border border-border/80 bg-transparent text-foreground hover:bg-muted/50 backdrop-blur-sm shadow-apple-sm",
+    ghost: "bg-transparent text-foreground hover:bg-muted/50",
   };
 
   const sizes = {
-    sm: "px-3.5 py-1.5 text-xs font-semibold tracking-tight",
-    md: "px-5 py-2 text-sm font-semibold tracking-tight",
-    lg: "px-6 py-3 text-base font-semibold tracking-tight",
+    sm: "px-3.5 py-1.5 text-xs font-bold tracking-tight gap-1.5",
+    md: "px-5 py-2 text-sm font-semibold tracking-tight gap-2",
+    lg: "px-6 py-2.5 text-base font-semibold tracking-tight gap-2",
   };
 
   return (
@@ -158,10 +160,72 @@ export const Badge: React.FC<BadgeProps> = ({
 
   return (
     <span
-      className={`inline-flex items-center px-3 py-0.5 rounded-full text-[11px] font-semibold tracking-tight transition-all duration-200 ${styles[variant]} ${className}`}
+      className={`inline-flex items-center px-3 py-0.5 rounded-full text-[11px] font-semibold tracking-tight whitespace-nowrap transition-all duration-200 ${styles[variant]} ${className}`}
       {...props}
     >
       {children}
+    </span>
+  );
+};
+
+// --- Universal Apple StatusBadge Component ---
+export const StatusBadge: React.FC<{ status: string; className?: string; pulse?: boolean }> = ({
+  status,
+  className = "",
+  pulse = true,
+}) => {
+  if (!status) return null;
+  const s = status.toLowerCase();
+
+  // Pending / Under Review / Submitted
+  if (s.includes("pending") || s.includes("review") || s === "submitted" || s === "in progress" || s === "action required") {
+    return (
+      <span
+        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-tight whitespace-nowrap bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/25 shadow-apple-sm ${className}`}
+      >
+        {pulse && (
+          <span className="relative flex h-2 w-2 shrink-0">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+          </span>
+        )}
+        <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+        <span>{status}</span>
+      </span>
+    );
+  }
+
+  // Approved / Completed / Active / Paid / Verified
+  if (s === "approved" || s === "completed" || s === "active" || s === "paid" || s === "success" || s === "verified") {
+    return (
+      <span
+        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-tight whitespace-nowrap bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 shadow-apple-sm ${className}`}
+      >
+        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+        <span>{status}</span>
+      </span>
+    );
+  }
+
+  // Rejected / Cancelled / Inactive / Failed / Error
+  if (s === "rejected" || s === "cancelled" || s === "inactive" || s === "failed" || s === "error") {
+    return (
+      <span
+        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-tight whitespace-nowrap bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/25 shadow-apple-sm ${className}`}
+      >
+        <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+        <span>{status}</span>
+      </span>
+    );
+  }
+
+  // Draft / Neutral / Default
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-tight whitespace-nowrap bg-muted/70 text-muted-foreground border border-border shadow-apple-sm ${className}`}
+    >
+      <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+      <span>{status}</span>
     </span>
   );
 };
