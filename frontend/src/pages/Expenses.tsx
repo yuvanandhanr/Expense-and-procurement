@@ -281,11 +281,12 @@ const Expenses: React.FC = () => {
   };
 
   const filteredExpenses = expenses.filter((r: any) => {
+    const s = (r.status || "").toLowerCase();
     if (statusFilter === "All") return true;
-    if (statusFilter === "Draft") return r.status === "Draft" || r.status === "Returned for Correction";
-    if (statusFilter === "Submitted") return r.status.includes("Pending") || r.status === "Corrected Claim";
-    if (statusFilter === "Approved") return r.status === "Approved" || r.status === "Closed" || r.status === "Payment Requested" || r.status === "Finance Verified";
-    if (statusFilter === "Rejected") return r.status === "Rejected";
+    if (statusFilter === "Draft") return s === "draft" || s.includes("return");
+    if (statusFilter === "Submitted") return s.includes("pending") || s.includes("corrected");
+    if (statusFilter === "Approved") return s === "approved" || s === "closed" || s.includes("payment") || s.includes("verified");
+    if (statusFilter === "Rejected") return s.includes("reject") || s.includes("return");
     return r.status === statusFilter;
   });
 
