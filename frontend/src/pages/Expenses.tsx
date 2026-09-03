@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Upload, CheckCircle, XCircle, FileText, AlertCircle, RefreshCw, DollarSign, Clock, CheckSquare, XOctagon, Trash2, ClipboardList, Building, Briefcase, Eye } from "lucide-react";
+import { Plus, Upload, CheckCircle, XCircle, FileText, AlertCircle, RefreshCw, DollarSign, Clock, CheckSquare, XOctagon, Trash2, ClipboardList, Building, Briefcase, Eye, ChevronRight, ArrowRight } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "../services/api";
 import { ExpenseReport, Receipt } from "../types";
@@ -475,7 +475,7 @@ const Expenses: React.FC = () => {
       
 {/* Right Column: Report Details & Receipts */}
           {selectedReportId && (() => {
-            const report = expenses.find(r => r.expense_report_id === selectedReportId);
+            const report = expenses.find(r => Number(r.expense_report_id) === Number(selectedReportId));
             if (!report) return null;
             return (
 <Dialog isOpen={true} onClose={() => setSelectedReportId(null)} title={report.purpose || "Untitled Expense"} maxWidthClass="max-w-2xl">

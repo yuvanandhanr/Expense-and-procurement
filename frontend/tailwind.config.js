@@ -13,7 +13,10 @@ export default {
         card: {
           DEFAULT: "var(--card)",
           foreground: "var(--text)",
+          2: "var(--card-2)",
         },
+        "card-2": "var(--card-2)",
+        "line-2": "var(--line-2)",
         popover: {
           DEFAULT: "var(--card-2)",
           foreground: "var(--text)",
