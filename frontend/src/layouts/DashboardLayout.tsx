@@ -190,22 +190,18 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       <aside
         className="hidden md:flex flex-col border-r border-border/70 bg-card/75 backdrop-blur-2xl transition-all duration-300 w-64 shadow-apple-sm z-20"
       >
-        {/* macOS Traffic Lights Header & Logo */}
-        <div className="h-16 flex items-center justify-between px-5 border-b border-border/50">
+        {/* Apple Sidebar Header & Logo */}
+        <div className="h-16 flex items-center justify-between px-5 border-b border-border/60">
           <div className="flex items-center space-x-3 overflow-hidden">
-            {/* macOS Dot Accents */}
-            <div className="flex items-center gap-1.5 mr-1">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80 inline-block" />
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block" />
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-primary to-primary-hover flex items-center justify-center text-white font-extrabold text-sm shadow-apple-sm shadow-primary/20">
+              ✦
             </div>
-            
-            <div className="flex items-center gap-2 pl-1">
-              <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-primary to-primary-hover flex items-center justify-center text-white font-bold text-xs shadow-apple-sm">
-                ✦
-              </div>
-              <span className="font-bold text-sm tracking-tight font-sans text-foreground">
+            <div className="flex flex-col">
+              <span className="font-extrabold text-sm tracking-tight text-foreground leading-none">
                 ProcureSync
+              </span>
+              <span className="text-[10px] font-semibold text-muted-foreground tracking-wider uppercase mt-1">
+                Enterprise Suite
               </span>
             </div>
           </div>

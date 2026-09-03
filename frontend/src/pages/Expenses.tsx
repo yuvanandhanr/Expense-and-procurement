@@ -501,15 +501,14 @@ const Expenses: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Apple Step Progress Bar */}
-                <div className="apple-card p-4 rounded-2xl">
-                  <div className="flex justify-between items-center px-4 py-2 relative">
-                    <div className="absolute top-1/2 left-8 right-8 h-1 bg-muted/60 -z-10 -translate-y-1/2 rounded-full" />
-                    {["Draft", "Pending", "Finance", "Payment", "Closed"].map((s, i) => {
+                {/* Apple Approval Flow Progress Bar with Connecting Arrows */}
+                <div className="apple-card p-5 rounded-2xl bg-card/80 backdrop-blur-xl border border-border/80 shadow-apple-sm">
+                  <div className="flex items-center justify-between gap-1 sm:gap-2">
+                    {["Draft", "Manager Review", "Finance Verification", "Payment", "Closed"].map((s, i) => {
                       const fullStatuses = ["Draft", "Pending Approval", "Finance Verified", "Payment Requested", "Closed"];
                       let currentIndex = fullStatuses.indexOf(report.status);
                       if (report.status === "Approved") currentIndex = 1;
-                      if (report.status === "Pending Finance Verification") currentIndex = 1;
+                      if (report.status === "Pending Finance Verification" || report.status === "Pending Finance Approval") currentIndex = 2;
                       if (report.status === "Corrected Claim") currentIndex = 1;
                       
                       const isCompleted = i <= currentIndex;
@@ -517,19 +516,30 @@ const Expenses: React.FC = () => {
                       const isActive = i === currentIndex;
                       
                       return (
-                        <div key={s} className="flex flex-col items-center gap-2 relative group">
-                          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold z-10 transition-all shadow-apple-sm
-                            ${isCompleted 
-                              ? (isRejected && isActive ? 'bg-rose-500 text-white' : 'bg-primary text-white shadow-primary/30 scale-105') 
-                              : 'bg-card border border-border/80 text-muted-foreground'}`}
-                          >
-                            {isCompleted && !isRejected ? "✓" : i + 1}
+                        <React.Fragment key={s}>
+                          <div className="flex-1 flex flex-col items-center text-center group">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold transition-all duration-300 shadow-apple-sm
+                              ${isCompleted 
+                                ? (isRejected && isActive ? 'bg-rose-500 text-white shadow-rose-500/30' : 'bg-primary text-white shadow-primary/35 scale-105') 
+                                : 'bg-muted/70 border border-border/80 text-muted-foreground'}`}
+                            >
+                              {isCompleted && !isRejected ? "✓" : i + 1}
+                            </div>
+                            <span className={`text-[10px] font-bold uppercase tracking-wider mt-2 leading-tight px-1 transition-colors
+                              ${isActive ? 'text-primary font-extrabold' : isCompleted ? 'text-foreground' : 'text-muted-foreground/70'}`}>
+                              {s}
+                            </span>
                           </div>
-                          <span className={`text-[10px] font-bold uppercase tracking-wider text-center w-16 leading-tight
-                            ${isActive ? 'text-primary font-extrabold' : isCompleted ? 'text-foreground' : 'text-muted-foreground'}`}>
-                            {s}
-                          </span>
-                        </div>
+
+                          {/* Arrow Connector between steps */}
+                          {i < 4 && (
+                            <div className="flex items-center justify-center pb-4 text-muted-foreground/40 shrink-0">
+                              <div className={`flex items-center transition-colors ${i < currentIndex ? 'text-primary font-bold' : 'text-border'}`}>
+                                <ChevronRight className={`w-4 h-4 transition-transform ${i < currentIndex ? 'text-primary' : 'text-muted-foreground/30'}`} />
+                              </div>
+                            </div>
+                          )}
+                        </React.Fragment>
                       )
                     })}
                   </div>

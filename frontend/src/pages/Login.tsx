@@ -139,28 +139,16 @@ export const Login: React.FC = () => {
       {/* Apple Frosted Card Container */}
       <div className="w-full max-w-[440px] relative z-10 apple-card rounded-3xl p-6 sm:p-8 backdrop-blur-3xl shadow-2xl animate-spring-in border border-border/80">
         
-        {/* macOS Traffic Lights Header */}
-        <div className="flex items-center justify-between pb-5 border-b border-border/40">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80 inline-block" />
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block" />
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
-          </div>
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1">
-            <Lock className="w-2.5 h-2.5 text-primary" /> Single Sign-On
-          </span>
-        </div>
-
-        {/* Apple Brand Identity */}
-        <div className="text-center pt-5 pb-2">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-primary to-primary-hover flex items-center justify-center text-white font-bold text-xl mx-auto shadow-apple-glow mb-3">
+        {/* Apple Brand Identity Header */}
+        <div className="text-center pt-2 pb-4 border-b border-border/50">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-primary to-primary-hover flex items-center justify-center text-white font-extrabold text-xl mx-auto shadow-apple-glow mb-3">
             ✦
           </div>
           <h2 className="text-2xl font-extrabold tracking-tight text-foreground">
-            Portal Access
+            ProcureSync
           </h2>
           <p className="text-xs font-semibold text-muted-foreground mt-1 tracking-tight">
-            Enterprise Procurement & Expense Suite
+            Enterprise Single Sign-On Portal
           </p>
         </div>
         

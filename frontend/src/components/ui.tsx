@@ -175,30 +175,24 @@ interface DialogProps {
   maxWidthClass?: string;
 }
 
-export const Dialog: React.FC<DialogProps> = ({ isOpen, onClose, title, children, maxWidthClass = "max-w-lg" }) => {
+export const Dialog: React.FC<DialogProps> = ({ isOpen, onClose, title, children, maxWidthClass = "max-w-2xl" }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
-      <div className={`relative w-full ${maxWidthClass} apple-glass-heavy text-card-foreground rounded-2xl border border-border/80 shadow-2xl p-6 overflow-hidden animate-slide-up`}>
-        {/* macOS Style Traffic Light Dots & Title */}
-        <div className="flex items-center justify-between pb-4 border-b border-border/50">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <button onClick={onClose} className="w-3 h-3 rounded-full bg-rose-500 hover:opacity-80 transition-opacity" title="Close" />
-              <div className="w-3 h-3 rounded-full bg-amber-500/80" />
-              <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
-            </div>
-            <h2 className="text-base font-bold tracking-tight pl-2">{title}</h2>
-          </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xl animate-fade-in">
+      <div className={`relative w-full ${maxWidthClass} apple-glass-heavy text-card-foreground rounded-3xl border border-border/90 shadow-2xl p-6 sm:p-8 overflow-hidden animate-spring-in`}>
+        {/* Apple Clean Modal Header */}
+        <div className="flex items-center justify-between pb-4 border-b border-border/60">
+          <h2 className="text-lg font-bold tracking-tight text-foreground">{title}</h2>
           <button
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-full bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors text-xs"
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-all active:scale-95 text-xs font-bold"
+            title="Close"
           >
-            &#x2715;
+            ✕
           </button>
         </div>
-        <div className="mt-4 max-h-[72vh] overflow-y-auto pr-1">{children}</div>
+        <div className="mt-5 max-h-[72vh] overflow-y-auto pr-1">{children}</div>
       </div>
     </div>
   );
