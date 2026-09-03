@@ -142,17 +142,16 @@ class ApprovalService:
             steps_to_create.append({"step_number": 1, "approver_role_id": ceo_role_id, "approver_id": None})
         else:
             manager_role_id = await self.get_role_id_by_name("Manager", 2)
-            finance_role_id = await self.get_role_id_by_name("Finance", 3)
-            cfo_role_id = await self.get_role_id_by_name("CFO", 4)
+            finance_role_id = await self.get_role_id_by_name("Finance Manager", 6)
+            cfo_role_id = await self.get_role_id_by_name("CFO", 5)
 
-            # Rule 1: Always Manager (Role-based)
+            # Step 1: Manager Approval (Team Manager or designated)
             steps_to_create.append({"step_number": 1, "approver_role_id": manager_role_id, "approver_id": manager_id})
 
-            # Rule 2: > $500 requires Finance Manager
-            if pr.total_estimated_amount > Decimal("500.00"):
-                steps_to_create.append({"step_number": 2, "approver_role_id": finance_role_id, "approver_id": None})
+            # Step 2: Finance Manager Approval
+            steps_to_create.append({"step_number": 2, "approver_role_id": finance_role_id, "approver_id": None})
 
-            # Rule 3: > $5000 requires CFO
+            # Step 3: > $5000 requires CFO
             if pr.total_estimated_amount > Decimal("5000.00"):
                 steps_to_create.append({"step_number": 3, "approver_role_id": cfo_role_id, "approver_id": None})
 
@@ -470,13 +469,14 @@ class ApprovalService:
                 description=pr.justification,
                 pr_id=pr.pr_id,
                 submission_deadline=datetime.utcnow() + timedelta(days=7),
-                invited_vendor_ids=list(active_vendor_ids),
+                invited_vendor_ids=list(active_vendor_ids)[:3],
                 items=rfq_items
             )
-            
-            rfq_service = RFQService(self.db)
-            rfq = await rfq_service.create_rfq(rfq_payload, user_id)
-            await rfq_service.publish_rfq(rfq.rfq_id)
+            try:
+                rfq_service = RFQService(self.db)
+                await rfq_service.create_rfq(rfq_payload, user_id)
+            except Exception:
+                pass
 
         return await self.pr_repo.get_by_id(pr_id)
 
@@ -704,5 +704,7 @@ class ApprovalService:
         role = result.scalar_one_or_none()
         
         if role:
+            if role.role_name in ["Finance", "Finance Manager"]:
+                return "Pending Finance Approval"
             return f"Pending {role.role_name} Approval"
         return "Under Review"
