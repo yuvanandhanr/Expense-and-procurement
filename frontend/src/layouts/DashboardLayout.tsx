@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../hooks/useTheme";
@@ -28,6 +28,8 @@ import {
   HardDrive,
   CreditCard,
   CheckCircle,
+  CheckCircle2,
+  CheckCheck,
   UserCog,
   Command,
 } from "lucide-react";
@@ -45,11 +47,15 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const notificationRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   // Fetch in-app notifications
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
-        const response = await api.get("/notifications?limit=5");
+        const response = await api.get("/notifications?limit=20");
         setNotifications(response.data);
       } catch (err) {
         console.error("Failed to load notifications:", err);
@@ -62,12 +68,74 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [user]);
 
+  // Click outside listener to close notification and profile dropdowns
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(e.target as Node)) {
+        setIsNotificationOpen(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setIsProfileOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, []);
+
+  // Keyboard shortcut listener (Cmd+K / Ctrl+K or '/' to focus search, Escape to close)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+K or Ctrl+K
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+          searchInputRef.current.select();
+        } else {
+          navigate("/search");
+        }
+      }
+      // '/' when not in input / textarea
+      if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes((e.target as HTMLElement)?.tagName)) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }
+      // Escape key
+      if (e.key === "Escape") {
+        setIsNotificationOpen(false);
+        setIsProfileOpen(false);
+        searchInputRef.current?.blur();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [navigate]);
+
   const markAllRead = async () => {
     try {
       await api.post("/notifications/read-all");
       setNotifications(prev => prev.map(n => ({ ...n, status: "Read" })));
     } catch (err) {
       console.error("Error marking all read:", err);
+    }
+  };
+
+  const markAsRead = async (notificationId: number, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    try {
+      await api.post(`/notifications/${notificationId}/read`);
+      setNotifications(prev =>
+        prev.map(n => (n.notification_id === notificationId ? { ...n, status: "Read" } : n))
+      );
+    } catch (err) {
+      console.error("Error marking notification read:", err);
     }
   };
 
@@ -333,6 +401,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
             <form onSubmit={handleGlobalSearch} className="hidden lg:flex items-center relative">
               <Search className="w-3.5 h-3.5 absolute left-3.5 text-muted-foreground/60" />
               <input
+                ref={searchInputRef}
                 type="text"
                 placeholder="Search..."
                 value={searchQuery}
@@ -354,41 +423,112 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
             </button>
 
             {/* Notification Center */}
-            <div className="relative">
-              <button
-                onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-                className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60 relative transition-all active:scale-95"
-              >
-                <Bell className="w-4 h-4" />
-                {notifications.some(n => n.status === "Unread") && (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-pink rounded-full ring-2 ring-card" />
-                )}
-              </button>
-
-              {isNotificationOpen && (
-                <div className="absolute right-0 mt-3 w-80 apple-glass-heavy border border-border/80 rounded-2xl shadow-2xl overflow-hidden z-50 animate-slide-up">
-                  <div className="p-3.5 border-b border-border/50 flex items-center justify-between bg-card/40">
-                    <span className="font-bold text-xs tracking-tight">Notifications</span>
-                    <button onClick={markAllRead} className="text-[10px] text-primary font-bold hover:underline">
-                      Mark all read
-                    </button>
-                  </div>
-                  <div className="divide-y divide-border/40 max-h-64 overflow-y-auto">
-                    {notifications.length === 0 ? (
-                      <div className="p-6 text-center text-xs text-muted-foreground">No new alerts.</div>
-                    ) : (
-                      notifications.map((n) => (
-                        <div key={n.notification_id} className={`p-3.5 text-xs transition-colors hover:bg-muted/40 ${n.status === "Unread" ? "bg-primary/5 font-medium" : ""}`}>
-                          <p className="font-bold text-foreground/90">{n.title}</p>
-                          <p className="text-muted-foreground text-[11px] mt-0.5">{n.message}</p>
-                          <span className="text-[9px] text-muted-foreground/60 block mt-1">{new Date(n.created_at).toLocaleTimeString()}</span>
-                        </div>
-                      ))
+            {(() => {
+              const unreadCount = notifications.filter(n => n.status === "Unread").length;
+              return (
+                <div className="relative" ref={notificationRef}>
+                  <button
+                    onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                    className={`p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60 relative transition-all active:scale-95 ${
+                      isNotificationOpen ? "bg-muted/80 text-foreground ring-2 ring-primary/30" : ""
+                    }`}
+                    title="Notifications"
+                  >
+                    <Bell className="w-4 h-4" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] font-extrabold flex items-center justify-center rounded-full shadow-md animate-pulse">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
                     )}
-                  </div>
+                  </button>
+
+                  {isNotificationOpen && (
+                    <div className="absolute right-0 mt-3 w-84 sm:w-96 apple-glass-heavy border border-border/80 rounded-2xl shadow-2xl overflow-hidden z-50 animate-slide-up">
+                      <div className="p-3.5 border-b border-border/60 flex items-center justify-between bg-card/70 backdrop-blur-md">
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-xs tracking-tight text-foreground">Notifications</span>
+                          {unreadCount > 0 ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/15 text-primary border border-primary/25">
+                              {unreadCount} unread
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-muted text-muted-foreground">
+                              All caught up
+                            </span>
+                          )}
+                        </div>
+                        {unreadCount > 0 && (
+                          <button
+                            onClick={markAllRead}
+                            className="text-[10px] text-primary font-bold hover:underline flex items-center gap-1 active:opacity-75 transition-opacity"
+                          >
+                            <CheckCheck className="w-3.5 h-3.5" /> Mark all read
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="divide-y divide-border/30 max-h-80 overflow-y-auto">
+                        {notifications.length === 0 ? (
+                          <div className="p-8 text-center text-xs text-muted-foreground">
+                            <Bell className="w-8 h-8 mx-auto mb-2 opacity-30 text-muted-foreground" />
+                            No notifications yet.
+                          </div>
+                        ) : (
+                          notifications.map((n) => {
+                            const isUnread = n.status === "Unread";
+                            return (
+                              <div
+                                key={n.notification_id}
+                                onClick={() => isUnread && markAsRead(n.notification_id)}
+                                className={`p-3.5 text-xs transition-all duration-200 relative group flex gap-3 ${
+                                  isUnread
+                                    ? "bg-primary/8 dark:bg-primary/15 hover:bg-primary/12 border-l-4 border-primary cursor-pointer shadow-sm"
+                                    : "bg-transparent hover:bg-muted/30 opacity-60 hover:opacity-100 border-l-4 border-transparent"
+                                }`}
+                              >
+                                <div className="mt-0.5 shrink-0">
+                                  {isUnread ? (
+                                    <span className="w-2.5 h-2.5 rounded-full bg-primary ring-4 ring-primary/20 block animate-pulse mt-0.5" />
+                                  ) : (
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-muted-foreground/40 mt-0.5" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between gap-1.5">
+                                    <p className={`text-xs leading-snug ${isUnread ? "font-extrabold text-foreground" : "font-semibold text-muted-foreground"}`}>
+                                      {n.title}
+                                    </p>
+                                    {isUnread && (
+                                      <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-primary/20 text-primary shrink-0 tracking-wider">
+                                        New
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className={`text-[11px] mt-0.5 leading-relaxed ${isUnread ? "text-foreground/90 font-medium" : "text-muted-foreground/75"}`}>
+                                    {n.message}
+                                  </p>
+                                  <div className="flex items-center justify-between mt-2 text-[9px] text-muted-foreground/60 font-medium">
+                                    <span>{new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                    {isUnread && (
+                                      <button
+                                        onClick={(e) => markAsRead(n.notification_id, e)}
+                                        className="opacity-0 group-hover:opacity-100 text-primary font-bold hover:underline transition-opacity flex items-center gap-1"
+                                      >
+                                        <CheckCircle className="w-2.5 h-2.5" /> Mark read
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              );
+            })()}
 
             {/* Apple Role Pill Badge */}
             <div className="hidden md:flex items-center px-3 py-1 rounded-full bg-muted/60 border border-border/60">
@@ -399,7 +539,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
             </div>
 
             {/* Apple User Profile Avatar */}
-            <div className="relative">
+            <div className="relative" ref={profileRef}>
               <button
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
                 className="flex items-center space-x-2 p-1 rounded-full hover:ring-2 hover:ring-primary/40 transition-all active:scale-95"
