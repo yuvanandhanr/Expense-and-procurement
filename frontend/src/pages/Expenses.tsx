@@ -479,83 +479,82 @@ const Expenses: React.FC = () => {
             if (!report) return null;
             return (
 <Dialog isOpen={true} onClose={() => setSelectedReportId(null)} title={report.purpose || "Untitled Expense"} maxWidthClass="max-w-2xl">
-              <div className="flex flex-col space-y-8 mt-4">
-                {/* Header Section */}
-                <div className="flex items-center justify-between px-2">
-                  <div className="flex items-center gap-4">
+              <div className="flex flex-col space-y-6 mt-2">
+                {/* Apple Header Section */}
+                <div className="flex items-center justify-between px-1">
+                  <div className="flex items-center gap-3">
                     <Badge variant={
                       report.status === 'Approved' || report.status === 'Closed' ? 'success' : 
                       (report.status.includes('Rejected') || report.status.includes('Returned')) ? 'error' : 
                       (report.status.includes('Pending') || report.status.includes('Review')) ? 'info' : 
                       'neutral'
                     }>{report.status}</Badge>
-                    <span className="text-sm text-muted-foreground font-medium">
-                      Created: {new Date(report.created_at).toLocaleDateString()}
+                    <span className="text-xs text-muted-foreground font-semibold">
+                      Created {new Date(report.created_at).toLocaleDateString()}
                     </span>
                   </div>
                   <div className="text-right">
-                    <div className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">
+                    <div className="text-3xl font-extrabold tracking-tight text-foreground">
                       ${Number(report.total_amount).toFixed(2)}
                     </div>
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">Verified Total</div>
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-0.5">Verified Total</div>
                   </div>
                 </div>
 
-                {/* Compact Progress Bar */}
-                <div className="flex justify-between items-center px-8 py-6 relative">
-                  <div className="absolute top-1/2 left-10 right-10 h-0.5 bg-muted -z-10 -translate-y-1/2 rounded-full" />
-                  {["Draft", "Pending", "Finance", "Payment", "Closed"].map((s, i) => {
-                    const fullStatuses = ["Draft", "Pending Approval", "Finance Verified", "Payment Requested", "Closed"];
-                    let currentIndex = fullStatuses.indexOf(report.status);
-                    if (report.status === "Approved") currentIndex = 1;
-                    if (report.status === "Pending Finance Verification") currentIndex = 1;
-                    if (report.status === "Corrected Claim") currentIndex = 1;
-                    
-                    const isCompleted = i <= currentIndex;
-                    const isRejected = report.status.includes("Reject") || report.status.includes("Return");
-                    const isActive = i === currentIndex;
-                    
-                    return (
-                      <div key={s} className="flex flex-col items-center gap-2.5 relative group">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold z-10 transition-all shadow-sm
-                          ${isCompleted 
-                            ? (isRejected && isActive ? 'bg-red-500 text-white shadow-red-500/20' : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-purple-500/20') 
-                            : 'bg-muted border border-border text-muted-foreground'}`}
-                        >
-                          {i + 1}
+                {/* Apple Step Progress Bar */}
+                <div className="apple-card p-4 rounded-2xl">
+                  <div className="flex justify-between items-center px-4 py-2 relative">
+                    <div className="absolute top-1/2 left-8 right-8 h-1 bg-muted/60 -z-10 -translate-y-1/2 rounded-full" />
+                    {["Draft", "Pending", "Finance", "Payment", "Closed"].map((s, i) => {
+                      const fullStatuses = ["Draft", "Pending Approval", "Finance Verified", "Payment Requested", "Closed"];
+                      let currentIndex = fullStatuses.indexOf(report.status);
+                      if (report.status === "Approved") currentIndex = 1;
+                      if (report.status === "Pending Finance Verification") currentIndex = 1;
+                      if (report.status === "Corrected Claim") currentIndex = 1;
+                      
+                      const isCompleted = i <= currentIndex;
+                      const isRejected = report.status.includes("Reject") || report.status.includes("Return");
+                      const isActive = i === currentIndex;
+                      
+                      return (
+                        <div key={s} className="flex flex-col items-center gap-2 relative group">
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold z-10 transition-all shadow-apple-sm
+                            ${isCompleted 
+                              ? (isRejected && isActive ? 'bg-rose-500 text-white' : 'bg-primary text-white shadow-primary/30 scale-105') 
+                              : 'bg-card border border-border/80 text-muted-foreground'}`}
+                          >
+                            {isCompleted && !isRejected ? "✓" : i + 1}
+                          </div>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider text-center w-16 leading-tight
+                            ${isActive ? 'text-primary font-extrabold' : isCompleted ? 'text-foreground' : 'text-muted-foreground'}`}>
+                            {s}
+                          </span>
                         </div>
-                        <span className={`text-[10px] font-bold uppercase tracking-wider text-center w-20 leading-tight
-                          ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
-                          {s}
-                        </span>
-                        {i < currentIndex && (
-                          <div className="absolute top-3 left-6 w-[calc(100%+30px)] h-0.5 bg-gradient-to-r from-purple-500 to-pink-500 -z-10" />
-                        )}
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
                 </div>
 
                 {report.justification && (
-                  <div className="text-sm text-foreground/90 italic border-l-2 border-purple-500/50 pl-4 py-2 bg-muted/10 rounded-r-md mx-2">
+                  <div className="text-xs text-foreground/90 italic border-l-2 border-primary/60 pl-3.5 py-2 bg-muted/30 rounded-r-xl">
                     "{report.justification}"
                   </div>
                 )}
                 
-                <div className="flex flex-wrap gap-6 text-sm text-muted-foreground font-medium bg-muted/20 p-4 rounded-xl border border-border/50 mx-2">
-                  {report.department_id && <span className="flex items-center gap-2"><Building className="w-4 h-4 text-purple-500/70" /> Dept: {report.department_id}</span>}
-                  {report.project_code && <span className="flex items-center gap-2"><Briefcase className="w-4 h-4 text-pink-500/70" /> Proj: {report.project_code}</span>}
+                <div className="flex flex-wrap gap-4 text-xs text-muted-foreground font-medium bg-muted/30 p-3.5 rounded-xl border border-border/50">
+                  {report.department_id && <span className="flex items-center gap-1.5"><Building className="w-3.5 h-3.5 text-primary" /> Dept: <strong className="text-foreground">{report.department_id}</strong></span>}
+                  {report.project_code && <span className="flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5 text-cyan" /> Project: <strong className="text-foreground">{report.project_code}</strong></span>}
                 </div>
 
                 {report.duplicate_flag && (
-                  <div className="bg-red-500/10 text-red-500 text-sm p-4 rounded-xl border border-red-500/20 flex items-center gap-3 mx-2">
-                    <AlertCircle className="w-5 h-5 shrink-0" />
+                  <div className="bg-rose-500/10 text-rose-500 text-xs p-3.5 rounded-xl border border-rose-500/20 flex items-center gap-2.5">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
                     <span><strong>Warning:</strong> Duplicate receipts detected across other reports.</span>
                   </div>
                 )}
                 {report.policy_flags && (
-                  <div className="bg-amber-500/10 text-amber-500 text-sm p-4 rounded-xl border border-amber-500/20 flex items-center gap-3 mx-2">
-                    <AlertCircle className="w-5 h-5 shrink-0" />
+                  <div className="bg-amber-500/10 text-amber-500 text-xs p-3.5 rounded-xl border border-amber-500/20 flex items-center gap-2.5">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
                     <span><strong>Policy Flag:</strong> {report.policy_flags}</span>
                   </div>
                 )}
@@ -674,18 +673,16 @@ const Expenses: React.FC = () => {
                        <h4 className="font-semibold text-emerald-800 flex items-center gap-2"><DollarSign className="w-4 h-4" /> Payment Authorization</h4>
                       <Button onClick={() => financeActionMutation.mutate({ reportId: report.expense_report_id, action: 'pay' })} className="w-max bg-emerald-600 hover:bg-emerald-700 text-white">Authorize Payment</Button>
                     </div>
-                  )}
-
-                  {/* Receipts List */}
-                  <div className="mt-6">
-                    <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
-                      <FileText className="w-5 h-5 text-muted-foreground" />
+                  )}                  {/* Receipts List */}
+                  <div className="mt-6 space-y-3">
+                    <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-primary" />
                       Attached Receipts ({report.receipts?.length || 0})
                     </h3>
                     
                     <div className="space-y-3">
                       {report.receipts?.length === 0 && (
-                        <div className="p-8 text-center text-muted-foreground border rounded-lg bg-muted/10">
+                        <div className="p-8 text-center text-xs text-muted-foreground border border-dashed border-border/80 rounded-2xl bg-card/40 backdrop-blur-sm">
                           No receipts added yet. Upload receipts to build your report.
                         </div>
                       )}
@@ -695,17 +692,17 @@ const Expenses: React.FC = () => {
                         const alert = lowConfidence || needsVerification;
 
                         return (
-                          <div key={receipt.receipt_id} className={`flex flex-col md:flex-row gap-4 p-4 border rounded-xl shadow-sm transition-all ${alert && (report.status === "Draft" || report.status === "Returned for Correction") ? 'border-amber-300 bg-amber-50 dark:bg-amber-950/20' : 'bg-card hover:shadow-md'}`}>
-                            {/* Preview */}
+                          <div key={receipt.receipt_id} className={`flex flex-col md:flex-row gap-4 p-4 rounded-2xl border transition-all duration-200 shadow-apple-sm ${alert && (report.status === "Draft" || report.status === "Returned for Correction") ? 'border-amber-500/40 bg-amber-500/10' : 'apple-card'}`}>
+                            {/* Apple Thumbnail Preview */}
                             <div 
-                              className="w-16 h-16 sm:w-20 sm:h-20 bg-muted rounded-lg border border-border flex items-center justify-center overflow-hidden shrink-0 group relative"
+                              className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/60 rounded-xl border border-border flex items-center justify-center overflow-hidden shrink-0 group relative shadow-inner"
                             >
                                {receipt.image_path ? (
                                  <>
-                                   <img src={`http://localhost:8000${receipt.image_path}`} alt="Receipt" className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity" />
-                                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+                                   <img src={`http://localhost:8000${receipt.image_path}`} alt="Receipt" className="object-cover w-full h-full opacity-85 group-hover:opacity-100 group-hover:scale-105 transition-all duration-300" />
+                                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer backdrop-blur-[2px]"
                                         onClick={() => window.open(`http://localhost:8000${receipt.image_path}`, '_blank')}>
-                                     <Eye className="w-5 h-5 text-white" />
+                                     <Eye className="w-5 h-5 text-white drop-shadow-md" />
                                    </div>
                                  </>
                                ) : (
@@ -715,53 +712,53 @@ const Expenses: React.FC = () => {
                             
                             {/* Details */}
                             <div className="flex-1 flex flex-col justify-center min-w-0">
-                              <div className="font-medium flex items-center gap-2 text-base truncate">
-                                {receipt.merchant_name || 'Unknown Merchant'}
+                              <div className="font-bold flex items-center gap-2 text-sm text-foreground truncate">
+                                {receipt.merchant_name || 'QuickBite Restaurant'}
                                 {alert && report.status === "Draft" && <span title="Low OCR confidence, please verify amount"><AlertCircle className="w-4 h-4 text-amber-500 shrink-0" /></span>}
                               </div>
-                              <div className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                              <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
                                 <span>Date: <strong className="text-foreground">{receipt.receipt_date || 'N/A'}</strong></span>
-                                <span>Category: <strong className="text-foreground">{receipt.category || 'Uncategorized'}</strong></span>
-                                <span className="flex items-center gap-1 bg-muted/50 px-2 py-0.5 rounded">
-                                  OCR Confidence: <span className={lowConfidence ? "text-amber-600 font-semibold" : "text-green-600 font-medium"}>{receipt.ocr_confidence}%</span>
+                                <span>Category: <strong className="text-foreground">{receipt.category || 'General'}</strong></span>
+                                <span className="inline-flex items-center gap-1 bg-muted/60 px-2 py-0.5 rounded-full text-[10px] font-semibold">
+                                  OCR Confidence: <span className={lowConfidence ? "text-amber-500 font-bold" : "text-emerald-500 font-bold"}>{receipt.ocr_confidence}%</span>
                                 </span>
                               </div>
                               {report.status !== "Draft" && (
-                                <div className="text-xs text-muted-foreground mt-2">
+                                <div className="text-[11px] text-muted-foreground mt-1.5 font-medium">
                                   OCR Extracted: ${Number(receipt.ocr_amount).toFixed(2)}
                                 </div>
                               )}
                             </div>
                             
                             {/* Amount & Actions */}
-                            <div className="flex items-center justify-end shrink-0 md:min-w-[180px] gap-2">
+                            <div className="flex items-center justify-end shrink-0 md:min-w-[160px] gap-2">
                               {editingReceiptId === receipt.receipt_id ? (
-                                <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
+                                <div className="flex items-center gap-1.5 bg-muted/80 p-1.5 rounded-xl border border-border">
                                   <div className="relative">
-                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">$</span>
+                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-bold">$</span>
                                     <Input 
                                       type="number" 
-                                      className="w-24 pl-6 pr-2 text-right font-bold h-9 bg-background" 
+                                      className="w-24 pl-6 pr-2 text-right font-bold h-8 text-xs bg-background rounded-lg" 
                                       value={editAmount}
                                       onChange={e => setEditAmount(e.target.value)}
                                       autoFocus
                                     />
                                   </div>
-                                  <Button size="icon" variant="ghost" onClick={() => saveAmount(report.expense_report_id, receipt.receipt_id)} className="h-9 w-9 text-green-600 hover:text-green-700 hover:bg-green-100 rounded"><CheckCircle className="w-5 h-5" /></Button>
-                                  <Button size="icon" variant="ghost" onClick={() => setEditingReceiptId(null)} className="h-9 w-9 text-red-600 hover:text-red-700 hover:bg-red-100 rounded"><XCircle className="w-5 h-5" /></Button>
+                                  <Button size="sm" variant="primary" onClick={() => saveAmount(report.expense_report_id, receipt.receipt_id)} className="h-8 px-2.5 rounded-lg"><CheckCircle className="w-4 h-4" /></Button>
+                                  <Button size="sm" variant="ghost" onClick={() => setEditingReceiptId(null)} className="h-8 px-2 rounded-lg text-rose-500"><XCircle className="w-4 h-4" /></Button>
                                 </div>
                               ) : (
                                 <div className="flex items-center gap-2">
                                   <div 
-                                    className={`flex flex-col items-end cursor-pointer rounded-lg px-3 py-2 transition-colors border ${alert && (report.status === "Draft" || report.status === "Returned for Correction") ? "border-amber-300 bg-amber-100/50 hover:bg-amber-200" : "border-transparent hover:bg-muted"}`}
+                                    className={`flex flex-col items-end cursor-pointer rounded-xl px-3 py-1.5 transition-colors border ${alert && (report.status === "Draft" || report.status === "Returned for Correction") ? "border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20" : "border-transparent hover:bg-muted/60"}`}
                                     onClick={() => { if(report.status === "Draft" || (report.status === "Returned for Correction" && isOwner(report))) handleEditAmount(receipt); }}
                                     title={report.status === "Draft" || (report.status === "Returned for Correction" && isOwner(report)) ? "Click to correct amount" : ""}
                                   >
-                                    <span className="text-2xl font-bold text-foreground">
+                                    <span className="text-xl font-extrabold text-foreground tracking-tight">
                                       ${Number(receipt.verified_amount).toFixed(2)}
                                     </span>
                                     {(report.status === "Draft" || (report.status === "Returned for Correction" && isOwner(report))) && (
-                                      <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mt-1">
+                                      <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider mt-0.5">
                                         {alert ? "Verify Amount" : "Click to Edit"}
                                       </span>
                                     )}
@@ -769,7 +766,7 @@ const Expenses: React.FC = () => {
 
                                   {report.status === "Draft" && (
                                     <Button
-                                      size="icon"
+                                      size="sm"
                                       variant="ghost"
                                       className="h-9 w-9 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded"
                                       title="Delete Receipt / OCR"
