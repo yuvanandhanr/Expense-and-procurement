@@ -56,11 +56,9 @@ def _log_action(user: User, action: str, record_id: int | str, *, level: int = l
 
 def _can_access_report(report: ExpenseReport, user: User) -> bool:
     roles = _roles(user)
-    if bool(roles & {"Admin", "Finance", "Finance Manager", "CFO", "CEO"}):
+    if bool(roles & {"Admin", "Finance", "Finance Manager", "CFO", "CEO", "Manager"}):
         return True
     if report.employee_id == user.user_id:
-        return True
-    if "Manager" in roles and report.department_id == user.department_id:
         return True
     return False
 
@@ -76,7 +74,7 @@ def _can_act_on_pending_report(report: ExpenseReport, user: User, explicit_appro
         return True
     if not _can_access_report(report, user):
         return False
-    return bool(_roles(user) & {"Admin", "Manager", "Finance Manager", "CFO"})
+    return bool(_roles(user) & {"Admin", "Manager", "Finance Manager", "CFO", "CEO"})
 
 
 async def _get_accessible_report(repo: ExpenseRepository, report_id: int, user: User) -> ExpenseReport:
@@ -93,7 +91,7 @@ async def _get_owned_editable_report(repo: ExpenseRepository, report_id: int, us
     if report.status not in ("Draft", "Returned for Correction"):
         raise HTTPException(status_code=400, detail="Report is not in an editable state")
     roles = _roles(user)
-    if report.employee_id != user.user_id and not bool(roles & {"Admin"}):
+    if report.employee_id != user.user_id and not bool(roles & {"Admin", "Manager"}):
         _log_action(user, "expense_draft_access_denied", report_id, level=logging.WARNING)
         raise HTTPException(status_code=403, detail="Not authorized to edit this report")
     return report
@@ -122,16 +120,11 @@ async def list_expenses(
     current_user: User = Depends(get_current_user)
 ):
     repo = ExpenseRepository(db)
-    # Simple role check: if Employee, show their own. If Manager, show their department. If Finance/CFO/Admin, show all.
     role_names = [r.role_name for r in current_user.roles]
-    if "Admin" in role_names or "Finance" in role_names or "Finance Manager" in role_names or "CFO" in role_names or "CEO" in role_names:
+    if any(r in role_names for r in ["Admin", "Finance", "Finance Manager", "CFO", "CEO", "Manager"]):
         reports = await repo.get_all_reports()
-    elif "Manager" in role_names:
-        reports = await repo.get_all_reports(department_id=current_user.department_id)
     else:
         reports = await repo.get_all_reports(employee_id=current_user.user_id)
-    # A manager/finance/admin may see workflow reports, but never another
-    # employee's in-progress draft.
     return [_present_report(report) for report in reports if _can_access_report(report, current_user)]
 
 @router.post("", response_model=ExpenseReportResponse)
