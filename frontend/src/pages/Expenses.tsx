@@ -615,20 +615,53 @@ const Expenses: React.FC = () => {
                   <div className="text-muted-foreground italic text-sm text-center p-4 bg-muted/30 rounded-xl mx-2">Draft report - Waiting for submission</div>
                 )}
                   
-                  {/* Manager Review */}
-                  {(report.status === "Pending Manager Approval" || report.status === "Pending Finance Manager Approval" || report.status === "Corrected Claim") && (hasRole("Manager") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin")) && (
+                  {/* Manager / Finance / Admin Review Actions */}
+                  {(
+                    report.status === "Pending Manager Approval" ||
+                    report.status === "Pending Finance Manager Approval" ||
+                    report.status === "Pending Finance Approval" ||
+                    report.status === "Pending Approval" ||
+                    report.status === "Corrected Claim"
+                  ) && (
+                    hasRole("Manager") ||
+                    hasRole("Finance Manager") ||
+                    hasRole("Finance") ||
+                    hasRole("CFO") ||
+                    hasRole("CEO") ||
+                    hasRole("Admin")
+                  ) && (
                     <div className="flex flex-col gap-3 p-4 bg-amber-500/10 rounded-xl border border-amber-500/20">
-                      <h4 className="font-semibold text-amber-800 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> Manager Review Required</h4>
-                      <div className="flex gap-2">
-                        <Button onClick={() => managerActionMutation.mutate({ reportId: report.expense_report_id, action: 'approve', comments: 'Looks good' })} className="bg-emerald-600 hover:bg-emerald-700 text-white">Approve Claim</Button>
-                        <Button onClick={() => setManagerAction({isOpen: true, action: 'return', reportId: report.expense_report_id})} variant="outline" className="bg-white text-black">Return to Employee</Button>
-                        <Button onClick={() => setManagerAction({isOpen: true, action: 'reject', reportId: report.expense_report_id})} variant="outline" className="bg-white text-red-600 hover:bg-red-50">Reject</Button>
+                      <h4 className="font-semibold text-amber-800 flex items-center gap-2">
+                        <CheckSquare className="w-4 h-4" /> Review & Approval Required
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        <Button 
+                          onClick={() => managerActionMutation.mutate({ reportId: report.expense_report_id, action: 'approve', comments: 'Looks good' })} 
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                          disabled={managerActionMutation.isPending}
+                        >
+                          Approve Claim
+                        </Button>
+                        <Button 
+                          onClick={() => setManagerAction({isOpen: true, action: 'return', reportId: report.expense_report_id})} 
+                          variant="outline" 
+                          className="bg-white text-black hover:bg-muted"
+                        >
+                          Return to Employee
+                        </Button>
+                        <Button 
+                          onClick={() => setManagerAction({isOpen: true, action: 'reject', reportId: report.expense_report_id})} 
+                          variant="outline" 
+                          className="bg-white text-red-600 hover:bg-red-50"
+                        >
+                          Reject
+                        </Button>
                       </div>
                     </div>
                   )}
 
                   {/* Finance Review */}
-                  {report.status === "Pending Finance Verification" && (hasRole("Finance") || hasRole("Admin")) && (
+                  {report.status === "Pending Finance Verification" && (hasRole("Finance") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("CEO") || hasRole("Admin")) && (
                     <div className="flex flex-col gap-3 p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
                        <h4 className="font-semibold text-blue-800 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> Finance Verification</h4>
                       <Button onClick={() => financeActionMutation.mutate({ reportId: report.expense_report_id, action: 'finance-verify' })} className="w-max bg-blue-600 hover:bg-blue-700 text-white">Verify All Receipts</Button>
@@ -636,7 +669,7 @@ const Expenses: React.FC = () => {
                   )}
 
                   {/* Payment */}
-                  {report.status === "Payment Requested" && (hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin")) && (
+                  {(report.status === "Payment Requested" || report.status === "Finance Verified") && (hasRole("Finance Manager") || hasRole("Finance") || hasRole("CFO") || hasRole("CEO") || hasRole("Admin")) && (
                     <div className="flex flex-col gap-3 p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
                        <h4 className="font-semibold text-emerald-800 flex items-center gap-2"><DollarSign className="w-4 h-4" /> Payment Authorization</h4>
                       <Button onClick={() => financeActionMutation.mutate({ reportId: report.expense_report_id, action: 'pay' })} className="w-max bg-emerald-600 hover:bg-emerald-700 text-white">Authorize Payment</Button>
