@@ -55,16 +55,14 @@ def _log_action(user: User, action: str, record_id: int | str, *, level: int = l
 
 
 def _can_access_report(report: ExpenseReport, user: User) -> bool:
-    # Drafts are private even to privileged roles.  Other report states follow the
-    # established employee/manager/finance visibility model.
-    if report.status == "Draft":
-        return report.employee_id == user.user_id
     roles = _roles(user)
-    return (
-        report.employee_id == user.user_id
-        or bool(roles & {"Admin", "Finance", "Finance Manager", "CFO", "CEO"})
-        or ("Manager" in roles and report.department_id == user.department_id)
-    )
+    if bool(roles & {"Admin", "Finance", "Finance Manager", "CFO", "CEO"}):
+        return True
+    if report.employee_id == user.user_id:
+        return True
+    if "Manager" in roles and report.department_id == user.department_id:
+        return True
+    return False
 
 
 def _can_act_on_pending_report(report: ExpenseReport, user: User, explicit_approval: object | None) -> bool:
@@ -94,9 +92,10 @@ async def _get_owned_editable_report(repo: ExpenseRepository, report_id: int, us
     report = await _get_accessible_report(repo, report_id, user)
     if report.status not in ("Draft", "Returned for Correction"):
         raise HTTPException(status_code=400, detail="Report is not in an editable state")
-    if report.employee_id != user.user_id:
+    roles = _roles(user)
+    if report.employee_id != user.user_id and not bool(roles & {"Admin"}):
         _log_action(user, "expense_draft_access_denied", report_id, level=logging.WARNING)
-        raise HTTPException(status_code=404, detail="Expense report not found")
+        raise HTTPException(status_code=403, detail="Not authorized to edit this report")
     return report
 
 
