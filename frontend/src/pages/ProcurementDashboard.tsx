@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../services/api";
 import {
@@ -19,6 +20,8 @@ import {
   AlertCircle,
   Clock,
   TrendingUp,
+  ArrowUpRight,
+  ChevronRight,
 } from "lucide-react";
 import {
   Chart as ChartJS,
@@ -46,6 +49,7 @@ ChartJS.register(
 
 export const ProcurementDashboard: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   
   // We mock the API call here for the new dashboard, 
@@ -111,58 +115,138 @@ export const ProcurementDashboard: React.FC = () => {
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Active Vendors</span>
-            <Users className="w-4 h-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data?.metrics?.active_vendors || 0}</div>
-            <p className="text-[10px] text-muted-foreground font-semibold mt-1">
-              Registered & approved suppliers
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        {/* Card 1: Active Vendors */}
+        <div
+          onClick={() => navigate("/vendors")}
+          title="Click to view Vendors Directory & Scores"
+          className="apple-card p-5 rounded-2xl relative overflow-hidden group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-apple-md hover:border-blue-500/40 active:scale-[0.99] border border-border/80 flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider group-hover:text-blue-500 transition-colors">
+                Active Vendors
+              </span>
+              <div className="flex items-center gap-1.5">
+                <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-blue-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
+                  <Users className="w-4 h-4" />
+                </div>
+              </div>
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl font-bold text-foreground group-hover:text-blue-500 transition-colors">
+                {data?.metrics?.active_vendors || 0}
+              </div>
+              <p className="text-[10px] text-muted-foreground font-semibold mt-1">
+                Registered & approved suppliers
+              </p>
+            </div>
+          </div>
+          <div className="mt-3.5 pt-2.5 border-t border-border/40 text-[10px] text-muted-foreground/80 group-hover:text-blue-500 flex items-center justify-between transition-colors">
+            <span>Directory & performance</span>
+            <span className="font-bold flex items-center">Vendors <ChevronRight className="w-3 h-3 ml-0.5" /></span>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Open RFQs</span>
-            <Briefcase className="w-4 h-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data?.metrics?.pending_rfqs || 0}</div>
-            <p className="text-[10px] text-muted-foreground font-semibold mt-1">
-              Awaiting supplier bids
-            </p>
-          </CardContent>
-        </Card>
+        {/* Card 2: Open RFQs */}
+        <div
+          onClick={() => navigate("/rfqs")}
+          title="Click to view Requests for Quotation (RFQs)"
+          className="apple-card p-5 rounded-2xl relative overflow-hidden group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-apple-md hover:border-amber-500/40 active:scale-[0.99] border border-border/80 flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider group-hover:text-amber-500 transition-colors">
+                Open RFQs
+              </span>
+              <div className="flex items-center gap-1.5">
+                <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-amber-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 group-hover:scale-110 transition-transform">
+                  <Briefcase className="w-4 h-4" />
+                </div>
+              </div>
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl font-bold text-foreground group-hover:text-amber-500 transition-colors">
+                {data?.metrics?.pending_rfqs || 0}
+              </div>
+              <p className="text-[10px] text-muted-foreground font-semibold mt-1">
+                Awaiting supplier bids
+              </p>
+            </div>
+          </div>
+          <div className="mt-3.5 pt-2.5 border-t border-border/40 text-[10px] text-muted-foreground/80 group-hover:text-amber-500 flex items-center justify-between transition-colors">
+            <span>Active tenders & quotes</span>
+            <span className="font-bold flex items-center">RFQs <ChevronRight className="w-3 h-3 ml-0.5" /></span>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Active POs</span>
-            <Package className="w-4 h-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data?.metrics?.open_pos || 0}</div>
-            <p className="text-[10px] text-muted-foreground font-semibold mt-1">
-              Currently processing
-            </p>
-          </CardContent>
-        </Card>
+        {/* Card 3: Active POs */}
+        <div
+          onClick={() => navigate("/pos")}
+          title="Click to view Purchase Orders"
+          className="apple-card p-5 rounded-2xl relative overflow-hidden group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-apple-md hover:border-emerald-500/40 active:scale-[0.99] border border-border/80 flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider group-hover:text-emerald-500 transition-colors">
+                Active POs
+              </span>
+              <div className="flex items-center gap-1.5">
+                <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-emerald-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 group-hover:scale-110 transition-transform">
+                  <Package className="w-4 h-4" />
+                </div>
+              </div>
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl font-bold text-foreground group-hover:text-emerald-500 transition-colors">
+                {data?.metrics?.open_pos || 0}
+              </div>
+              <p className="text-[10px] text-muted-foreground font-semibold mt-1">
+                Currently processing
+              </p>
+            </div>
+          </div>
+          <div className="mt-3.5 pt-2.5 border-t border-border/40 text-[10px] text-muted-foreground/80 group-hover:text-emerald-500 flex items-center justify-between transition-colors">
+            <span>Fulfillment & deliveries</span>
+            <span className="font-bold flex items-center">Orders <ChevronRight className="w-3 h-3 ml-0.5" /></span>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Active Contracts</span>
-            <FileSpreadsheet className="w-4 h-4 text-purple-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data?.metrics?.active_contracts || 0}</div>
-            <p className="text-[10px] text-muted-foreground font-semibold mt-1">
-              Valid supplier agreements
-            </p>
-          </CardContent>
-        </Card>
+        {/* Card 4: Active Contracts */}
+        <div
+          onClick={() => navigate("/contracts")}
+          title="Click to view Contracts Registry"
+          className="apple-card p-5 rounded-2xl relative overflow-hidden group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-apple-md hover:border-purple-500/40 active:scale-[0.99] border border-border/80 flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider group-hover:text-purple-500 transition-colors">
+                Active Contracts
+              </span>
+              <div className="flex items-center gap-1.5">
+                <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-purple-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                <div className="w-8 h-8 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-500 group-hover:scale-110 transition-transform">
+                  <FileSpreadsheet className="w-4 h-4" />
+                </div>
+              </div>
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl font-bold text-foreground group-hover:text-purple-500 transition-colors">
+                {data?.metrics?.active_contracts || 0}
+              </div>
+              <p className="text-[10px] text-muted-foreground font-semibold mt-1">
+                Valid supplier agreements
+              </p>
+            </div>
+          </div>
+          <div className="mt-3.5 pt-2.5 border-t border-border/40 text-[10px] text-muted-foreground/80 group-hover:text-purple-500 flex items-center justify-between transition-colors">
+            <span>Terms & SLA compliance</span>
+            <span className="font-bold flex items-center">Contracts <ChevronRight className="w-3 h-3 ml-0.5" /></span>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../services/api";
 import { Card, CardHeader, CardTitle, CardContent, Skeleton, Badge, HeroTimestamp } from "../components/ui";
 import { formatDate } from "../utils/helpers";
-import { HardDrive, Receipt, FileText, CheckCircle, Clock, AlertCircle, TrendingUp, DollarSign, ShieldCheck, ArrowUpRight } from "lucide-react";
+import { HardDrive, Receipt, FileText, CheckCircle, Clock, AlertCircle, TrendingUp, DollarSign, ShieldCheck, ArrowUpRight, ChevronRight, Info } from "lucide-react";
 
 export const Dashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
+  const navigate = useNavigate();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -49,6 +51,7 @@ export const Dashboard: React.FC = () => {
   // Calculate dynamic stats
   const totalSpend = recentExpenses.reduce((sum: number, e: any) => sum + (e.amount || 0), 0);
   const pendingCount = recentExpenses.filter((e: any) => e.status?.includes("Pending")).length;
+  const isApprover = hasRole("Manager") || hasRole("Finance") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin") || hasRole("CEO");
 
   return (
     <div className="space-y-7 animate-fade-in">
@@ -68,81 +71,141 @@ export const Dashboard: React.FC = () => {
       {/* Apple Metrics Overview Bento Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Total Spending */}
-        <div className="apple-card p-5 rounded-2xl relative overflow-hidden group">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground">Total Spend</span>
-            <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-              <DollarSign className="w-4 h-4" />
+        <div
+          onClick={() => navigate("/expenses")}
+          title="Click to view full Expense Reimbursements ledger"
+          className="apple-card p-5 rounded-2xl relative overflow-hidden group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-apple-md hover:border-primary/40 active:scale-[0.99] border border-border/80 flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
+                Total Spend
+              </span>
+              <div className="flex items-center gap-1.5">
+                <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+              </div>
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-primary transition-colors">
+                ${totalSpend > 0 ? totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "124,560.00"}
+              </div>
+              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-emerald-500">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-emerald-500/10">
+                  <ArrowUpRight className="w-3 h-3 mr-0.5" /> +2.4%
+                </span>
+                <span className="text-muted-foreground">vs last month</span>
+              </div>
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-extrabold tracking-tight text-foreground">
-              ${totalSpend > 0 ? totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "124,560.00"}
-            </div>
-            <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-emerald-500">
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-emerald-500/10">
-                <ArrowUpRight className="w-3 h-3 mr-0.5" /> +2.4%
-              </span>
-              <span className="text-muted-foreground">vs last month</span>
-            </div>
+          <div className="mt-3.5 pt-2.5 border-t border-border/40 text-[10px] text-muted-foreground/80 group-hover:text-primary flex items-center justify-between transition-colors">
+            <span>Verified claims & reimbursements</span>
+            <span className="font-bold flex items-center">View Ledger <ChevronRight className="w-3 h-3 ml-0.5" /></span>
           </div>
         </div>
 
         {/* Card 2: Pending Approvals */}
-        <div className="apple-card p-5 rounded-2xl relative overflow-hidden group">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground">Pending Claims</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500">
-              <Clock className="w-4 h-4" />
+        <div
+          onClick={() => navigate(isApprover ? "/approvals" : "/expenses")}
+          title="Click to review Pending Approvals & Claims"
+          className="apple-card p-5 rounded-2xl relative overflow-hidden group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-apple-md hover:border-amber-500/40 active:scale-[0.99] border border-border/80 flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
+                Pending Claims
+              </span>
+              <div className="flex items-center gap-1.5">
+                <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-amber-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 group-hover:scale-110 transition-transform">
+                  <Clock className="w-4 h-4" />
+                </div>
+              </div>
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-amber-500 transition-colors">
+                {pendingCount || "18"}
+              </div>
+              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-amber-500">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-500/10">
+                  Action Required
+                </span>
+              </div>
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-extrabold tracking-tight text-foreground">
-              {pendingCount || "18"}
-            </div>
-            <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-amber-500">
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-500/10">
-                Action Required
-              </span>
-            </div>
+          <div className="mt-3.5 pt-2.5 border-t border-border/40 text-[10px] text-muted-foreground/80 group-hover:text-amber-500 flex items-center justify-between transition-colors">
+            <span>Awaiting verification & signoff</span>
+            <span className="font-bold flex items-center">Open Queue <ChevronRight className="w-3 h-3 ml-0.5" /></span>
           </div>
         </div>
 
         {/* Card 3: Velocity */}
-        <div className="apple-card p-5 rounded-2xl relative overflow-hidden group">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground">Approval Velocity</span>
-            <div className="w-8 h-8 rounded-xl bg-cyan/10 flex items-center justify-center text-cyan">
-              <TrendingUp className="w-4 h-4" />
+        <div
+          onClick={() => navigate("/analytics")}
+          title="Click to view Financial Analytics & Velocity Metrics"
+          className="apple-card p-5 rounded-2xl relative overflow-hidden group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-apple-md hover:border-cyan/40 active:scale-[0.99] border border-border/80 flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
+                Approval Velocity
+              </span>
+              <div className="flex items-center gap-1.5">
+                <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-cyan group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                <div className="w-8 h-8 rounded-xl bg-cyan/10 flex items-center justify-center text-cyan group-hover:scale-110 transition-transform">
+                  <TrendingUp className="w-4 h-4" />
+                </div>
+              </div>
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-cyan transition-colors">
+                1.8 <span className="text-base font-semibold text-muted-foreground">days</span>
+              </div>
+              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-emerald-500">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-emerald-500/10">
+                  -18% faster
+                </span>
+              </div>
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-extrabold tracking-tight text-foreground">
-              1.8 <span className="text-base font-semibold text-muted-foreground">days</span>
-            </div>
-            <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-emerald-500">
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-emerald-500/10">
-                -18% faster
-              </span>
-            </div>
+          <div className="mt-3.5 pt-2.5 border-t border-border/40 text-[10px] text-muted-foreground/80 group-hover:text-cyan flex items-center justify-between transition-colors">
+            <span>Average multi-tier turnaround</span>
+            <span className="font-bold flex items-center">Analytics <ChevronRight className="w-3 h-3 ml-0.5" /></span>
           </div>
         </div>
 
         {/* Card 4: Active Assets */}
-        <div className="apple-card p-5 rounded-2xl relative overflow-hidden group">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground">Assigned Assets</span>
-            <div className="w-8 h-8 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-500">
-              <HardDrive className="w-4 h-4" />
+        <div
+          onClick={() => navigate("/my-assets")}
+          title="Click to view and manage Assigned Assets"
+          className="apple-card p-5 rounded-2xl relative overflow-hidden group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-apple-md hover:border-purple-500/40 active:scale-[0.99] border border-border/80 flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
+                Assigned Assets
+              </span>
+              <div className="flex items-center gap-1.5">
+                <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-purple-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                <div className="w-8 h-8 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-500 group-hover:scale-110 transition-transform">
+                  <HardDrive className="w-4 h-4" />
+                </div>
+              </div>
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-purple-500 transition-colors">
+                {myAssets.length || "3"}
+              </div>
+              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-muted-foreground">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1" /> All verified
+              </div>
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-extrabold tracking-tight text-foreground">
-              {myAssets.length || "3"}
-            </div>
-            <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-muted-foreground">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1" /> All verified
-            </div>
+          <div className="mt-3.5 pt-2.5 border-t border-border/40 text-[10px] text-muted-foreground/80 group-hover:text-purple-500 flex items-center justify-between transition-colors">
+            <span>Hardware & software licenses</span>
+            <span className="font-bold flex items-center">My Assets <ChevronRight className="w-3 h-3 ml-0.5" /></span>
           </div>
         </div>
       </div>
