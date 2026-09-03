@@ -1,40 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --bg: #f8f9ff;
-    --card: #FFFFFF;
-    --card-2: #f8f9ff;
-    --line: #cbdbf5;
-    --line-2: #a9c0e6;
-    --text: #17132A;
-    --text-dim: #625C7A;
-    --text-faint: #938DAE;
-    --violet: #797bff;
-    --pink: #DB2777;
-    --lime: #4D8B1F;
-    --cyan: #0E8FA3;
+    /* Apple Light Mode - Liquid Frost & Silver */
+    --bg: #F5F5F7;
+    --card: rgba(255, 255, 255, 0.88);
+    --card-2: rgba(245, 245, 247, 0.9);
+    --line: rgba(0, 0, 0, 0.07);
+    --line-2: rgba(0, 0, 0, 0.12);
+    --text: #1D1D1F;
+    --text-dim: #6E6E73;
+    --text-faint: #86868B;
+    --primary: #0071E3;
+    --primary-hover: #0077ED;
+    --violet: #0071E3;
+    --pink: #FF2D55;
+    --lime: #34C759;
+    --cyan: #30B0C7;
+    --amber: #FF9500;
     
-    --glow-opacity: 0.12;
+    --shadow-card: 0 4px 24px -2px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-hover: 0 12px 32px -4px rgba(0, 113, 227, 0.12), 0 4px 12px rgba(0, 0, 0, 0.04);
+    --glow-opacity: 0.08;
   }
 
   .dark {
-    --bg: #0A0A12;
-    --card: #14141F;
-    --card-2: #191926;
-    --line: rgba(255,255,255,0.07);
-    --line-2: rgba(255,255,255,0.14);
-    --text: #F3F1FA;
-    --text-dim: #9C99B5;
-    --text-faint: #6B6884;
-    --violet: #8B5CF6;
-    --pink: #F472B6;
-    --lime: #B6FF6E;
-    --cyan: #4CE0E8;
+    /* Apple Dark Mode - Space Black & Brushed Titanium */
+    --bg: #070709;
+    --card: rgba(20, 20, 24, 0.75);
+    --card-2: rgba(28, 28, 34, 0.85);
+    --line: rgba(255, 255, 255, 0.08);
+    --line-2: rgba(255, 255, 255, 0.15);
+    --text: #F5F5F7;
+    --text-dim: #A1A1A6;
+    --text-faint: #6E6E73;
+    --primary: #0A84FF;
+    --primary-hover: #409CFF;
+    --violet: #0A84FF;
+    --pink: #FF375F;
+    --lime: #30D158;
+    --cyan: #64D2FF;
+    --amber: #FF9F0A;
     
-    --glow-opacity: 0.35;
+    --shadow-card: 0 4px 24px -2px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    --shadow-hover: 0 12px 36px -4px rgba(10, 132, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    --glow-opacity: 0.25;
   }
 }
 
@@ -45,11 +59,15 @@
   body {
     background-color: var(--bg);
     color: var(--text);
-    font-family: 'Inter', sans-serif;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", sans-serif;
     position: relative;
     min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.015em;
   }
   
+  /* Apple Ambient Lighting Mesh */
   body::before {
     content: '';
     position: fixed;
@@ -57,44 +75,81 @@
     pointer-events: none;
     z-index: -1;
     background: 
-      radial-gradient(circle at 10% 10%, rgba(139, 92, 246, var(--glow-opacity)) 0%, transparent 40%),
-      radial-gradient(circle at 90% 10%, rgba(244, 114, 182, calc(var(--glow-opacity) * 0.6)) 0%, transparent 40%),
-      radial-gradient(circle at 50% 90%, rgba(76, 224, 232, calc(var(--glow-opacity) * 0.3)) 0%, transparent 40%);
+      radial-gradient(circle at 15% 15%, rgba(10, 132, 255, var(--glow-opacity)) 0%, transparent 45%),
+      radial-gradient(circle at 85% 20%, rgba(94, 92, 230, calc(var(--glow-opacity) * 0.7)) 0%, transparent 40%),
+      radial-gradient(circle at 50% 85%, rgba(48, 209, 88, calc(var(--glow-opacity) * 0.4)) 0%, transparent 45%);
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Space Grotesk', sans-serif;
-    letter-spacing: -0.5px;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+    letter-spacing: -0.025em;
+    font-weight: 700;
   }
 }
 
-.gradient-accent {
-  background: linear-gradient(120deg, var(--violet) 0%, var(--pink) 55%, #FF9F6E 100%);
+/* Apple Liquid Acrylic Glassmorphism */
+.apple-card {
+  background-color: var(--card);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.gradient-accent-text {
-  background: linear-gradient(120deg, var(--violet) 0%, var(--pink) 55%, #FF9F6E 100%);
+.apple-card:hover {
+  border-color: var(--line-2);
+  box-shadow: var(--shadow-hover);
+}
+
+.apple-glass {
+  background-color: var(--card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--line);
+}
+
+.apple-glass-heavy {
+  background-color: var(--card-2);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border: 1px solid var(--line-2);
+}
+
+/* Apple Buttons & Interactive Elements */
+.apple-button-primary {
+  background: linear-gradient(180deg, var(--primary-hover) 0%, var(--primary) 100%);
+  color: #FFFFFF;
+  font-weight: 600;
+  border-radius: 9999px;
+  box-shadow: 0 2px 8px rgba(0, 113, 227, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.apple-button-primary:hover {
+  box-shadow: 0 4px 14px rgba(0, 113, 227, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.apple-button-primary:active {
+  transform: scale(0.98);
+}
+
+/* Apple Gradients */
+.gradient-apple-blue {
+  background: linear-gradient(135deg, #0A84FF 0%, #0071E3 100%);
+}
+
+.gradient-apple-text {
+  background: linear-gradient(135deg, #0A84FF 0%, #5E5CE6 50%, #BF5AF2 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-/* Glassmorphism utility card class */
-.glass-panel {
-  background-color: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--line);
-  box-shadow: 0 4px 20px rgba(20,10,40,0.04);
-}
-.dark .glass-panel {
-  background-color: rgba(20, 20, 31, 0.8);
-  border: 1px solid var(--line);
-  box-shadow: none;
-}
-
-/* Custom scrollbars */
+/* Apple macOS Minimalist Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;

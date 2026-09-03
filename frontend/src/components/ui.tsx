@@ -1,6 +1,6 @@
 import React from "react";
 
-// --- Button Component ---
+// --- Apple Button Component ---
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "danger" | "ghost" | "outline";
   size?: "sm" | "md" | "lg";
@@ -13,20 +13,20 @@ export const Button: React.FC<ButtonProps> = ({
   children,
   ...props
 }) => {
-  const baseStyle = "inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none";
+  const baseStyle = "inline-flex items-center justify-center font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-1 disabled:opacity-40 disabled:pointer-events-none active:scale-[0.98] select-none";
   
   const variants = {
-    primary: "gradient-accent text-white hover:opacity-90 focus:ring-violet shadow-sm",
-    secondary: "bg-card-2 text-foreground hover:bg-accent/50 focus:ring-violet border border-border",
-    danger: "bg-pink text-white hover:opacity-90 focus:ring-pink shadow-sm",
-    outline: "border border-border bg-transparent text-foreground hover:bg-accent/50 focus:ring-violet",
-    ghost: "bg-transparent text-foreground hover:bg-accent/50 focus:ring-violet",
+    primary: "apple-button-primary bg-primary text-white hover:brightness-110 shadow-apple-sm",
+    secondary: "bg-card-2/80 hover:bg-card-2 text-foreground border border-border backdrop-blur-md shadow-apple-sm hover:border-line-2",
+    danger: "bg-pink text-white hover:brightness-110 shadow-apple-sm active:bg-pink/90",
+    outline: "border border-border bg-transparent text-foreground hover:bg-card/60 backdrop-blur-sm",
+    ghost: "bg-transparent text-foreground hover:bg-muted/40",
   };
 
   const sizes = {
-    sm: "px-3 py-1.5 text-xs",
-    md: "px-4 py-2 text-sm",
-    lg: "px-6 py-3 text-base",
+    sm: "px-3.5 py-1.5 text-xs font-semibold tracking-tight",
+    md: "px-5 py-2 text-sm font-semibold tracking-tight",
+    lg: "px-6 py-3 text-base font-semibold tracking-tight",
   };
 
   return (
@@ -39,7 +39,7 @@ export const Button: React.FC<ButtonProps> = ({
   );
 };
 
-// --- Input Component ---
+// --- Apple Input Component ---
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
@@ -53,25 +53,25 @@ export const Input: React.FC<InputProps> = ({
   ...props
 }) => {
   return (
-    <div className="w-full space-y-1">
+    <div className="w-full space-y-1.5">
       {label && (
-        <label htmlFor={id} className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        <label htmlFor={id} className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider pl-1">
           {label}
         </label>
       )}
       <input
         id={id}
-        className={`w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200 placeholder:text-muted-foreground/60 ${
+        className={`w-full px-3.5 py-2.5 text-sm rounded-xl bg-background/80 backdrop-blur-sm border border-border focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all duration-200 placeholder:text-muted-foreground/50 shadow-inner ${
           error ? "border-destructive focus:ring-destructive" : ""
         } ${className}`}
         {...props}
       />
-      {error && <p className="text-xs text-destructive font-medium">{error}</p>}
+      {error && <p className="text-xs text-destructive font-medium pl-1">{error}</p>}
     </div>
   );
 };
 
-// --- Select Component ---
+// --- Apple Select Component ---
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
@@ -87,15 +87,15 @@ export const Select: React.FC<SelectProps> = ({
   ...props
 }) => {
   return (
-    <div className="w-full space-y-1">
+    <div className="w-full space-y-1.5">
       {label && (
-        <label htmlFor={id} className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        <label htmlFor={id} className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider pl-1">
           {label}
         </label>
       )}
       <select
         id={id}
-        className={`w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200 ${
+        className={`w-full px-3.5 py-2.5 text-sm rounded-xl bg-background/80 backdrop-blur-sm border border-border focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all duration-200 ${
           error ? "border-destructive focus:ring-destructive" : ""
         } ${className}`}
         {...props}
@@ -107,26 +107,26 @@ export const Select: React.FC<SelectProps> = ({
           </option>
         ))}
       </select>
-      {error && <p className="text-xs text-destructive font-medium">{error}</p>}
+      {error && <p className="text-xs text-destructive font-medium pl-1">{error}</p>}
     </div>
   );
 };
 
-// --- Card Components ---
+// --- Apple Liquid Glass Card Components ---
 export const Card: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className = "", children, ...props }) => (
-  <div className={`rounded-lg border border-border bg-card text-foreground transition-all duration-200 ${className}`} {...props}>
+  <div className={`apple-card rounded-2xl text-foreground overflow-hidden ${className}`} {...props}>
     {children}
   </div>
 );
 
 export const CardHeader: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className = "", children, ...props }) => (
-  <div className={`flex flex-col space-y-1.5 p-6 border-b border-border/40 ${className}`} {...props}>
+  <div className={`flex flex-col space-y-1.5 p-6 border-b border-border/50 ${className}`} {...props}>
     {children}
   </div>
 );
 
 export const CardTitle: React.FC<React.HTMLAttributes<HTMLHeadingElement>> = ({ className = "", children, ...props }) => (
-  <h3 className={`text-lg font-semibold leading-none tracking-tight ${className}`} {...props}>
+  <h3 className={`text-lg font-bold leading-none tracking-tight text-foreground ${className}`} {...props}>
     {children}
   </h3>
 );
@@ -137,7 +137,7 @@ export const CardContent: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ cl
   </div>
 );
 
-// --- Badge Component ---
+// --- Apple Pill Badge Component ---
 interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   variant?: "success" | "warning" | "error" | "info" | "neutral";
 }
@@ -149,16 +149,16 @@ export const Badge: React.FC<BadgeProps> = ({
   ...props
 }) => {
   const styles = {
-    success: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20",
-    warning: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20",
-    error: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20",
-    info: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20",
-    neutral: "bg-muted text-muted-foreground border border-border",
+    success: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25",
+    warning: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25",
+    error: "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25",
+    info: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25",
+    neutral: "bg-muted/80 text-muted-foreground border border-border",
   };
 
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full font-mono text-[10px] font-semibold uppercase tracking-wider transition-colors duration-200 ${styles[variant]} ${className}`}
+      className={`inline-flex items-center px-3 py-0.5 rounded-full text-[11px] font-semibold tracking-tight transition-all duration-200 ${styles[variant]} ${className}`}
       {...props}
     >
       {children}
@@ -166,7 +166,7 @@ export const Badge: React.FC<BadgeProps> = ({
   );
 };
 
-// --- Modal/Dialog Component ---
+// --- Apple Modal / macOS Dialog Component ---
 interface DialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -179,24 +179,32 @@ export const Dialog: React.FC<DialogProps> = ({ isOpen, onClose, title, children
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className={`relative w-full ${maxWidthClass} bg-card text-card-foreground rounded-xl border border-border shadow-2xl p-6 overflow-hidden animate-slide-up`}>
-        <div className="flex items-center justify-between pb-4 border-b border-border/40">
-          <h2 className="text-lg font-bold font-display tracking-tight">{title}</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
+      <div className={`relative w-full ${maxWidthClass} apple-glass-heavy text-card-foreground rounded-2xl border border-border/80 shadow-2xl p-6 overflow-hidden animate-slide-up`}>
+        {/* macOS Style Traffic Light Dots & Title */}
+        <div className="flex items-center justify-between pb-4 border-b border-border/50">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <button onClick={onClose} className="w-3 h-3 rounded-full bg-rose-500 hover:opacity-80 transition-opacity" title="Close" />
+              <div className="w-3 h-3 rounded-full bg-amber-500/80" />
+              <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
+            </div>
+            <h2 className="text-base font-bold tracking-tight pl-2">{title}</h2>
+          </div>
           <button
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors"
+            className="w-7 h-7 flex items-center justify-center rounded-full bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors text-xs"
           >
             &#x2715;
           </button>
         </div>
-        <div className="mt-4 max-h-[70vh] overflow-y-auto pr-1">{children}</div>
+        <div className="mt-4 max-h-[72vh] overflow-y-auto pr-1">{children}</div>
       </div>
     </div>
   );
 };
 
-// --- Tabs Components ---
+// --- Apple Segmented Controls / Tabs ---
 interface TabsProps {
   defaultValue: string;
   children: React.ReactNode;
@@ -221,7 +229,7 @@ export const TabsList: React.FC<{ children: React.ReactNode; className?: string 
   children,
   className = "",
 }) => (
-  <div className={`flex space-x-1 p-1 bg-muted rounded-lg border border-border ${className}`}>
+  <div className={`flex space-x-1 p-1 bg-muted/60 backdrop-blur-md rounded-full border border-border/60 ${className}`}>
     {children}
   </div>
 );
@@ -238,9 +246,9 @@ export const TabsTrigger: React.FC<{ value: string; children: React.ReactNode; c
   return (
     <button
       onClick={() => ctx.setActiveTab(value)}
-      className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${
+      className={`flex-1 py-1.5 px-4 text-xs font-semibold rounded-full transition-all duration-200 ${
         isActive
-          ? "bg-card text-foreground shadow-sm border border-border/40"
+          ? "bg-card text-foreground shadow-apple-sm border border-border/50"
           : "text-muted-foreground hover:text-foreground"
       } ${className}`}
     >
@@ -255,12 +263,12 @@ export const TabsContent: React.FC<{ value: string; children: React.ReactNode }>
 }) => {
   const ctx = React.useContext(TabsContext);
   if (!ctx || ctx.activeTab !== value) return null;
-  return <div className="space-y-4">{children}</div>;
+  return <div className="space-y-4 animate-fade-in">{children}</div>;
 };
 
 // --- Loading Skeleton Component ---
 export const Skeleton: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className = "", ...props }) => (
-  <div className={`animate-pulse rounded bg-muted/60 ${className}`} {...props} />
+  <div className={`animate-pulse rounded-xl bg-muted/50 ${className}`} {...props} />
 );
 
 export const HeroTimestamp: React.FC = () => {
@@ -272,8 +280,8 @@ export const HeroTimestamp: React.FC = () => {
   }, []);
 
   return (
-    <div className="text-[10px] font-mono text-muted-foreground font-semibold uppercase tracking-[1.6px] border border-border px-3 py-1.5 rounded-lg bg-card-2/50 shadow-sm whitespace-nowrap">
-      AS OF {time.toLocaleString()}
+    <div className="text-[11px] font-mono text-muted-foreground font-semibold uppercase tracking-wider border border-border/80 px-3.5 py-1.5 rounded-full bg-card/60 backdrop-blur-md shadow-apple-sm whitespace-nowrap">
+      {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })} • {time.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
     </div>
   );
 };
@@ -286,19 +294,19 @@ export const EmptyState: React.FC<{
   actionHref?: string;
   onAction?: () => void;
 }> = ({ icon, title, description, actionLabel, actionHref, onAction }) => (
-  <div className="p-10 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl m-4 bg-card/20 backdrop-blur-sm">
-    {icon && <div className="text-muted-foreground/50 mb-3">{icon}</div>}
-    <p className="text-sm font-semibold text-foreground mb-1">{title}</p>
-    <p className="text-xs text-muted-foreground mb-4">{description}</p>
+  <div className="p-12 flex flex-col items-center justify-center border border-dashed border-border/80 rounded-2xl m-4 bg-card/30 backdrop-blur-md text-center">
+    {icon && <div className="text-muted-foreground/60 mb-3.5 p-3 rounded-2xl bg-muted/40">{icon}</div>}
+    <p className="text-base font-bold text-foreground mb-1">{title}</p>
+    <p className="text-xs text-muted-foreground max-w-sm mb-5 leading-relaxed">{description}</p>
     {(actionLabel || onAction) && (
       actionHref ? (
-        <a href={actionHref} className="text-xs font-bold text-cyan hover:text-cyan/80 flex items-center transition-colors">
-          {actionLabel} <span className="ml-1">&rarr;</span>
+        <a href={actionHref} className="apple-button-primary px-5 py-2 text-xs">
+          {actionLabel}
         </a>
       ) : (
-        <button onClick={onAction} className="text-xs font-bold text-cyan hover:text-cyan/80 flex items-center transition-colors">
-          {actionLabel} <span className="ml-1">&rarr;</span>
-        </button>
+        <Button onClick={onAction} size="sm" variant="primary">
+          {actionLabel}
+        </Button>
       )
     )}
   </div>
