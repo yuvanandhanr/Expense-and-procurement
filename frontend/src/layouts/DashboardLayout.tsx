@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../hooks/useTheme";
 import { api } from "../services/api";
-import { Notification } from "../types";
+import { Notification, SearchResult } from "../types";
 import {
   LayoutDashboard,
   FileText,
@@ -32,6 +32,12 @@ import {
   CheckCheck,
   UserCog,
   Command,
+  Clock,
+  ArrowRight,
+  Sparkles,
+  History,
+  Trash2,
+  CornerDownLeft,
 } from "lucide-react";
 
 export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -45,11 +51,25 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  
+  // Search and dropdown state
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("procuresync_recent_searches");
+      return saved ? JSON.parse(saved) : ["Expense Reports", "Office Supplies", "Vendor Invitations"];
+    } catch {
+      return ["Expense Reports", "Office Supplies", "Vendor Invitations"];
+    }
+  });
 
   const notificationRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   // Fetch in-app notifications
   useEffect(() => {
@@ -68,7 +88,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [user]);
 
-  // Click outside listener to close notification and profile dropdowns
+  // Click outside listener to close notification, profile, and search dropdowns
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       if (notificationRef.current && !notificationRef.current.contains(e.target as Node)) {
@@ -76,6 +96,9 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       }
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
         setIsProfileOpen(false);
+      }
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setIsSearchOpen(false);
       }
     };
 
@@ -93,6 +116,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       // Cmd+K or Ctrl+K
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
+        setIsSearchOpen(true);
         if (searchInputRef.current) {
           searchInputRef.current.focus();
           searchInputRef.current.select();
@@ -103,6 +127,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       // '/' when not in input / textarea
       if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes((e.target as HTMLElement)?.tagName)) {
         e.preventDefault();
+        setIsSearchOpen(true);
         searchInputRef.current?.focus();
         searchInputRef.current?.select();
       }
@@ -110,6 +135,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       if (e.key === "Escape") {
         setIsNotificationOpen(false);
         setIsProfileOpen(false);
+        setIsSearchOpen(false);
         searchInputRef.current?.blur();
       }
     };
@@ -117,6 +143,63 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [navigate]);
+
+  // Live Debounced Search Query
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const response = await api.get(`/search?q=${encodeURIComponent(searchQuery.trim())}&limit=8`);
+        setSearchResults(response.data || []);
+      } catch (err) {
+        console.error("Live search failed:", err);
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const saveRecentSearch = (term: string) => {
+    if (!term.trim()) return;
+    const clean = term.trim();
+    const updated = [clean, ...recentSearches.filter(s => s.toLowerCase() !== clean.toLowerCase())].slice(0, 6);
+    setRecentSearches(updated);
+    try {
+      localStorage.setItem("procuresync_recent_searches", JSON.stringify(updated));
+    } catch (e) {
+      console.error("Error saving recent search", e);
+    }
+  };
+
+  const removeRecentSearch = (term: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = recentSearches.filter(s => s !== term);
+    setRecentSearches(updated);
+    try {
+      localStorage.setItem("procuresync_recent_searches", JSON.stringify(updated));
+    } catch (e) {
+      console.error("Error removing recent search", e);
+    }
+  };
+
+  const clearRecentSearches = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRecentSearches([]);
+    try {
+      localStorage.removeItem("procuresync_recent_searches");
+    } catch (e) {
+      console.error("Error clearing recent searches", e);
+    }
+  };
 
   const markAllRead = async () => {
     try {
@@ -137,6 +220,36 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (err) {
       console.error("Error marking notification read:", err);
     }
+  };
+
+  // Quick navigation destinations
+  const quickPages = [
+    { label: "Employee Reimbursements", path: "/expenses", icon: FileText, category: "Claims" },
+    { label: "Purchase Requisitions", path: "/prs", icon: FileText, category: "Requisitions" },
+    { label: "Pending Approvals", path: "/approvals", icon: CheckSquare, category: "Approvals" },
+    { label: "Vendor Management", path: "/vendors", icon: Users, category: "Procurement" },
+    { label: "Requests For Quotations", path: "/rfqs", icon: Briefcase, category: "Sourcing" },
+    { label: "Quotations Inbox", path: "/quotations", icon: Layers, category: "Sourcing" },
+    { label: "Purchase Orders", path: "/pos", icon: Package, category: "Procurement" },
+    { label: "Vendor Invoices", path: "/invoices", icon: CreditCard, category: "Finance" },
+    { label: "Financial Analytics", path: "/analytics", icon: TrendingUp, category: "Analytics" },
+  ];
+
+  const matchedPages = searchQuery.trim()
+    ? quickPages.filter(p => p.label.toLowerCase().includes(searchQuery.toLowerCase()) || p.category.toLowerCase().includes(searchQuery.toLowerCase()))
+    : [];
+
+  const getEntityRoute = (entityType: string) => {
+    const t = entityType.toUpperCase();
+    if (t.includes("PR") || t.includes("REQUISITION")) return "/prs";
+    if (t.includes("PO") || t.includes("ORDER")) return "/pos";
+    if (t.includes("EXPENSE") || t.includes("REPORT") || t.includes("CLAIM")) return "/expenses";
+    if (t.includes("VENDOR")) return "/vendors";
+    if (t.includes("RFQ")) return "/rfqs";
+    if (t.includes("INVOICE")) return "/invoices";
+    if (t.includes("CONTRACT")) return "/contracts";
+    if (t.includes("ASSET")) return "/assets";
+    return `/search?q=${encodeURIComponent(searchQuery)}`;
   };
 
   const buildSidebar = () => {
@@ -248,7 +361,9 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   const handleGlobalSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+      saveRecentSearch(searchQuery.trim());
+      setIsSearchOpen(false);
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
 
@@ -397,21 +512,217 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
           </div>
 
           <div className="flex items-center space-x-3">
-            {/* Apple Minimalist Quick Search */}
-            <form onSubmit={handleGlobalSearch} className="hidden lg:flex items-center relative">
-              <Search className="w-3.5 h-3.5 absolute left-3.5 text-muted-foreground/60" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-8 py-1.5 w-56 rounded-full bg-background/80 backdrop-blur-md border border-border/80 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary focus:w-72 transition-all duration-300 shadow-inner placeholder:text-muted-foreground/50"
-              />
-              <span className="absolute right-3 text-[10px] font-mono text-muted-foreground/50 flex items-center">
-                <Command className="w-2.5 h-2.5 mr-0.5" />K
-              </span>
-            </form>
+            {/* Apple Minimalist Quick Search with Live Dropdown */}
+            <div className="hidden lg:block relative" ref={searchContainerRef}>
+              <form onSubmit={handleGlobalSearch} className="flex items-center relative">
+                <Search className="w-3.5 h-3.5 absolute left-3.5 text-muted-foreground/60" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search anything (⌘K)..."
+                  value={searchQuery}
+                  onFocus={() => setIsSearchOpen(true)}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setIsSearchOpen(true);
+                  }}
+                  className="pl-9 pr-8 py-1.5 w-60 rounded-full bg-background/80 backdrop-blur-md border border-border/80 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary focus:w-80 transition-all duration-300 shadow-inner placeholder:text-muted-foreground/50"
+                />
+                <span className="absolute right-3 text-[10px] font-mono text-muted-foreground/50 flex items-center">
+                  <Command className="w-2.5 h-2.5 mr-0.5" />K
+                </span>
+              </form>
+
+              {/* Search Dropdown (Recent Searches & Live Results) */}
+              {isSearchOpen && (
+                <div className="absolute left-0 mt-2.5 w-80 sm:w-96 apple-glass-heavy border border-border/80 rounded-2xl shadow-2xl overflow-hidden z-50 animate-slide-up">
+                  {/* If search query is empty: Show Recent Searches & Quick Nav */}
+                  {!searchQuery.trim() ? (
+                    <div className="p-3 space-y-3">
+                      {/* Recent Searches Header */}
+                      {recentSearches.length > 0 && (
+                        <div>
+                          <div className="flex items-center justify-between px-2 py-1">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                              <History className="w-3 h-3 text-primary" /> Recent Searches
+                            </span>
+                            <button
+                              type="button"
+                              onClick={clearRecentSearches}
+                              className="text-[10px] text-muted-foreground hover:text-pink transition-colors"
+                            >
+                              Clear all
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5 mt-1.5 px-1">
+                            {recentSearches.map((term, idx) => (
+                              <div
+                                key={idx}
+                                onClick={() => {
+                                  setSearchQuery(term);
+                                  saveRecentSearch(term);
+                                  setIsSearchOpen(false);
+                                  navigate(`/search?q=${encodeURIComponent(term)}`);
+                                }}
+                                className="group flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 hover:bg-primary/15 hover:text-primary text-xs font-medium cursor-pointer transition-all border border-border/50 hover:border-primary/30"
+                              >
+                                <Clock className="w-3 h-3 opacity-60 text-muted-foreground group-hover:text-primary" />
+                                <span>{term}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => removeRecentSearch(term, e)}
+                                  className="w-3.5 h-3.5 rounded-full hover:bg-muted-foreground/20 flex items-center justify-center text-[10px] text-muted-foreground hover:text-foreground opacity-60 group-hover:opacity-100"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Quick Jump Shortcuts */}
+                      <div>
+                        <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-2 py-1">
+                          Quick Navigation
+                        </span>
+                        <div className="grid grid-cols-2 gap-1.5 mt-1 px-1">
+                          {quickPages.slice(0, 6).map((page, idx) => {
+                            const Icon = page.icon;
+                            return (
+                              <div
+                                key={idx}
+                                onClick={() => {
+                                  setIsSearchOpen(false);
+                                  navigate(page.path);
+                                }}
+                                className="flex items-center gap-2 p-2 rounded-xl hover:bg-muted/60 cursor-pointer transition-all border border-transparent hover:border-border/50 group"
+                              >
+                                <div className="p-1.5 rounded-lg bg-primary/10 text-primary group-hover:scale-105 transition-transform shrink-0">
+                                  <Icon className="w-3.5 h-3.5" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-semibold text-foreground truncate">{page.label}</p>
+                                  <p className="text-[10px] text-muted-foreground truncate">{page.category}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* If search query has text: Show live results & matching pages */
+                    <div>
+                      {/* Search state loading */}
+                      {searchLoading && (
+                        <div className="p-6 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                          <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                          <span>Searching index...</span>
+                        </div>
+                      )}
+
+                      {!searchLoading && (
+                        <div className="divide-y divide-border/40 max-h-80 overflow-y-auto">
+                          {/* Matched Pages */}
+                          {matchedPages.length > 0 && (
+                            <div className="p-2 bg-card/40">
+                              <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-2 py-1">
+                                Pages & Features
+                              </span>
+                              {matchedPages.map((page, idx) => {
+                                const Icon = page.icon;
+                                return (
+                                  <div
+                                    key={idx}
+                                    onClick={() => {
+                                      saveRecentSearch(page.label);
+                                      setIsSearchOpen(false);
+                                      navigate(page.path);
+                                    }}
+                                    className="flex items-center justify-between p-2 rounded-xl hover:bg-primary/10 hover:text-primary cursor-pointer transition-all group"
+                                  >
+                                    <div className="flex items-center gap-2.5">
+                                      <div className="p-1.5 rounded-lg bg-muted group-hover:bg-primary/20 text-muted-foreground group-hover:text-primary">
+                                        <Icon className="w-3.5 h-3.5" />
+                                      </div>
+                                      <span className="text-xs font-bold text-foreground group-hover:text-primary">
+                                        {page.label}
+                                      </span>
+                                    </div>
+                                    <span className="text-[10px] font-semibold text-muted-foreground px-2 py-0.5 rounded-full bg-muted/60">
+                                      {page.category}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* Matched Entity Records */}
+                          {searchResults.length > 0 ? (
+                            <div className="p-2">
+                              <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-2 py-1">
+                                Records Found ({searchResults.length})
+                              </span>
+                              <div className="space-y-1">
+                                {searchResults.map((result) => {
+                                  const route = getEntityRoute(result.entity_type);
+                                  return (
+                                    <div
+                                      key={result.index_id || result.entity_id}
+                                      onClick={() => {
+                                        saveRecentSearch(searchQuery);
+                                        setIsSearchOpen(false);
+                                        navigate(route);
+                                      }}
+                                      className="p-2.5 rounded-xl hover:bg-muted/60 cursor-pointer transition-all border border-transparent hover:border-border/50 group"
+                                    >
+                                      <div className="flex items-center justify-between gap-2">
+                                        <p className="text-xs font-bold text-foreground group-hover:text-primary truncate">
+                                          {result.title}
+                                        </p>
+                                        <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-primary/15 text-primary shrink-0">
+                                          {result.entity_type}
+                                        </span>
+                                      </div>
+                                      {result.content && (
+                                        <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
+                                          {result.content}
+                                        </p>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ) : (
+                            matchedPages.length === 0 && (
+                              <div className="p-6 text-center text-xs text-muted-foreground">
+                                No direct matches found for "{searchQuery}".
+                              </div>
+                            )
+                          )}
+                        </div>
+                      )}
+
+                      {/* Footer: View All in Global Search */}
+                      <div
+                        onClick={handleGlobalSearch}
+                        className="p-3 bg-muted/40 hover:bg-primary/10 border-t border-border/50 flex items-center justify-between cursor-pointer text-xs font-bold text-primary transition-colors group"
+                      >
+                        <span className="truncate">
+                          Search all records for "<span className="text-foreground">{searchQuery}</span>"
+                        </span>
+                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground group-hover:text-primary shrink-0 ml-2">
+                          <CornerDownLeft className="w-3.5 h-3.5" /> Enter
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Dark / Light Toggle */}
             <button 
