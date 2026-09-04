@@ -63,7 +63,7 @@ export const Input: React.FC<InputProps> = ({
       )}
       <input
         id={id}
-        className={`w-full px-3.5 py-2.5 text-sm rounded-xl bg-background/80 backdrop-blur-sm border border-border focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all duration-200 placeholder:text-muted-foreground/50 shadow-inner ${
+        className={`w-full px-3.5 py-2.5 text-sm rounded-xl bg-background/80 dark:bg-black dark:text-white backdrop-blur-sm border border-border focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all duration-200 placeholder:text-muted-foreground/50 shadow-inner ${
           error ? "border-destructive focus:ring-destructive" : ""
         } ${className}`}
         {...props}
@@ -97,7 +97,7 @@ export const Select: React.FC<SelectProps> = ({
       )}
       <select
         id={id}
-        className={`w-full px-3.5 py-2.5 text-sm rounded-xl bg-background/80 backdrop-blur-sm border border-border focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all duration-200 ${
+        className={`w-full px-3.5 py-2.5 text-sm rounded-xl bg-background/80 dark:bg-black dark:text-white backdrop-blur-sm border border-border focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all duration-200 ${
           error ? "border-destructive focus:ring-destructive" : ""
         } ${className}`}
         {...props}
@@ -243,7 +243,7 @@ export const Dialog: React.FC<DialogProps> = ({ isOpen, onClose, title, children
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xl animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background animate-fade-in">
       <div className={`relative w-full ${maxWidthClass} apple-glass-heavy text-card-foreground rounded-3xl border border-border/90 shadow-2xl p-6 sm:p-8 overflow-hidden animate-spring-in`}>
         {/* Apple Clean Modal Header */}
         <div className="flex items-center justify-between pb-4 border-b border-border/60">

@@ -79,9 +79,10 @@ export const Assets: React.FC = () => {
     setIsSubmitting(true);
     try {
       await api.post(`/assets`, {
-        asset_name: newAsset.name,
-        category: newAsset.category,
-        cost: parseFloat(newAsset.cost),
+        asset_number: `AST-${Math.floor(Math.random() * 1000000)}`,
+        asset_tag: `TAG-${Math.floor(Math.random() * 1000000)}`,
+        model: newAsset.name,
+        category_id: null,
         status: newAsset.status
       });
       toast.success("Asset added successfully!");
@@ -185,7 +186,7 @@ export const Assets: React.FC = () => {
                       {isAdmin && (
                         <td className="p-4 text-right">
                           <Button size="sm" variant="outline" onClick={() => setTransferAsset(a)}>
-                            <ArrowRightLeft className="w-3.5 h-3.5 mr-1.5" /> Transfer
+                            <ArrowRightLeft className="w-3.5 h-3.5 mr-1.5" /> {a.assigned_to_name ? "Transfer" : "Assign"}
                           </Button>
                         </td>
                       )}
@@ -243,7 +244,7 @@ export const Assets: React.FC = () => {
       </Dialog>
 
       {/* Transfer Asset Dialog */}
-      <Dialog isOpen={!!transferAsset} onClose={() => setTransferAsset(null)} title="Transfer Asset">
+      <Dialog isOpen={!!transferAsset} onClose={() => setTransferAsset(null)} title={transferAsset?.assigned_to_name && transferAsset.assigned_to_name !== "Unassigned" ? "Transfer Asset" : "Assign Asset"}>
         {transferAsset && (
           <div className="space-y-4">
             <div className="bg-muted/40 p-3 rounded-lg border border-border text-xs">
@@ -253,25 +254,31 @@ export const Assets: React.FC = () => {
             </div>
             
             <Select 
-              label="New Employee"
+              label="New Assignee"
               value={selectedUser}
-              onChange={(e) => setSelectedUser(e.target.value)}
-              options={users.map(u => ({ label: `${u.first_name} ${u.last_name}`, value: u.user_id }))}
+              onChange={e => setSelectedUser(e.target.value)}
+              options={[
+                { value: "", label: "Select an employee..." },
+                ...users.map(u => ({ value: u.user_id.toString(), label: `${u.first_name} ${u.last_name} (${u.department})` }))
+              ]}
             />
-            
-            <Input 
-              label="Transfer Notes (Optional)" 
-              placeholder="e.g. Desk move to floor 3" 
-              value={transferNotes}
-              onChange={e => setTransferNotes(e.target.value)}
-            />
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Transfer Notes / Reason</label>
+              <textarea 
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm min-h-[80px]"
+                value={transferNotes}
+                onChange={e => setTransferNotes(e.target.value)}
+                placeholder="Optional notes regarding this assignment..."
+              />
+            </div>
             
             <div className="flex justify-end space-x-3 pt-4 border-t border-border mt-4">
               <Button variant="ghost" onClick={() => setTransferAsset(null)} disabled={isSubmitting}>
                 Cancel
               </Button>
               <Button variant="primary" onClick={handleTransferSubmit} disabled={isSubmitting || !selectedUser}>
-                {isSubmitting ? "Processing..." : "Transfer Asset"}
+                {isSubmitting ? "Processing..." : (transferAsset?.assigned_to_name && transferAsset.assigned_to_name !== "Unassigned" ? "Transfer Asset" : "Assign Asset")}
               </Button>
             </div>
           </div>

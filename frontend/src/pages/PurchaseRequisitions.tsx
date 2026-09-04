@@ -57,7 +57,7 @@ export const PurchaseRequisitions: React.FC = () => {
         title,
         estimated_cost: parseFloat(estimatedCost),
         priority,
-        description,
+        justification: description,
         department_id: user?.department_id || null,
         items: [
           {

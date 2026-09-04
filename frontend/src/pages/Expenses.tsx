@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Upload, CheckCircle, XCircle, FileText, AlertCircle, RefreshCw, DollarSign, Clock, CheckSquare, XOctagon, Trash2, ClipboardList, Building, Briefcase } from "lucide-react";
+import { Plus, Upload, CheckCircle, XCircle, FileText, AlertCircle, RefreshCw, DollarSign, Clock, CheckSquare, XOctagon, Trash2, ClipboardList, Building, Briefcase, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "../services/api";
 import { ExpenseReport, Receipt } from "../types";
@@ -37,6 +37,7 @@ const Expenses: React.FC = () => {
   // Edit Details State
   const [isEditDetailsOpen, setIsEditDetailsOpen] = useState(false);
   const [editDetails, setEditDetails] = useState({ purpose: "", justification: "", department_id: "", cost_center_id: "", project_code: "" });
+  const [previewReceiptUrl, setPreviewReceiptUrl] = useState<string | null>(null);
 
   const [editingReceiptId, setEditingReceiptId] = useState<number | null>(null);
   const [editAmount, setEditAmount] = useState<string>("");
@@ -283,8 +284,8 @@ const Expenses: React.FC = () => {
   const filteredExpenses = expenses.filter((r: any) => {
     if (statusFilter === "All") return true;
     if (statusFilter === "Draft") return r.status === "Draft";
-    if (statusFilter === "Submitted") return r.status.includes("Pending") || r.status === "Corrected Claim";
-    if (statusFilter === "Approved") return r.status === "Approved" || r.status === "Closed" || r.status === "Payment Requested" || r.status === "Finance Verified";
+    if (statusFilter === "Submitted") return r.status.includes("Pending") || r.status === "Corrected Claim" || r.status === "Payment Requested" || r.status === "Finance Verified";
+    if (statusFilter === "Approved") return r.status === "Approved" || r.status === "Closed";
     if (statusFilter === "Rejected") return r.status === "Rejected" || r.status === "Returned for Correction";
     return r.status === statusFilter;
   });
@@ -387,8 +388,20 @@ const Expenses: React.FC = () => {
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         )}
-                        <Button size="sm" onClick={() => setSelectedReportId(report.expense_report_id)}>
-                          Review
+                        <Button 
+                          size="sm" 
+                          onClick={() => setSelectedReportId(report.expense_report_id)}
+                          variant={["Approved", "Closed", "Rejected", "Returned for Correction"].includes(report.status) ? "secondary" : "primary"}
+                          className="gap-1.5"
+                        >
+                          {(() => {
+                            if (["Approved", "Closed", "Rejected", "Returned for Correction"].includes(report.status)) return <><Eye className="w-3.5 h-3.5" /> View</>;
+                            if (report.status === "Pending Manager Approval" && (hasRole("Manager") || hasRole("Admin"))) return "Need Approval";
+                            if (report.status === "Pending Finance Approval" && (hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin"))) return "Need Approval";
+                            if (report.status === "Payment Requested" && (hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin"))) return "Need Approval";
+                            if (!isOwner(report) && report.status !== "Draft") return <><Eye className="w-3.5 h-3.5" /> View</>;
+                            return "Review";
+                          })()}
                         </Button>
                       </td>
                     </tr>
@@ -455,7 +468,7 @@ const Expenses: React.FC = () => {
               Description / Justification <span className="text-red-500">*</span>
             </label>
             <textarea
-              className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200"
+              className="w-full px-3 py-2 text-sm rounded-lg bg-background dark:bg-black dark:text-white border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200"
               rows={3}
               placeholder="Provide a detailed justification for this expense claim..."
               value={newReport.justification}
@@ -518,7 +531,7 @@ const Expenses: React.FC = () => {
                   </span>
                 </div>
                 <div className="text-right">
-                  <div className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">
+                  <div className="text-3xl font-black text-purple-600 dark:text-purple-400">
                     ${Number(report.total_amount).toFixed(2)}
                   </div>
                   <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">Verified Total</div>
@@ -528,36 +541,53 @@ const Expenses: React.FC = () => {
               {/* Compact Progress Bar */}
               <div className="flex justify-between items-center px-8 py-6 relative">
                 <div className="absolute top-1/2 left-10 right-10 h-0.5 bg-muted -z-10 -translate-y-1/2 rounded-full" />
-                {["Draft", "Pending", "Finance", "Payment", "Closed"].map((s, i) => {
-                  const fullStatuses = ["Draft", "Pending Approval", "Finance Verified", "Payment Requested", "Closed"];
-                  let currentIndex = fullStatuses.indexOf(report.status);
-                  if (report.status === "Approved") currentIndex = 1;
-                  if (report.status === "Pending Finance Verification") currentIndex = 1;
-                  if (report.status === "Corrected Claim") currentIndex = 1;
+                {(() => {
+                  const isManagerSubmitter = isOwner(report) && (hasRole("Manager") || hasRole("Finance Manager") || hasRole("Admin") || hasRole("CFO"));
+                  
+                  // Usually, if it's a manager's claim, it's known, but we can't definitively know for others. We'll default to the standard flow
+                  // unless we know for sure we skipped the manager.
+                  // Actually, let's just base it on the roles we have. If the owner is a manager, they skip manager approval.
+                  // If we aren't the owner, we still want to show the correct flow. 
+                  // Since the backend skips Manager approval if the submitter is a Manager, let's assume if it went straight to Finance, it skipped it.
+                  
+                  const steps = isManagerSubmitter
+                    ? ["Draft", "Submitted", "Finance", "Payment", "Closed"]
+                    : ["Draft", "Submitted", "Manager", "Finance", "Payment", "Closed"];
+                    
+                  let currentIndex = 0;
+                  if (report.status === "Draft") currentIndex = 0;
+                  else if (report.status === "Corrected Claim") currentIndex = 1;
+                  else if (report.status === "Pending Manager Approval") currentIndex = steps.indexOf("Manager") !== -1 ? steps.indexOf("Manager") : 1;
+                  else if (report.status === "Pending Finance Approval" || report.status === "Pending Finance Manager Approval") currentIndex = steps.indexOf("Finance");
+                  else if (report.status === "Payment Requested") currentIndex = steps.indexOf("Payment");
+                  else if (report.status === "Closed" || report.status === "Approved") currentIndex = steps.indexOf("Closed");
+                  else currentIndex = 1;
 
-                  const isCompleted = i <= currentIndex;
-                  const isRejected = report.status.includes("Reject") || report.status.includes("Return");
-                  const isActive = i === currentIndex;
+                  return steps.map((s, i) => {
+                    const isCompleted = i < currentIndex;
+                    const isRejected = report.status.includes("Reject") || report.status.includes("Return");
+                    const isActive = i === currentIndex;
 
-                  return (
-                    <div key={s} className="flex flex-col items-center gap-2.5 relative group">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold z-10 transition-all shadow-sm
-                          ${isCompleted
-                          ? (isRejected && isActive ? 'bg-red-500 text-white shadow-red-500/20' : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-purple-500/20')
-                          : 'bg-muted border border-border text-muted-foreground'}`}
-                      >
-                        {i + 1}
+                    return (
+                      <div key={s} className="flex flex-col items-center gap-2.5 relative group">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold z-10 transition-all shadow-sm
+                            ${isCompleted
+                            ? (isRejected && isActive ? 'bg-red-500 text-white shadow-red-500/20' : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-purple-500/20')
+                            : (isActive ? 'border-2 border-purple-500 bg-background text-purple-500' : 'bg-muted border border-border text-muted-foreground')}`}
+                        >
+                          {i + 1}
+                        </div>
+                        <span className={`text-[10px] font-bold uppercase tracking-wider text-center w-20 leading-tight
+                            ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
+                          {s}
+                        </span>
+                        {i < currentIndex && (
+                          <div className="absolute top-3 left-6 w-[calc(100%+30px)] h-0.5 bg-gradient-to-r from-purple-500 to-pink-500 -z-10" />
+                        )}
                       </div>
-                      <span className={`text-[10px] font-bold uppercase tracking-wider text-center w-20 leading-tight
-                          ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
-                        {s}
-                      </span>
-                      {i < currentIndex && (
-                        <div className="absolute top-3 left-6 w-[calc(100%+30px)] h-0.5 bg-gradient-to-r from-purple-500 to-pink-500 -z-10" />
-                      )}
-                    </div>
-                  )
-                })}
+                    )
+                  });
+                })()}
               </div>
 
               {report.justification && (
@@ -642,27 +672,33 @@ const Expenses: React.FC = () => {
               )}
               {!isOwner(report) && report.status === "Draft" && (
                 <div className="text-muted-foreground italic text-sm text-center p-4 bg-muted/30 rounded-xl mx-2">Draft report - Waiting for submission</div>
-              )}</div>
+              )}
 
             {/* Manager Review */}
-            {(report.status === "Pending Manager Approval" || report.status === "Pending Finance Manager Approval" || report.status === "Corrected Claim") && (hasRole("Manager") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin")) && (
+            {(report.status === "Pending Manager Approval" || report.status === "Corrected Claim") && (hasRole("Manager") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin")) && (
               <div className="flex flex-col gap-3 p-4 bg-amber-500/10 rounded-xl border border-amber-500/20">
                 <h4 className="font-semibold text-amber-800 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> Manager Review Required</h4>
                 <div className="flex gap-2">
                   <Button onClick={() => managerActionMutation.mutate({ reportId: report.expense_report_id, action: 'approve', comments: 'Looks good' })} className="bg-emerald-600 hover:bg-emerald-700 text-white">Approve Claim</Button>
-                  <Button onClick={() => setManagerAction({ isOpen: true, action: 'return', reportId: report.expense_report_id })} variant="outline" className="bg-white text-black">Return to Employee</Button>
+                  <Button onClick={() => setManagerAction({ isOpen: true, action: 'return', reportId: report.expense_report_id })} variant="outline" className="bg-white text-black dark:text-black hover:bg-gray-200">Return to Employee</Button>
                   <Button onClick={() => setManagerAction({ isOpen: true, action: 'reject', reportId: report.expense_report_id })} variant="outline" className="bg-white text-red-600 hover:bg-red-50">Reject</Button>
                 </div>
               </div>
             )}
 
             {/* Finance Review */}
-            {report.status === "Pending Finance Verification" && (hasRole("Finance") || hasRole("Admin")) && (
+            {(report.status === "Pending Finance Verification" || report.status === "Pending Finance Approval" || report.status === "Pending Finance Manager Approval") && (hasRole("Finance Manager") || hasRole("Finance") || hasRole("CFO") || hasRole("Admin")) && (
               <div className="flex flex-col gap-3 p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
-                <h4 className="font-semibold text-blue-800 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> Finance Verification</h4>
-                <Button onClick={() => financeActionMutation.mutate({ reportId: report.expense_report_id, action: 'finance-verify' })} className="w-max bg-blue-600 hover:bg-blue-700 text-white">Verify All Receipts</Button>
+                <h4 className="font-semibold text-blue-800 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> Finance Review Required</h4>
+                <div className="flex gap-2">
+                  <Button onClick={() => managerActionMutation.mutate({ reportId: report.expense_report_id, action: 'approve', comments: 'Finance approved' })} className="bg-blue-600 hover:bg-blue-700 text-white">Approve Claim</Button>
+                  <Button onClick={() => setManagerAction({ isOpen: true, action: 'return', reportId: report.expense_report_id })} variant="outline" className="bg-white text-black dark:text-black hover:bg-gray-200">Return to Employee</Button>
+                  <Button onClick={() => setManagerAction({ isOpen: true, action: 'reject', reportId: report.expense_report_id })} variant="outline" className="bg-white text-red-600 hover:bg-red-50">Reject</Button>
+                </div>
               </div>
             )}
+
+
 
             {/* Payment */}
             {report.status === "Payment Requested" && (hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin")) && (
@@ -694,13 +730,15 @@ const Expenses: React.FC = () => {
                     <div key={receipt.receipt_id} className={`flex flex-col md:flex-row gap-4 p-4 rounded-2xl border transition-all duration-200 shadow-apple-sm ${alert && (report.status === "Draft" || report.status === "Returned for Correction") ? 'border-amber-500/40 bg-amber-500/10' : 'apple-card'}`}>
                       {/* Apple Thumbnail Preview */}
                       <div
-                        className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/60 rounded-xl border border-border flex items-center justify-center overflow-hidden shrink-0 group relative shadow-inner"
+                        className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/60 rounded-xl border border-border flex items-center justify-center overflow-hidden shrink-0 group relative shadow-inner cursor-pointer"
+                        onClick={() => {
+                            setPreviewReceiptUrl(receipt.image_path);
+                        }}
                       >
                         {receipt.image_path ? (
                           <>
-                            <img src={`http://localhost:8000${receipt.image_path}`} alt="Receipt" className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity" />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
-                              onClick={() => window.open(`http://localhost:8000${receipt.image_path}`, '_blank')}>
+                            <img src={receipt.image_path} alt="Receipt" className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                               <Eye className="w-5 h-5 text-white" />
                             </div>
                           </>
@@ -788,10 +826,9 @@ const Expenses: React.FC = () => {
               </div>
             </div>
           </div>
-                </div>
-              </Dialog >
-          );
-        }) ()}
+        </Dialog>
+      );
+    })()}
 
 
 {/* Review & Submit Modal */ }
@@ -857,7 +894,7 @@ const Expenses: React.FC = () => {
   <div className="space-y-4">
     <p className="text-sm text-muted-foreground">Please provide a justification for this action. This will be visible to the employee.</p>
     <textarea
-      className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary focus:border-transparent"
+      className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background dark:bg-black dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
       rows={4}
       placeholder="Enter your justification..."
       value={managerComments}
@@ -936,7 +973,7 @@ const Expenses: React.FC = () => {
         Description / Justification <span className="text-red-500">*</span>
       </label>
       <textarea
-        className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200"
+        className="w-full px-3 py-2 text-sm rounded-lg bg-background dark:bg-black dark:text-white border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200"
         rows={3}
         value={editDetails.justification}
         onChange={e => setEditDetails({ ...editDetails, justification: e.target.value.replace(/[^a-zA-Z0-9\s.,!?-]/g, '') })}
@@ -949,9 +986,15 @@ const Expenses: React.FC = () => {
     </div>
   </form>
 </Dialog>
-    </div >
+      <Dialog isOpen={!!previewReceiptUrl} onClose={() => setPreviewReceiptUrl(null)} title="Receipt Preview" maxWidthClass="max-w-4xl">
+        <div className="flex items-center justify-center bg-black/10 dark:bg-black/50 rounded-xl overflow-hidden p-2 min-h-[50vh]">
+          {previewReceiptUrl && (
+            <img src={previewReceiptUrl} alt="Receipt Preview" className="max-w-full max-h-[80vh] object-contain rounded-lg" />
+          )}
+        </div>
+      </Dialog>
+    </div>
   );
 };
 
 export default Expenses;
-

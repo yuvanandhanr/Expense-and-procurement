@@ -2,9 +2,9 @@ name: Frontend CI/CD Pipeline
 
 on:
   push:
-    branches: [ Yuvan_Build, master ]
+    branches: [ main ]
   pull_request:
-    branches: [ Yuvan_Build, master ]
+    branches: [ main ]
 
 jobs:
   build-and-test:
@@ -64,4 +64,4 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
             ${{ secrets.Docker_username }}/enterprise-procurement-frontend:latest
-            ${{ secrets.yuvan334 }}/enterprise-procurement-frontend:${{ github.sha }}
+            ${{ secrets.Docker_username }}/enterprise-procurement-frontend:${{ github.sha }}
