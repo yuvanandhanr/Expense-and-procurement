@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { ApprovalWorkflow } from "../types";
-import { Button, Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Dialog, Input, EmptyState } from "../components/ui";
+import { Button, Card, CardHeader, CardTitle, CardContent, Badge, StatusBadge, Skeleton, Dialog, Input, EmptyState } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
 import { formatDate, getErrorMessage } from "../utils/helpers";
@@ -67,13 +67,34 @@ export const Approvals: React.FC = () => {
   };
 
   const getFilteredWorkflows = () => {
-    return workflows.filter(wf => {
-      if (activeTab === "Requisitions") return wf.entity_type === "PurchaseRequisition";
-      if (activeTab === "Expenses") return wf.entity_type === "ExpenseReport";
-      if (activeTab === "Asset Incidents") return wf.entity_type === "AssetIncident";
-      if (activeTab === "Resignations") return wf.entity_type === "Resignation";
-      return false;
-    });
+    return workflows
+      .filter((wf: any) => {
+        // Exclude 0.00 items from approval inbox
+        const amt = Number(wf.amount || wf.total_amount || wf.estimated_cost || 0);
+        if (wf.entity_type === "ExpenseReport" || wf.entity_type === "PurchaseRequisition" || wf.entity_type === "VendorInvoice") {
+          if (amt <= 0) return false;
+        }
+        if (activeTab === "Requisitions") return wf.entity_type === "PurchaseRequisition";
+        if (activeTab === "Expenses") return wf.entity_type === "ExpenseReport";
+        if (activeTab === "Asset Incidents") return wf.entity_type === "AssetIncident";
+        if (activeTab === "Resignations") return wf.entity_type === "Resignation";
+        return false;
+      })
+      .sort((a: any, b: any) => {
+        const sA = (a.status || "").toLowerCase();
+        const sB = (b.status || "").toLowerCase();
+        const isPendingA = sA.includes("pending") || sA.includes("review");
+        const isPendingB = sB.includes("pending") || sB.includes("review");
+        
+        // Priority: pending approval workflows come first
+        if (isPendingA && !isPendingB) return -1;
+        if (!isPendingA && isPendingB) return 1;
+        
+        // Sort according to time of creation (newest first)
+        const timeA = new Date(a.created_at || a.submission_date || a.date || 0).getTime();
+        const timeB = new Date(b.created_at || b.submission_date || b.date || 0).getTime();
+        return timeB - timeA;
+      });
   };
 
   const filteredWorkflows = getFilteredWorkflows();
@@ -93,7 +114,7 @@ export const Approvals: React.FC = () => {
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-2 text-sm font-semibold transition-colors border-b-2 ${
               activeTab === tab 
-                ? "border-violet text-violet" 
+                ? "border-primary text-primary" 
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -126,12 +147,7 @@ export const Approvals: React.FC = () => {
                   </span>
                   <CardTitle className="text-base">{wf.workflow_step} Step</CardTitle>
                 </div>
-                <Badge variant={
-                  wf.status === 'Approved' ? 'success' : 
-                  wf.status === 'Rejected' ? 'error' : 
-                  (wf.status === 'Pending' || wf.status === 'Under Review') ? 'info' : 
-                  'neutral'
-                }>{wf.status}</Badge>
+                <StatusBadge status={wf.status} />
               </CardHeader>
               <CardContent className="flex-1 flex flex-col justify-between pt-0 space-y-4">
                 <div className="text-sm space-y-3 mt-2">
@@ -155,11 +171,11 @@ export const Approvals: React.FC = () => {
                   </div>
                 </div>
                 
-                {(wf.status === "Pending" || wf.status === "Under Review") && (
+                {(wf.status === "Pending" || wf.status === "Under Review" || wf.status.toLowerCase().includes("pending")) && (
                   <div className="flex space-x-2 pt-4 border-t border-border">
                     <Button 
-                      variant="primary" 
-                      className="flex-1 flex items-center justify-center space-x-2"
+                      variant="success" 
+                      className="flex-1 font-bold shadow-apple-sm"
                       onClick={() => { setSelectedWorkflow(wf); setActionType("approve"); }}
                     >
                       <Check className="w-4 h-4" />
@@ -167,7 +183,7 @@ export const Approvals: React.FC = () => {
                     </Button>
                     <Button 
                       variant="danger" 
-                      className="flex-1 flex items-center justify-center space-x-2 bg-pink hover:bg-pink/90 text-white shadow-sm"
+                      className="flex-1 font-bold shadow-apple-sm"
                       onClick={() => { setSelectedWorkflow(wf); setActionType("reject"); }}
                     >
                       <XIcon className="w-4 h-4" />

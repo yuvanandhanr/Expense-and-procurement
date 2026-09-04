@@ -34,16 +34,7 @@ class DashboardService:
         """
         Compiles executive dashboard data filtered by role and caches it.
         """
-        cache_key = f"dashboard:role={role}:user={user_id}"
-        cached = await self.cache.get(cache_key)
-        if cached:
-            logger.info(f"Dashboard cache hit for key '{cache_key}'")
-            return cached
-
-        # Fetch active widgets configuration for the role
-        logger.info(f"Dashboard cache miss. Computing metrics for role '{role}'")
-        
-        # Base dashboard widgets
+        # Base dashboard widgets - computed live in real-time
         data = {
             "role": role,
             "timestamp": datetime.utcnow().isoformat(),
@@ -90,8 +81,7 @@ class DashboardService:
             data["widgets"]["my_assets"] = await self._get_employee_my_assets(user_id)
             data["widgets"]["recent_expenses"] = await self._get_employee_recent_expenses(user_id)
 
-        # Cache data for 5 minutes
-        await self.cache.set(cache_key, data, expire_seconds=300)
+        # Real-time metrics computed directly
         return data
 
     async def get_spend_analytics(self) -> Dict[str, Any]:

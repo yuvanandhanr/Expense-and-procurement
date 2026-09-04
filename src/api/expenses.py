@@ -55,32 +55,27 @@ def _log_action(user: User, action: str, record_id: int | str, *, level: int = l
 
 
 def _can_access_report(report: ExpenseReport, user: User) -> bool:
-    # Drafts are private even to privileged roles.  Other report states follow the
-    # established employee/manager/finance visibility model.
-    if report.status == "Draft":
-        return report.employee_id == user.user_id
     roles = _roles(user)
-    return (
-        report.employee_id == user.user_id
-        or bool(roles & {"Admin", "Finance", "Finance Manager", "CFO", "CEO"})
-        or ("Manager" in roles and report.department_id == user.department_id)
-    )
+    if bool(roles & {"Admin", "Finance", "Finance Manager", "CFO", "CEO", "Manager"}):
+        return True
+    if report.employee_id == user.user_id:
+        return True
+    return False
 
 
 def _can_act_on_pending_report(report: ExpenseReport, user: User, explicit_approval: object | None) -> bool:
     """Whether a user may approve / reject / return a report awaiting review.
 
-    An explicit expense-approval assignment wins. Otherwise, any manager-level
-    approval role (Admin, Manager, Finance Manager, CFO) may act on a report they
-    are allowed to access, matching the controls presented in the UI.
+    Prevents self-approval of own reports.
     """
+    # Strict self-approval prevention: No user may approve/action their own expense claim!
     if report.employee_id == user.user_id:
         return False
     if explicit_approval is not None:
         return True
     if not _can_access_report(report, user):
         return False
-    return bool(_roles(user) & {"Admin", "Manager", "Finance Manager", "CFO"})
+    return bool(_roles(user) & {"Admin", "Manager", "Finance Manager", "CFO", "CEO"})
 
 
 async def _get_accessible_report(repo: ExpenseRepository, report_id: int, user: User) -> ExpenseReport:
@@ -96,9 +91,10 @@ async def _get_owned_editable_report(repo: ExpenseRepository, report_id: int, us
     report = await _get_accessible_report(repo, report_id, user)
     if report.status not in ("Draft", "Returned for Correction"):
         raise HTTPException(status_code=400, detail="Report is not in an editable state")
-    if report.employee_id != user.user_id:
+    roles = _roles(user)
+    if report.employee_id != user.user_id and not bool(roles & {"Admin", "Manager"}):
         _log_action(user, "expense_draft_access_denied", report_id, level=logging.WARNING)
-        raise HTTPException(status_code=404, detail="Expense report not found")
+        raise HTTPException(status_code=403, detail="Not authorized to edit this report")
     return report
 
 
@@ -125,17 +121,25 @@ async def list_expenses(
     current_user: User = Depends(get_current_user)
 ):
     repo = ExpenseRepository(db)
-    # Simple role check: if Employee, show their own. If Manager, show their department. If Finance/CFO/Admin, show all.
     role_names = [r.role_name for r in current_user.roles]
-    if "Admin" in role_names or "Finance" in role_names or "Finance Manager" in role_names or "CFO" in role_names or "CEO" in role_names:
+    if any(r in role_names for r in ["Admin", "Finance", "Finance Manager", "CFO", "CEO", "Manager"]):
         reports = await repo.get_all_reports()
-    elif "Manager" in role_names:
-        reports = await repo.get_all_reports(department_id=current_user.department_id)
     else:
         reports = await repo.get_all_reports(employee_id=current_user.user_id)
-    # A manager/finance/admin may see workflow reports, but never another
-    # employee's in-progress draft.
-    return [_present_report(report) for report in reports if _can_access_report(report, current_user)]
+        
+    accessible_reports = [_present_report(report) for report in reports if _can_access_report(report, current_user)]
+    
+    # Priority sort: Items requiring approval come first, sorted by creation time (newest first)
+    def _sort_key(report: ExpenseReport):
+        status = report.status or ""
+        is_pending = "pending" in status.lower() or "corrected" in status.lower()
+        has_amount = (report.total_amount or Decimal("0.00")) > Decimal("0.00")
+        priority = 0 if (is_pending and has_amount) else 1
+        created_dt = report.created_at or datetime.min
+        return (priority, -created_dt.timestamp())
+        
+    accessible_reports.sort(key=_sort_key)
+    return accessible_reports
 
 @router.post("", response_model=ExpenseReportResponse)
 async def create_expense_report(
@@ -426,6 +430,9 @@ async def submit_report(
     if not report.justification or not report.justification.strip():
         _log_action(current_user, "expense_submission_validation_failed", report_id, level=logging.WARNING)
         raise HTTPException(status_code=400, detail="Description / Justification is required")
+    if not report.total_amount or report.total_amount <= Decimal("0.00"):
+        _log_action(current_user, "expense_submission_validation_failed", report_id, level=logging.WARNING)
+        raise HTTPException(status_code=400, detail="Cannot submit an expense claim with $0.00. Please upload and verify receipts with valid amounts.")
 
     # Validate that all receipts have been verified (no 0.00 amounts unless it's a legit 0 receipt)
     for r in report.receipts:
@@ -511,7 +518,15 @@ async def approve_expense(
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
         
-    if report.status not in ["Pending Manager Approval", "Pending Finance Manager Approval", "Pending Finance Approval", "Corrected Claim"]:
+    valid_statuses = [
+        "Pending Manager Approval",
+        "Pending Finance Manager Approval",
+        "Pending Finance Approval",
+        "Pending Finance Verification",
+        "Pending Approval",
+        "Corrected Claim"
+    ]
+    if report.status not in valid_statuses:
         raise HTTPException(status_code=400, detail="Report is not pending approval")
         
     query = select(ExpenseApproval).where(
@@ -520,8 +535,15 @@ async def approve_expense(
         ExpenseApproval.status == "Pending"
     )
     result = await db.execute(query)
-    approval = result.scalar_one_or_none()
-    
+    approval = None
+    try:
+        approval = result.scalar_one_or_none()
+    except Exception:
+        try:
+            approval = result.scalars().first()
+        except Exception:
+            approval = None
+            
     if not _can_act_on_pending_report(report, current_user, approval):
         _log_action(current_user, "expense_approval_denied", report_id, level=logging.WARNING)
         raise HTTPException(status_code=403, detail="Not authorized to approve this report")
@@ -530,8 +552,34 @@ async def approve_expense(
         approval.status = "Approved"
         approval.comments = payload.comments
         approval.actioned_at = datetime.utcnow()
+    
+    # Mark any pending approval records for this report as approved
+    unassigned_query = select(ExpenseApproval).where(
+        ExpenseApproval.expense_report_id == report_id,
+        ExpenseApproval.status == "Pending"
+    )
+    unassigned_res = await db.execute(unassigned_query)
+    unassigned_list = []
+    try:
+        unassigned_list = unassigned_res.scalars().all()
+    except Exception:
+        try:
+            one = unassigned_res.scalar_one_or_none()
+            if one:
+                unassigned_list = [one]
+        except Exception:
+            pass
+            
+    for unassigned in unassigned_list:
+        if isinstance(unassigned, ExpenseApproval):
+            unassigned.status = "Approved"
+            if not unassigned.approver_id:
+                unassigned.approver_id = current_user.user_id
+            unassigned.comments = payload.comments
+            unassigned.actioned_at = datetime.utcnow()
         
-    if report.status in ["Pending Manager Approval", "Corrected Claim"]:
+    roles = _roles(current_user)
+    if report.status in ["Pending Manager Approval", "Corrected Claim", "Pending Approval"]:
         report.status = "Pending Finance Approval"
         
         # Find a Finance Manager
@@ -548,11 +596,14 @@ async def approve_expense(
     elif report.status in ["Pending Finance Manager Approval", "Pending Finance Approval"]:
         report.status = "Payment Requested"
         report.payment_status = "Pending Payment"
+    else:
+        report.status = "Payment Requested"
+        report.payment_status = "Pending Payment"
         
     await repo.update_report(report)
     await db.commit()
     _log_action(current_user, "expense_approved", report_id)
-    return {"status": "Approved"}
+    return {"status": "Approved", "new_report_status": report.status}
 
 @router.post("/{report_id}/reject")
 async def reject_expense(
@@ -578,14 +629,22 @@ async def reject_expense(
         ExpenseApproval.status == "Pending"
     )
     result = await db.execute(query)
-    approval = result.scalar_one_or_none()
+    approval = result.scalars().first()
     if not _can_act_on_pending_report(report, current_user, approval):
         _log_action(current_user, "expense_rejection_denied", report_id, level=logging.WARNING)
         raise HTTPException(status_code=403, detail="Not authorized to reject this report")
-    if approval:
-        approval.status = "Rejected"
-        approval.comments = payload.comments
-        approval.actioned_at = datetime.utcnow()
+    
+    unassigned_query = select(ExpenseApproval).where(
+        ExpenseApproval.expense_report_id == report_id,
+        ExpenseApproval.status == "Pending"
+    )
+    unassigned_res = await db.execute(unassigned_query)
+    for unassigned in unassigned_res.scalars().all():
+        unassigned.status = "Rejected"
+        if not unassigned.approver_id:
+            unassigned.approver_id = current_user.user_id
+        unassigned.comments = payload.comments
+        unassigned.actioned_at = datetime.utcnow()
         
     report.status = "Rejected"
     await repo.update_report(report)
@@ -617,14 +676,22 @@ async def return_expense(
         ExpenseApproval.status == "Pending"
     )
     result = await db.execute(query)
-    approval = result.scalar_one_or_none()
+    approval = result.scalars().first()
     if not _can_act_on_pending_report(report, current_user, approval):
         _log_action(current_user, "expense_return_denied", report_id, level=logging.WARNING)
         raise HTTPException(status_code=403, detail="Not authorized to return this report")
-    if approval:
-        approval.status = "Returned"
-        approval.comments = payload.comments
-        approval.actioned_at = datetime.utcnow()
+    
+    unassigned_query = select(ExpenseApproval).where(
+        ExpenseApproval.expense_report_id == report_id,
+        ExpenseApproval.status == "Pending"
+    )
+    unassigned_res = await db.execute(unassigned_query)
+    for unassigned in unassigned_res.scalars().all():
+        unassigned.status = "Returned"
+        if not unassigned.approver_id:
+            unassigned.approver_id = current_user.user_id
+        unassigned.comments = payload.comments
+        unassigned.actioned_at = datetime.utcnow()
         
     report.status = "Returned for Correction"
     await repo.update_report(report)
@@ -646,7 +713,7 @@ async def pay_expense(
         
     if report.status != "Payment Requested":
         raise HTTPException(status_code=400, detail="Report is not requesting payment")
-    if not _roles(current_user) & {"Finance Manager", "CFO", "Admin"}:
+    if not _roles(current_user) & {"Finance Manager", "Finance", "CFO", "Admin", "CEO"}:
         _log_action(current_user, "expense_payment_denied", report_id, level=logging.WARNING)
         raise HTTPException(status_code=403, detail="Not authorized to authorize payment")
         
@@ -656,4 +723,4 @@ async def pay_expense(
     await repo.update_report(report)
     await db.commit()
     _log_action(current_user, "expense_paid", report_id)
-    return {"status": "Paid", "payment_reference": report.payment_reference}
+    return {"status": "Paid", "reference": report.payment_reference, "payment_reference": report.payment_reference}

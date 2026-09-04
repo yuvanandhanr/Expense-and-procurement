@@ -114,24 +114,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const hasRole = (roleName: string): boolean => {
-    if (!user) return false;
+    if (!user || !Array.isArray(user.roles)) return false;
     // Treat "Finance" and "Finance Manager" interchangeably for frontend access checks
-    if (roleName === "Finance" && user.roles.some((role) => role.role_name === "Finance Manager" && role.status)) return true;
-    if (roleName === "Finance Manager" && user.roles.some((role) => role.role_name === "Finance" && role.status)) return true;
+    if (roleName === "Finance" && user.roles.some((role) => role?.role_name === "Finance Manager" && role?.status)) return true;
+    if (roleName === "Finance Manager" && user.roles.some((role) => role?.role_name === "Finance" && role?.status)) return true;
     // Treat "Vendor" and "Vendor Portal" interchangeably
-    if (roleName === "Vendor" && user.roles.some((role) => role.role_name === "Vendor Portal" && role.status)) return true;
-    if (roleName === "Vendor Portal" && user.roles.some((role) => role.role_name === "Vendor" && role.status)) return true;
-    return user.roles.some((role) => role.role_name === roleName && role.status);
+    if (roleName === "Vendor" && user.roles.some((role) => role?.role_name === "Vendor Portal" && role?.status)) return true;
+    if (roleName === "Vendor Portal" && user.roles.some((role) => role?.role_name === "Vendor" && role?.status)) return true;
+    return user.roles.some((role) => role?.role_name === roleName && role?.status);
   };
 
   const hasPermission = (permissionName: string): boolean => {
-    if (!user) return false;
+    if (!user || !Array.isArray(user.roles)) return false;
     // Check permissions across all active roles
     return user.roles.some((role) => {
-      if (!role.status) return false;
+      if (!role?.status) return false;
       // Admin bypass
-      if (role.role_name === "Admin") return true;
-      return role.permissions?.some((perm) => perm.permission_name === permissionName) || false;
+      if (role?.role_name === "Admin") return true;
+      return role?.permissions?.some((perm) => perm?.permission_name === permissionName) || false;
     });
   };
 

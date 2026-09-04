@@ -2,6 +2,7 @@ from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
 from sqlalchemy import BigInteger, String, Text, Numeric, Boolean, DateTime, ForeignKey
+from sqlalchemy.schema import FetchedValue
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.database.base import Base
 
@@ -130,7 +131,7 @@ class PRItem(Base):
         Numeric(15, 2), nullable=False, comment="Estimated item unit cost"
     )
     total_price: Mapped[Optional[Decimal]] = mapped_column(
-        Numeric(15, 2), nullable=True, comment="Quantity * Unit Price"
+        Numeric(15, 2), server_default=FetchedValue(), comment="Quantity * Unit Price"
     )
 
     purchase_requisition = relationship("PurchaseRequisition", back_populates="items")

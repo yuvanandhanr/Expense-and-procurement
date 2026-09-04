@@ -48,8 +48,7 @@ class PRService:
                 item_name=item_data.item_name,
                 specification=item_data.specification,
                 quantity=item_data.quantity,
-                unit_price=item_data.unit_price,
-                total_price=item_total
+                unit_price=item_data.unit_price
             )
             items_to_create.append(item)
 
