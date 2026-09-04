@@ -573,7 +573,7 @@ const Expenses: React.FC = () => {
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold z-10 transition-all shadow-sm
                             ${isCompleted
                             ? (isRejected && isActive ? 'bg-red-500 text-white shadow-red-500/20' : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-purple-500/20')
-                            : (isActive ? 'border-2 border-purple-500 bg-background text-purple-500' : 'bg-muted border border-border text-muted-foreground')}`}
+                            : (isActive ? 'border-2 border-blue-500 bg-background text-blue-500' : 'bg-muted border border-border text-muted-foreground')}`}
                         >
                           {i + 1}
                         </div>
@@ -680,7 +680,7 @@ const Expenses: React.FC = () => {
                 <h4 className="font-semibold text-amber-800 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> Manager Review Required</h4>
                 <div className="flex gap-2">
                   <Button onClick={() => managerActionMutation.mutate({ reportId: report.expense_report_id, action: 'approve', comments: 'Looks good' })} className="bg-emerald-600 hover:bg-emerald-700 text-white">Approve Claim</Button>
-                  <Button onClick={() => setManagerAction({ isOpen: true, action: 'return', reportId: report.expense_report_id })} variant="outline" className="bg-white text-black dark:text-black hover:bg-gray-200">Return to Employee</Button>
+                  <Button onClick={() => setManagerAction({ isOpen: true, action: 'return', reportId: report.expense_report_id })} variant="outline" className="bg-white text-black dark:text-black hover:bg-gray-200" style={{ color: 'black' }}>Return to Employee</Button>
                   <Button onClick={() => setManagerAction({ isOpen: true, action: 'reject', reportId: report.expense_report_id })} variant="outline" className="bg-white text-red-600 hover:bg-red-50">Reject</Button>
                 </div>
               </div>
@@ -692,7 +692,7 @@ const Expenses: React.FC = () => {
                 <h4 className="font-semibold text-blue-800 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> Finance Review Required</h4>
                 <div className="flex gap-2">
                   <Button onClick={() => managerActionMutation.mutate({ reportId: report.expense_report_id, action: 'approve', comments: 'Finance approved' })} className="bg-blue-600 hover:bg-blue-700 text-white">Approve Claim</Button>
-                  <Button onClick={() => setManagerAction({ isOpen: true, action: 'return', reportId: report.expense_report_id })} variant="outline" className="bg-white text-black dark:text-black hover:bg-gray-200">Return to Employee</Button>
+                  <Button onClick={() => setManagerAction({ isOpen: true, action: 'return', reportId: report.expense_report_id })} variant="outline" className="bg-white text-black dark:text-black hover:bg-gray-200" style={{ color: 'black' }}>Return to Employee</Button>
                   <Button onClick={() => setManagerAction({ isOpen: true, action: 'reject', reportId: report.expense_report_id })} variant="outline" className="bg-white text-red-600 hover:bg-red-50">Reject</Button>
                 </div>
               </div>
