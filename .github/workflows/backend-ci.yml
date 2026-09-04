@@ -36,6 +36,7 @@ jobs:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
           JWT_SECRET: testing_secret_key_for_ci
           ENVIRONMENT: testing
+          PYTHONPATH: ${{ github.workspace }}
         run: pytest -v
 
   docker-publish:
