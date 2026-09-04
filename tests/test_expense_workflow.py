@@ -96,7 +96,7 @@ async def test_expense_approval_under_1000(
     )
     
     assert response.status_code == status.HTTP_200_OK
-    assert report.status == "Pending Finance Manager Approval"
+    assert report.status == "Pending Finance Approval"
     assert approval.status == "Approved"
     
     app.dependency_overrides.pop(get_db_session, None)
@@ -151,7 +151,7 @@ async def test_expense_approval_over_1000(
     )
     
     assert response.status_code == status.HTTP_200_OK
-    assert report.status == "Pending Finance Manager Approval"
+    assert report.status == "Pending Finance Approval"
     assert approval.status == "Approved"
     
     # Verify FM approval created
@@ -201,7 +201,7 @@ async def test_expense_finance_manager_approval(
     )
     
     assert response.status_code == status.HTTP_200_OK
-    assert report.status == "Approved"
+    assert report.status == "Payment Requested"
     assert report.payment_status == "Payment Authorized"
     assert approval.status == "Approved"
     
