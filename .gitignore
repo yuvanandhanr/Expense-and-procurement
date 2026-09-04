@@ -128,3 +128,8 @@ Desktop.ini
 # Local application configurations and logs
 logs/
 *.log
+
+# Node.js / frontend dependencies and build artifacts
+node_modules/
+playwright-report/
+test-results/
