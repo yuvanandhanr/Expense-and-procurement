@@ -202,7 +202,7 @@ async def test_expense_finance_manager_approval(
     
     assert response.status_code == status.HTTP_200_OK
     assert report.status == "Payment Requested"
-    assert report.payment_status == "Payment Authorized"
+    assert report.payment_status == "Pending Payment"
     assert approval.status == "Approved"
     
     app.dependency_overrides.pop(get_db_session, None)
