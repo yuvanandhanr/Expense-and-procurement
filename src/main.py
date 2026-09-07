@@ -150,7 +150,11 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust for production configurations
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://expense-frontend-rxv8.onrender.com",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -158,7 +162,7 @@ app.add_middleware(
 
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["*"] if settings.ENVIRONMENT != "production" else ["localhost", "127.0.0.1"]
+    allowed_hosts=["*"] if settings.ENVIRONMENT != "production" else ["localhost", "127.0.0.1", "*.onrender.com"]
 )
 
 # Include Authentication and Authorization routes
