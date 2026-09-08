@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { useAuth } from "../hooks/useAuth";
 import {Card, CardHeader, CardTitle, CardContent, Button, Badge, Skeleton, Dialog, Input, EmptyState} from "../components/ui";
-import { formatDate } from "../utils/helpers";
+import { formatDate, isValidText } from "../utils/helpers";
 import toast from "react-hot-toast";
 
 export const VendorPortal: React.FC = () => {
@@ -55,8 +55,8 @@ export const VendorPortal: React.FC = () => {
 
   const handleSubmitBid = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!timeline) {
-      toast.error("Please enter a delivery timeline.");
+    if (!timeline || !isValidText(timeline)) {
+      toast.error("Please enter a valid delivery timeline (letters or numbers required).");
       return;
     }
     

@@ -1,6 +1,6 @@
 from typing import Optional, List
 from datetime import datetime, date
-from sqlalchemy import BigInteger, String, Text, DateTime, Date, ForeignKey
+from sqlalchemy import BigInteger, String, Text, DateTime, Date, ForeignKey, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.database.base import Base
 
@@ -105,6 +105,8 @@ class AssetIncident(Base):
     incident_type: Mapped[str] = mapped_column(String(100), nullable=False) # Damage, Loss, Theft
     status: Mapped[str] = mapped_column(String(50), default="Reported") # Reported, Inspection Pending, Repair, Replacement, Closed
     resolution: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    image_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    physical_inspection_done: Mapped[Optional[bool]] = mapped_column(Boolean, default=False, server_default='false')
     linked_pr_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("purchase_requisitions.pr_id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

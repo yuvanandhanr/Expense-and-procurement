@@ -4,7 +4,7 @@ import { PurchaseRequisition } from "../types";
 import { Button, Input, Card, CardHeader, CardTitle, CardContent, Badge, StatusBadge, Skeleton, Dialog, HeroTimestamp, EmptyState } from "../components/ui";
 import { ClipboardList, Plus, Eye, Send, Check, X, Ban } from "lucide-react";
 import toast from "react-hot-toast";
-import { formatDate, getErrorMessage } from "../utils/helpers";
+import { formatDate, getErrorMessage, isValidText } from "../utils/helpers";
 import { useAuth } from "../hooks/useAuth";
 
 export const PurchaseRequisitions: React.FC = () => {
@@ -46,8 +46,13 @@ export const PurchaseRequisitions: React.FC = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !estimatedCost) {
+    if (!title || !estimatedCost || !description) {
       toast.error("Please fill in all required fields.");
+      return;
+    }
+
+    if (!isValidText(title) || !isValidText(description)) {
+      toast.error("Title and justification must contain letters or numbers.");
       return;
     }
 
@@ -94,8 +99,8 @@ export const PurchaseRequisitions: React.FC = () => {
     setIsSubmitting(true);
     try {
       if (action === "cancel" || action === "reject") {
-        if (!comment.trim()) {
-          toast.error(`Please provide a reason for ${action === "cancel" ? "cancellation" : "rejection"}.`);
+        if (!comment.trim() || !isValidText(comment)) {
+          toast.error(`Please provide a valid reason for ${action === "cancel" ? "cancellation" : "rejection"} (letters or numbers required).`);
           setIsSubmitting(false);
           return;
         }

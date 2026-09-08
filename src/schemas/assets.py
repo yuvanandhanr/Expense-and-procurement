@@ -120,12 +120,20 @@ class AssetSchema(BaseModel):
 class AssetIncidentCreate(BaseModel):
     asset_id: int
     description: str
-    incident_type: str # Damage, Loss, Theft
+    incident_type: str
+    image_url: Optional[str] = None
+
+
+class AssetIncidentUpdate(BaseModel):
+    description: Optional[str] = None
+    incident_type: Optional[str] = None
+    image_url: Optional[str] = None
 
 
 class AssetIncidentAction(BaseModel):
-    action: str # Approve, Reject, Repair, Replace
+    action: str # Approve, Reject, Repair, Replace, Return for Correction
     resolution: Optional[str] = None
+    physical_inspection_done: Optional[bool] = False
 
 
 class AssetIncidentSchema(BaseModel):
@@ -139,6 +147,8 @@ class AssetIncidentSchema(BaseModel):
     incident_type: str
     status: str
     resolution: Optional[str] = None
+    image_url: Optional[str] = None
+    physical_inspection_done: Optional[bool] = False
     linked_pr_id: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

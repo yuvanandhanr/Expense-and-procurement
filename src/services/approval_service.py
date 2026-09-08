@@ -67,37 +67,18 @@ class ApprovalService:
             requestor = result_user.scalar_one_or_none()
             manager_id = requestor.manager_id if requestor else None
             
-            requestor_is_manager = False
             if requestor:
-                requestor_is_manager = any(r.role_name in ["Manager", "Admin", "CEO", "Finance Manager", "CFO"] for r in requestor.roles)
+                # Always route to Manager Approval first, regardless of requestor's role
+                pass
             
-            # If the requestor is a Manager (or has no manager / is self), route directly to Finance Manager!
-            if requestor_is_manager or (manager_id is None or manager_id == report.employee_id):
-                query_finance = select(User).join(User.roles).where(
-                    Role.role_name.in_(["Finance Manager", "Finance", "CFO"]),
-                    User.status == "Active",
-                )
-                finance_result = await self.db.execute(query_finance)
-                finance_mgr = finance_result.scalars().first()
-                approver_id = finance_mgr.user_id if finance_mgr else None
-                
-                approval_entry = ExpenseApproval(
-                    expense_report_id=report.expense_report_id,
-                    approver_id=approver_id,
-                    status="Pending"
-                )
-                self.db.add(approval_entry)
-                report.status = "Pending Finance Manager Approval"
-            else:
-                # Regular employee claim -> Manager Approval first
-                approver_id = manager_id
-                approval_entry = ExpenseApproval(
-                    expense_report_id=report.expense_report_id,
-                    approver_id=approver_id,
-                    status="Pending"
-                )
-                self.db.add(approval_entry)
-                report.status = "Pending Manager Approval"
+            approver_id = manager_id
+            approval_entry = ExpenseApproval(
+                expense_report_id=report.expense_report_id,
+                approver_id=approver_id,
+                status="Pending"
+            )
+            self.db.add(approval_entry)
+            report.status = "Pending Manager Approval"
             
             if approver_id:
                 try:
@@ -325,6 +306,7 @@ class ApprovalService:
                     "current_step_sequence": current_step_sequence,
                     "status": workflow.status,
                     "created_at": workflow.created_at,
+                    "updated_at": workflow.updated_at,
                     "requestor_id": pr.requestor_id,
                     "requestor_name": f"{requestor.first_name} {requestor.last_name}",
                     "title": pr.title,
