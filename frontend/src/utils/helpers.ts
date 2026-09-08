@@ -18,3 +18,8 @@ export const getErrorMessage = (err: any, defaultMsg: string = "An error occurre
   }
   return err.message || defaultMsg;
 };
+
+export const isValidText = (text?: string | null): boolean => {
+  if (!text) return false;
+  return /[a-zA-Z0-9]/.test(text);
+};

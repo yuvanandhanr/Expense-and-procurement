@@ -58,6 +58,7 @@ class InboxApprovalWorkflowSchema(BaseModel):
     current_step_sequence: int
     status: str
     created_at: datetime
+    updated_at: Optional[datetime] = None
     requestor_id: Optional[int] = None
     requestor_name: str
     title: Optional[str] = None

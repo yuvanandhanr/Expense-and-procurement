@@ -179,15 +179,28 @@ export const Assets: React.FC = () => {
                       {canViewAll && <td className="p-4 text-xs font-semibold">{a.assigned_to_name || "Unassigned"}</td>}
                       {canViewAll && <td className="p-4 font-mono">${a.cost?.toLocaleString()}</td>}
                       <td className="p-4">
-                        <Badge variant={a.status === "Active" || a.status === "Assigned" ? "success" : a.status === "Retired" ? "neutral" : "error"}>
+                        <Badge 
+                          variant={
+                            ["Damaged", "Reported", "Under Maintenance", "Disposed", "Lost"].includes(a.status) ? "error" : 
+                            a.status === "Active" ? "success" : 
+                            a.status === "Assigned" ? "warning" : 
+                            "neutral"
+                          }
+                        >
                           {a.status}
                         </Badge>
                       </td>
                       {isAdmin && (
                         <td className="p-4 text-right">
-                          <Button size="sm" variant="outline" onClick={() => setTransferAsset(a)}>
-                            <ArrowRightLeft className="w-3.5 h-3.5 mr-1.5" /> {a.assigned_to_name ? "Transfer" : "Assign"}
-                          </Button>
+                          {["Damaged", "Reported", "Under Maintenance", "Disposed"].includes(a.status) ? (
+                            <Button size="sm" variant="ghost" disabled>
+                              Unavailable
+                            </Button>
+                          ) : (
+                            <Button size="sm" variant="outline" onClick={() => setTransferAsset(a)}>
+                              <ArrowRightLeft className="w-3.5 h-3.5 mr-1.5" /> {a.assigned_to_name ? "Transfer" : "Assign"}
+                            </Button>
+                          )}
                         </td>
                       )}
                     </tr>
@@ -259,7 +272,7 @@ export const Assets: React.FC = () => {
               onChange={e => setSelectedUser(e.target.value)}
               options={[
                 { value: "", label: "Select an employee..." },
-                ...users.map(u => ({ value: u.user_id.toString(), label: `${u.first_name} ${u.last_name} (${u.department})` }))
+                ...users.map(u => ({ value: u.user_id.toString(), label: `${u.first_name} ${u.last_name} (${u.roles && u.roles.length > 0 ? u.roles.map(r => r.role_name).join(', ') : 'Employee'})` }))
               ]}
             />
 

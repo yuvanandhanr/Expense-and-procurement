@@ -3,9 +3,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Upload, CheckCircle, XCircle, FileText, AlertCircle, RefreshCw, DollarSign, Clock, CheckSquare, XOctagon, Trash2, ClipboardList, Building, Briefcase, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "../services/api";
-import { ExpenseReport, Receipt } from "../types";
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Skeleton, Badge, StatusBadge, Dialog, HeroTimestamp, EmptyState } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
+import { isValidText } from "../utils/helpers";
 
 const Expenses: React.FC = () => {
   const { hasRole, user } = useAuth();
@@ -200,12 +200,12 @@ const Expenses: React.FC = () => {
 
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newReport.purpose.trim()) {
-      toast.error("Business purpose is required");
+    if (!newReport.purpose.trim() || !isValidText(newReport.purpose)) {
+      toast.error("Business purpose is required and must contain letters or numbers.");
       return;
     }
-    if (!newReport.justification.trim()) {
-      toast.error("Description / Justification is required");
+    if (!newReport.justification.trim() || !isValidText(newReport.justification)) {
+      toast.error("Description / Justification is required and must contain letters or numbers.");
       return;
     }
     const payload: any = {
@@ -905,6 +905,10 @@ const Expenses: React.FC = () => {
       <Button
         disabled={!managerComments.trim() || managerActionMutation.isPending}
         onClick={() => {
+          if (!isValidText(managerComments)) {
+            toast.error("Please enter a valid justification (letters or numbers required).");
+            return;
+          }
           if (managerAction.reportId && managerAction.action) {
             managerActionMutation.mutate({ reportId: managerAction.reportId, action: managerAction.action, comments: managerComments });
             setManagerAction({ isOpen: false, action: null, reportId: null });
