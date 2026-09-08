@@ -136,12 +136,13 @@ async def test_manager_approve_incident(
         "/api/v1/asset-incidents/1/action",
         json={
             "action": "Approve",
-            "resolution": "Please inspect physically"
+            "resolution": "Please inspect physically",
+            "physical_inspection_done": True
         }
     )
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.json()["status"] == "Inspection Pending"
+    assert response.json()["status"] == "Pending Fulfillment"
 
 
 @pytest.mark.anyio
@@ -194,17 +195,21 @@ async def test_it_replace_incident(
         reporter_id=1,
         description="Screen cracked",
         incident_type="Damage",
-        status="Inspection Pending",
+        status="Pending Fulfillment",
         incident_date=date.today(),
         asset=mock_asset
     )
 
     mock_result = MagicMock()
     mock_result.scalar_one_or_none.return_value = mock_incident
+    
+    mock_avail_result = MagicMock()
+    mock_avail_result.scalars().first.return_value = None
+
     mock_cat_result = MagicMock()
     mock_cat_result.scalar_one_or_none.return_value = AssetCategory(category_id=1, category_name="IT Assets")
     
-    override_db.execute = AsyncMock(side_effect=[mock_result, mock_cat_result])
+    override_db.execute = AsyncMock(side_effect=[mock_result, mock_avail_result, mock_cat_result])
     
     # Mock PR Service
     mock_pr_service_inst = mock_pr_service_cls.return_value
@@ -222,5 +227,5 @@ async def test_it_replace_incident(
     )
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.json()["status"] == "Replacement"
+    assert response.json()["status"] == "Waiting for Procurement"
     assert response.json()["linked_pr_id"] == 99
