@@ -541,17 +541,14 @@ const Expenses: React.FC = () => {
                 <div className="absolute top-1/2 left-10 right-10 h-0.5 bg-muted -z-10 -translate-y-1/2 rounded-full" />
                 {(() => {
                   const requestorRoles = report.employee?.roles?.map((r: any) => r.role_name) || [];
-                  const isFinanceManagerSubmitter = requestorRoles.includes("Finance Manager") || requestorRoles.includes("Finance");
-                  const isAdminCfoCeoSubmitter = requestorRoles.includes("Admin") || requestorRoles.includes("CFO") || requestorRoles.includes("CEO");
-                  const isManagerSubmitter = requestorRoles.includes("Manager");
+                  const routesToCfo = requestorRoles.includes("Admin") || requestorRoles.includes("CEO") || requestorRoles.includes("Finance Manager") || requestorRoles.includes("Finance");
+                  const routesToFinanceManager = requestorRoles.includes("CFO") || (requestorRoles.includes("Manager") && !routesToCfo);
 
                   let steps = ["Draft", "Submitted", "Manager", "Finance", "Payment", "Closed"];
-                  if (isFinanceManagerSubmitter) {
+                  if (routesToCfo) {
                     steps = ["Draft", "Submitted", "CFO", "Payment", "Closed"];
-                  } else if (isAdminCfoCeoSubmitter) {
+                  } else if (routesToFinanceManager) {
                     steps = ["Draft", "Submitted", "Finance Manager", "Payment", "Closed"];
-                  } else if (isManagerSubmitter) {
-                    steps = ["Draft", "Submitted", "Finance", "Payment", "Closed"];
                   }
                     
                   let currentIndex = 0;
