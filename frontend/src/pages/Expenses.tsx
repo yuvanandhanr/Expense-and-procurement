@@ -301,11 +301,9 @@ const Expenses: React.FC = () => {
         </div>
         <div className="flex items-center space-x-4">
           <HeroTimestamp />
-          {(!isFinance && !hasRole("CFO")) && (
-            <Button onClick={() => setIsCreateOpen(true)} className="font-bold text-xs uppercase tracking-wider">
-              New Reimbursement
-            </Button>
-          )}
+          <Button onClick={() => setIsCreateOpen(true)} className="font-bold text-xs uppercase tracking-wider">
+            New Reimbursement
+          </Button>
         </div>
       </div>
 

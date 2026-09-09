@@ -71,10 +71,14 @@ class ApprovalService:
             
             # If requestor is a Manager, Admin, CFO, CEO, or Finance Manager, skip Manager Approval
             if requestor_roles & {"Manager", "Admin", "CFO", "CEO", "Finance Manager"}:
-                # Route directly to Finance Manager approval
-                # Find a Finance Manager who is NOT the requestor
+                # If requestor is Finance Manager, route directly to CFO
+                is_fm = "Finance Manager" in requestor_roles or "Finance" in requestor_roles
+                target_roles = ["CFO"] if is_fm else ["Finance Manager", "Finance", "CFO", "Admin"]
+
+                # Route directly to appropriate level
+                # Find an approver who is NOT the requestor
                 fm_query = select(User).join(User.roles).where(
-                    Role.role_name.in_(["Finance Manager", "Finance", "CFO", "Admin"]),
+                    Role.role_name.in_(target_roles),
                     User.status == "Active",
                     User.user_id != requestor.user_id
                 )
@@ -145,19 +149,31 @@ class ApprovalService:
         manager_id = requestor.manager_id if requestor else None
         
         requestor_is_cfo = False
+        requestor_is_fm = False
+        requestor_is_admin = False
+        requestor_is_ceo = False
         if requestor:
             requestor_is_cfo = any(r.role_name == "CFO" for r in requestor.roles)
+            requestor_is_fm = any(r.role_name in ["Finance Manager", "Finance"] for r in requestor.roles)
+            requestor_is_admin = any(r.role_name == "Admin" for r in requestor.roles)
+            requestor_is_ceo = any(r.role_name == "CEO" for r in requestor.roles)
 
-        if requestor_is_cfo:
+        if requestor_is_ceo:
+            fm_role_id = await self.get_role_id_by_name("Finance Manager", 6)
+            steps_to_create.append({"step_number": 1, "approver_role_id": fm_role_id, "approver_id": None})
+        elif requestor_is_cfo:
             ceo_role_id = await self.get_role_id_by_name("CEO", 5)
             steps_to_create.append({"step_number": 1, "approver_role_id": ceo_role_id, "approver_id": None})
+        elif requestor_is_fm or requestor_is_admin:
+            cfo_role_id = await self.get_role_id_by_name("CFO", 5)
+            steps_to_create.append({"step_number": 1, "approver_role_id": cfo_role_id, "approver_id": None})
         else:
             manager_role_id = await self.get_role_id_by_name("Manager", 2)
             finance_role_id = await self.get_role_id_by_name("Finance Manager", 6)
             cfo_role_id = await self.get_role_id_by_name("CFO", 5)
 
             # Step 1: Manager Approval (Team Manager or designated)
-            steps_to_create.append({"step_number": 1, "approver_role_id": manager_role_id, "approver_id": manager_id})
+            steps_to_create.append({"step_number": 1, "approver_role_id": manager_role_id, "approver_id": manager_id if manager_id != pr.requestor_id else None})
 
             # Step 2: Finance Manager Approval
             steps_to_create.append({"step_number": 2, "approver_role_id": finance_role_id, "approver_id": None})
