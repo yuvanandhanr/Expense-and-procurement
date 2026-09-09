@@ -44,8 +44,8 @@ RUN groupadd -g 10001 appuser && \
 COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
 COPY --chown=appuser:appuser . .
 
-# Ensure logs directory can be written to by appuser
-RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs
+# Ensure app directory and logs can be written to by appuser
+RUN mkdir -p /app/logs && chown -R appuser:appuser /app
 
 USER appuser
 
