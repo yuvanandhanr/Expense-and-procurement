@@ -78,7 +78,7 @@ export const Login: React.FC = () => {
       try {
         window.google.accounts.id.prompt((notification: any) => {
           if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            handleCredentialResponse({ credential: "mock_google_y.raja@dataeko.ai" });
+             toast.error("Google Sign-In popup blocked. Please allow popups or try again.");
           }
         });
         return;
@@ -87,7 +87,7 @@ export const Login: React.FC = () => {
       }
     }
     // Fallback standard Google login
-    handleCredentialResponse({ credential: "mock_google_y.raja@dataeko.ai" });
+    toast.error("Google Identity Services failed to load. Please refresh.");
   };
 
   const handleCustomGoogleEmailSubmit = (e: React.FormEvent) => {
