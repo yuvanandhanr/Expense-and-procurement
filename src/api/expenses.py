@@ -55,6 +55,8 @@ def _log_action(user: User, action: str, record_id: int | str, *, level: int = l
 
 
 def _can_access_report(report: ExpenseReport, user: User) -> bool:
+    if report.status == "Draft":
+        return report.employee_id == user.user_id
     roles = _roles(user)
     if bool(roles & {"Admin", "Finance", "Finance Manager", "CFO", "CEO", "Manager"}):
         return True

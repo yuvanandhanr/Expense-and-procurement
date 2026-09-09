@@ -18,6 +18,13 @@ def check_pr_access(pr, current_user: User) -> None:
     - Procurement: Only approved PRs.
     - Employee/Others: Own requisitions only.
     """
+    # If Draft, only requestor can access
+    if pr.status == "Draft" and pr.requestor_id != current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the owner can access their drafts."
+        )
+
     # Check full access roles
     user_roles = [role.role_name for role in current_user.roles]
     if any(role in user_roles for role in ["Admin", "CFO", "Finance Manager", "Finance", "Manager", "CEO"]):
@@ -64,11 +71,13 @@ async def list_prs(
     user_roles = [role.role_name for role in current_user.roles]
 
     if any(role in user_roles for role in ["Admin", "CFO", "Finance Manager", "Finance", "Procurement", "CEO"]):
-        return await service.pr_repo.list_all()
+        prs = await service.pr_repo.list_all()
     elif "Manager" in user_roles and current_user.department_id:
-        return await service.pr_repo.list_by_department(current_user.department_id)
+        prs = await service.pr_repo.list_by_department(current_user.department_id)
     else:
-        return await service.pr_repo.list_by_requestor(current_user.user_id)
+        prs = await service.pr_repo.list_by_requestor(current_user.user_id)
+        
+    return [pr for pr in prs if not (pr.status == "Draft" and pr.requestor_id != current_user.user_id)]
 
 
 @router.get("/{id}", response_model=PRSchema)
