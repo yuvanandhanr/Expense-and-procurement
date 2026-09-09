@@ -4,6 +4,16 @@ from datetime import datetime, date
 from decimal import Decimal
 
 # Receipt Schemas
+from src.schemas.auth import RoleSchema
+
+class EmployeeBasicSchema(BaseModel):
+    user_id: int
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    roles: List[RoleSchema] = []
+    
+    model_config = ConfigDict(from_attributes=True)
+
 class ReceiptBase(BaseModel):
     merchant_name: Optional[str] = None
     receipt_date: Optional[date] = None
@@ -88,6 +98,7 @@ class ExpenseReportResponse(ExpenseReportBase):
     created_at: datetime
     updated_at: datetime
     receipts: List[ReceiptResponse] = []
+    employee: Optional[EmployeeBasicSchema] = None
     
     model_config = ConfigDict(from_attributes=True)
 

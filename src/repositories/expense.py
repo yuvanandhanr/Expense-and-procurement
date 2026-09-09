@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from src.models.auth import User
 from src.models.expense import ExpenseReport, Receipt, ExpenseApproval
 
 
@@ -13,7 +14,8 @@ class ExpenseRepository:
     async def get_all_reports(self, employee_id: Optional[int] = None, department_id: Optional[int] = None) -> Sequence[ExpenseReport]:
         stmt = select(ExpenseReport).options(
             selectinload(ExpenseReport.receipts),
-            selectinload(ExpenseReport.approvals)
+            selectinload(ExpenseReport.approvals),
+            selectinload(ExpenseReport.employee).selectinload(User.roles)
         )
         if employee_id:
             stmt = stmt.where(ExpenseReport.employee_id == employee_id)
@@ -26,7 +28,8 @@ class ExpenseRepository:
     async def get_report_by_id(self, report_id: int) -> Optional[ExpenseReport]:
         stmt = select(ExpenseReport).options(
             selectinload(ExpenseReport.receipts),
-            selectinload(ExpenseReport.approvals)
+            selectinload(ExpenseReport.approvals),
+            selectinload(ExpenseReport.employee).selectinload(User.roles)
         ).where(ExpenseReport.expense_report_id == report_id)
         result = await self.db.execute(stmt)
         return result.scalars().first()
