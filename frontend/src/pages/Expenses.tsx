@@ -675,7 +675,7 @@ const Expenses: React.FC = () => {
               )}
 
             {/* Manager Review */}
-            {(report.status === "Pending Manager Approval" || report.status === "Corrected Claim") && (hasRole("Manager") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin")) && (
+            {(report.status === "Pending Manager Approval" || report.status === "Corrected Claim") && !isOwner(report) && (hasRole("Manager") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin")) && (
               <div className="flex flex-col gap-3 p-4 bg-amber-500/10 rounded-xl border border-amber-500/20">
                 <h4 className="font-semibold text-amber-800 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> Manager Review Required</h4>
                 <div className="flex gap-2">
@@ -687,7 +687,7 @@ const Expenses: React.FC = () => {
             )}
 
             {/* Finance Review */}
-            {(report.status === "Pending Finance Verification" || report.status === "Pending Finance Approval" || report.status === "Pending Finance Manager Approval") && (hasRole("Finance Manager") || hasRole("Finance") || hasRole("CFO") || hasRole("Admin")) && (
+            {(report.status === "Pending Finance Verification" || report.status === "Pending Finance Approval" || report.status === "Pending Finance Manager Approval") && !isOwner(report) && (hasRole("Finance Manager") || hasRole("Finance") || hasRole("CFO") || hasRole("Admin")) && (
               <div className="flex flex-col gap-3 p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
                 <h4 className="font-semibold text-blue-800 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> Finance Review Required</h4>
                 <div className="flex gap-2">
@@ -701,7 +701,7 @@ const Expenses: React.FC = () => {
 
 
             {/* Payment */}
-            {report.status === "Payment Requested" && (hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin")) && (
+            {report.status === "Payment Requested" && !isOwner(report) && (hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin")) && (
               <div className="flex flex-col gap-3 p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
                 <h4 className="font-semibold text-emerald-800 flex items-center gap-2"><DollarSign className="w-4 h-4" /> Payment Authorization</h4>
                 <div className="flex gap-2">
