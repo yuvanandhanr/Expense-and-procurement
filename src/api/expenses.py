@@ -478,8 +478,12 @@ async def submit_report(
     if is_manager and policy_issues and not report.justification:
         _log_action(current_user, "expense_submission_validation_failed", report_id, level=logging.WARNING)
         raise HTTPException(status_code=400, detail="Policy violations found. Manager claims require justification.")
-    # Transition status
-    report.status = "Corrected Claim" if report.status == "Returned for Correction" else "Pending Manager Approval"
+    # Initial status transition before approval flow kicks in
+    if report.status == "Returned for Correction":
+        report.status = "Corrected Claim"
+    else:
+        report.status = "Submitted"
+        
     await repo.update_report(report)
     
     # Trigger approval engine based on total_amount
@@ -530,6 +534,10 @@ async def approve_expense(
     ]
     if report.status not in valid_statuses:
         raise HTTPException(status_code=400, detail="Report is not pending approval")
+        
+    if report.employee_id == current_user.user_id:
+        _log_action(current_user, "expense_approval_self_denied", report_id, level=logging.WARNING)
+        raise HTTPException(status_code=403, detail="Cannot approve your own claim")
         
     query = select(ExpenseApproval).where(
         ExpenseApproval.expense_report_id == report_id,
@@ -584,8 +592,12 @@ async def approve_expense(
     if report.status in ["Pending Manager Approval", "Corrected Claim", "Pending Approval"]:
         report.status = "Pending Finance Approval"
         
-        # Find a Finance Manager
-        fm_query = select(User).join(User.roles).where(Role.role_name.in_(["Finance Manager", "Finance", "CFO"]), User.status == "Active")
+        # Find a Finance Manager who is not the submitter
+        fm_query = select(User).join(User.roles).where(
+            Role.role_name.in_(["Finance Manager", "Finance", "CFO", "Admin"]), 
+            User.status == "Active",
+            User.user_id != report.employee_id
+        )
         fm_result = await db.execute(fm_query)
         finance_manager = fm_result.scalars().first()
         
@@ -718,6 +730,10 @@ async def pay_expense(
     
     if report.status != "Payment Requested":
         raise HTTPException(status_code=400, detail="Report is not requesting payment. It must be approved by the Finance Manager first.")
+        
+    if report.employee_id == current_user.user_id:
+        _log_action(current_user, "expense_payment_self_denied", report_id, level=logging.WARNING)
+        raise HTTPException(status_code=403, detail="Cannot authorize payment for your own claim")
         
     # Extra validation: Ensure no pending approvals exist for this claim
     pending_approvals_query = select(ExpenseApproval).where(

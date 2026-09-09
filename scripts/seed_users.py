@@ -20,8 +20,8 @@ fake = Faker()
 # IMPORTANT: Update this list with your real team members' details
 REAL_USERS = [
     {"email": "c.anisetty@dataeko.ai", "first_name": "Chaitna Sree", "last_name": "Anisetty", "role": "Employee"},
-    {"email": "s.verma@dataeko.ai", "first_name": "Sumit", "last_name": "Verma", "role": "Manager"},
-    {"email": "y.raja@dataeko.ai", "first_name": "Yuvanandan", "last_name": "Raja", "role": "Finance Manager"},
+    {"email": "s.verma@dataeko.ai", "first_name": "Sumit", "last_name": "Verma", "role": "Employee"},
+    {"email": "y.raja@dataeko.ai", "first_name": "Yuvanandan", "last_name": "Raja", "role": "Employee"},
 ]
 
 async def seed_users():

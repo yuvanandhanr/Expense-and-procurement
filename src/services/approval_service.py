@@ -67,18 +67,42 @@ class ApprovalService:
             requestor = result_user.scalar_one_or_none()
             manager_id = requestor.manager_id if requestor else None
             
-            if requestor:
-                # Always route to Manager Approval first, regardless of requestor's role
-                pass
+            requestor_roles = {r.role_name for r in requestor.roles} if requestor else set()
             
-            approver_id = manager_id
-            approval_entry = ExpenseApproval(
-                expense_report_id=report.expense_report_id,
-                approver_id=approver_id,
-                status="Pending"
-            )
-            self.db.add(approval_entry)
-            report.status = "Pending Manager Approval"
+            # If requestor is a Manager, Admin, CFO, CEO, or Finance Manager, skip Manager Approval
+            if requestor_roles & {"Manager", "Admin", "CFO", "CEO", "Finance Manager"}:
+                # Route directly to Finance Manager approval
+                # Find a Finance Manager who is NOT the requestor
+                fm_query = select(User).join(User.roles).where(
+                    Role.role_name.in_(["Finance Manager", "Finance", "CFO", "Admin"]),
+                    User.status == "Active",
+                    User.user_id != requestor.user_id
+                )
+                fm_result = await self.db.execute(fm_query)
+                finance_manager = fm_result.scalars().first()
+                approver_id = finance_manager.user_id if finance_manager else None
+                
+                approval_entry = ExpenseApproval(
+                    expense_report_id=report.expense_report_id,
+                    approver_id=approver_id,
+                    status="Pending"
+                )
+                self.db.add(approval_entry)
+                report.status = "Pending Finance Approval"
+            else:
+                # Employee submits -> Manager
+                approver_id = manager_id
+                # Enforce that approver cannot be the requestor (fallback logic)
+                if approver_id == requestor.user_id:
+                    approver_id = None
+                    
+                approval_entry = ExpenseApproval(
+                    expense_report_id=report.expense_report_id,
+                    approver_id=approver_id,
+                    status="Pending"
+                )
+                self.db.add(approval_entry)
+                report.status = "Pending Manager Approval"
             
             if approver_id:
                 try:
