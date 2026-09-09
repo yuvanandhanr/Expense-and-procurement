@@ -540,23 +540,29 @@ const Expenses: React.FC = () => {
               <div className="flex justify-between items-center px-8 py-6 relative">
                 <div className="absolute top-1/2 left-10 right-10 h-0.5 bg-muted -z-10 -translate-y-1/2 rounded-full" />
                 {(() => {
-                  const isManagerSubmitter = isOwner(report) && (hasRole("Manager") || hasRole("Finance Manager") || hasRole("Admin") || hasRole("CFO"));
-                  
-                  // Usually, if it's a manager's claim, it's known, but we can't definitively know for others. We'll default to the standard flow
-                  // unless we know for sure we skipped the manager.
-                  // Actually, let's just base it on the roles we have. If the owner is a manager, they skip manager approval.
-                  // If we aren't the owner, we still want to show the correct flow. 
-                  // Since the backend skips Manager approval if the submitter is a Manager, let's assume if it went straight to Finance, it skipped it.
-                  
-                  const steps = isManagerSubmitter
-                    ? ["Draft", "Submitted", "Finance", "Payment", "Closed"]
-                    : ["Draft", "Submitted", "Manager", "Finance", "Payment", "Closed"];
+                  const requestorRoles = report.employee?.roles?.map((r: any) => r.role_name) || [];
+                  const isFinanceManagerSubmitter = requestorRoles.includes("Finance Manager") || requestorRoles.includes("Finance");
+                  const isAdminCfoCeoSubmitter = requestorRoles.includes("Admin") || requestorRoles.includes("CFO") || requestorRoles.includes("CEO");
+                  const isManagerSubmitter = requestorRoles.includes("Manager");
+
+                  let steps = ["Draft", "Submitted", "Manager", "Finance", "Payment", "Closed"];
+                  if (isFinanceManagerSubmitter) {
+                    steps = ["Draft", "Submitted", "CFO", "Payment", "Closed"];
+                  } else if (isAdminCfoCeoSubmitter) {
+                    steps = ["Draft", "Submitted", "Finance Manager", "Payment", "Closed"];
+                  } else if (isManagerSubmitter) {
+                    steps = ["Draft", "Submitted", "Finance", "Payment", "Closed"];
+                  }
                     
                   let currentIndex = 0;
                   if (report.status === "Draft") currentIndex = 0;
                   else if (report.status === "Corrected Claim") currentIndex = 1;
                   else if (report.status === "Pending Manager Approval") currentIndex = steps.indexOf("Manager") !== -1 ? steps.indexOf("Manager") : 1;
-                  else if (report.status === "Pending Finance Approval" || report.status === "Pending Finance Manager Approval") currentIndex = steps.indexOf("Finance");
+                  else if (report.status === "Pending Finance Approval" || report.status === "Pending Finance Manager Approval" || report.status === "Pending CFO Approval") {
+                      if (steps.includes("CFO")) currentIndex = steps.indexOf("CFO");
+                      else if (steps.includes("Finance Manager")) currentIndex = steps.indexOf("Finance Manager");
+                      else currentIndex = steps.indexOf("Finance");
+                  }
                   else if (report.status === "Payment Requested") currentIndex = steps.indexOf("Payment");
                   else if (report.status === "Closed" || report.status === "Approved") currentIndex = steps.indexOf("Closed");
                   else currentIndex = 1;
@@ -685,9 +691,9 @@ const Expenses: React.FC = () => {
             )}
 
             {/* Finance Review */}
-            {(report.status === "Pending Finance Verification" || report.status === "Pending Finance Approval" || report.status === "Pending Finance Manager Approval") && !isOwner(report) && (hasRole("Finance Manager") || hasRole("Finance") || hasRole("CFO") || hasRole("Admin")) && (
+            {(report.status === "Pending Finance Verification" || report.status === "Pending Finance Approval" || report.status === "Pending Finance Manager Approval" || report.status === "Pending CFO Approval") && !isOwner(report) && (hasRole("Finance Manager") || hasRole("Finance") || hasRole("CFO") || hasRole("Admin")) && (
               <div className="flex flex-col gap-3 p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
-                <h4 className="font-semibold text-blue-800 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> Finance Review Required</h4>
+                <h4 className="font-semibold text-blue-800 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> {report.status === "Pending CFO Approval" ? "CFO Review Required" : "Finance Review Required"}</h4>
                 <div className="flex gap-2">
                   <Button onClick={() => managerActionMutation.mutate({ reportId: report.expense_report_id, action: 'approve', comments: 'Finance approved' })} variant="success">Approve Claim</Button>
                   <Button onClick={() => setManagerAction({ isOpen: true, action: 'return', reportId: report.expense_report_id })} variant="outline" className="bg-white text-black dark:text-black hover:bg-gray-200" style={{ color: 'black' }}>Return to Employee</Button>

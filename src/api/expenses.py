@@ -608,7 +608,7 @@ async def approve_expense(
             status="Pending"
         )
         db.add(fm_approval)
-    elif report.status in ["Pending Finance Manager Approval", "Pending Finance Approval"]:
+    elif report.status in ["Pending Finance Manager Approval", "Pending Finance Approval", "Pending CFO Approval"]:
         report.status = "Payment Requested"
         report.payment_status = "Pending Payment"
     else:

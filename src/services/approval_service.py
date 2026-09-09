@@ -73,7 +73,7 @@ class ApprovalService:
             if requestor_roles & {"Manager", "Admin", "CFO", "CEO", "Finance Manager"}:
                 # If requestor is Finance Manager, route directly to CFO
                 is_fm = "Finance Manager" in requestor_roles or "Finance" in requestor_roles
-                target_roles = ["CFO"] if is_fm else ["Finance Manager", "Finance", "CFO", "Admin"]
+                target_roles = ["CFO"] if is_fm else ["Finance Manager", "Finance"]
 
                 # Route directly to appropriate level
                 # Find an approver who is NOT the requestor
@@ -92,7 +92,7 @@ class ApprovalService:
                     status="Pending"
                 )
                 self.db.add(approval_entry)
-                report.status = "Pending Finance Approval"
+                report.status = "Pending CFO Approval" if is_fm else "Pending Finance Manager Approval"
             else:
                 # Employee submits -> Manager
                 approver_id = manager_id
