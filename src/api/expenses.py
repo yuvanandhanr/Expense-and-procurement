@@ -714,7 +714,17 @@ async def pay_expense(
         raise HTTPException(status_code=404, detail="Report not found")
         
     if report.status != "Payment Requested":
-        raise HTTPException(status_code=400, detail="Report is not requesting payment")
+        raise HTTPException(status_code=400, detail="Report is not requesting payment. It must be approved by the Finance Manager first.")
+        
+    # Extra validation: Ensure no pending approvals exist for this claim
+    pending_approvals_query = select(ExpenseApproval).where(
+        ExpenseApproval.expense_report_id == report_id,
+        ExpenseApproval.status == "Pending"
+    )
+    pending_approvals_result = await db.execute(pending_approvals_query)
+    if pending_approvals_result.scalars().first():
+        raise HTTPException(status_code=400, detail="Cannot authorize payment while there are pending approvals.")
+        
     if not _roles(current_user) & {"Finance Manager", "Finance", "CFO", "Admin", "CEO"}:
         _log_action(current_user, "expense_payment_denied", report_id, level=logging.WARNING)
         raise HTTPException(status_code=403, detail="Not authorized to authorize payment")
