@@ -99,7 +99,7 @@ const Expenses: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
     },
     onError: (err: any) => {
-      toast.error(err.response?.data?.detail || "Failed to upload receipt (Duplicate or Invalid file)");
+      toast.error(err.response?.data?.detail || err.message || "Failed to upload receipt (Duplicate or Invalid file)");
     }
   });
 

@@ -205,7 +205,8 @@ async def upload_receipts(
     written_paths: list[str] = []
     try:
       for file, content, content_hash in uploads:
-        ext = file.filename.rsplit(".", 1)[-1] if "." in file.filename else "bin"
+        filename = file.filename or "receipt.bin"
+        ext = filename.rsplit(".", 1)[-1] if "." in filename else "bin"
         unique_name = f"{uuid.uuid4().hex}.{ext}"
         filepath = os.path.join(UPLOAD_DIR, unique_name)
         
@@ -226,10 +227,10 @@ async def upload_receipts(
         # Keep the OCR-based comparison as a second line of defence for legacy
         # receipts uploaded before content hashes were available.
         for existing in report.receipts:
-            if existing.file_name == file.filename:
+            if existing.file_name == filename:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Duplicate receipt error: File '{file.filename}' has already been uploaded to this report."
+                    detail=f"Duplicate receipt error: File '{filename}' has already been uploaded to this report."
                 )
             if (
                 merchant 

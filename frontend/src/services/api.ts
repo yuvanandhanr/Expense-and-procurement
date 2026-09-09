@@ -6,7 +6,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000, // 30s timeout
+  timeout: 120000, // 120s timeout
 });
 
 // Cache tokens locally for quick synchronous access in interceptors
@@ -66,8 +66,11 @@ api.interceptors.response.use(
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
     
     if (!error.response) {
-      // Network Error
-      toast.error("Network connection refused. Please ensure the backend service is running.");
+      if (error.code === 'ECONNABORTED') {
+        toast.error("Request timed out. The server might be processing a large file.");
+      } else {
+        toast.error(`Network Error: ${error.message}. Please ensure the backend is running.`);
+      }
       return Promise.reject(error);
     }
 
