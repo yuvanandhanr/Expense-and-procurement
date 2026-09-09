@@ -713,6 +713,9 @@ async def pay_expense(
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
         
+    from sqlalchemy import select
+    from src.models.expense import ExpenseApproval
+    
     if report.status != "Payment Requested":
         raise HTTPException(status_code=400, detail="Report is not requesting payment. It must be approved by the Finance Manager first.")
         
