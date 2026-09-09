@@ -704,7 +704,11 @@ const Expenses: React.FC = () => {
             {report.status === "Payment Requested" && (hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin")) && (
               <div className="flex flex-col gap-3 p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
                 <h4 className="font-semibold text-emerald-800 flex items-center gap-2"><DollarSign className="w-4 h-4" /> Payment Authorization</h4>
-                <Button onClick={() => financeActionMutation.mutate({ reportId: report.expense_report_id, action: 'pay' })} className="w-max bg-emerald-600 hover:bg-emerald-700 text-white">Authorize Payment</Button>
+                <div className="flex gap-2">
+                  <Button onClick={() => financeActionMutation.mutate({ reportId: report.expense_report_id, action: 'pay' })} className="bg-emerald-600 hover:bg-emerald-700 text-white">Authorize Payment</Button>
+                  <Button onClick={() => setManagerAction({ isOpen: true, action: 'return', reportId: report.expense_report_id })} variant="outline" className="bg-white text-black dark:text-black hover:bg-gray-200" style={{ color: 'black' }}>Return to Employee</Button>
+                  <Button onClick={() => setManagerAction({ isOpen: true, action: 'reject', reportId: report.expense_report_id })} variant="outline" className="bg-white text-red-600 hover:bg-red-50">Reject</Button>
+                </div>
               </div>
             )}
 
@@ -732,12 +736,13 @@ const Expenses: React.FC = () => {
                       <div
                         className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/60 rounded-xl border border-border flex items-center justify-center overflow-hidden shrink-0 group relative shadow-inner cursor-pointer"
                         onClick={() => {
-                            setPreviewReceiptUrl(receipt.image_path);
+                            const fullUrl = receipt.image_path.startsWith('http') ? receipt.image_path : `${import.meta.env.VITE_API_URL.replace('/api/v1', '')}${receipt.image_path}`;
+                            setPreviewReceiptUrl(fullUrl);
                         }}
                       >
                         {receipt.image_path ? (
                           <>
-                            <img src={receipt.image_path} alt="Receipt" className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity" />
+                            <img src={receipt.image_path.startsWith('http') ? receipt.image_path : `${import.meta.env.VITE_API_URL.replace('/api/v1', '')}${receipt.image_path}`} alt="Receipt" className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity" />
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                               <Eye className="w-5 h-5 text-white" />
                             </div>
