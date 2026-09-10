@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.dependency import get_db_session
 from src.auth.dependencies import get_current_user, PermissionChecker
 from src.models.auth import User
-from src.schemas.purchase_requisition import PRCreate, PRUpdate, PRSchema
+from src.schemas.purchase_requisition import PRCreate, PRUpdate, PRSchema, PRAllocateInventoryRequest
 from src.services.pr_service import PRService
 
 router = APIRouter(prefix="/pr", tags=["Purchase Requisitions"])
@@ -174,3 +174,34 @@ async def clone_pr(
 
     check_pr_access(pr, current_user)
     return await service.clone_pr(id, current_user.user_id)
+
+
+@router.post("/{id}/allocate-inventory", response_model=PRSchema)
+async def allocate_inventory(
+    id: int,
+    data: PRAllocateInventoryRequest,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    service = PRService(db)
+    pr = await service.pr_repo.get_by_id(id)
+    if not pr:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
+        
+    check_pr_access(pr, current_user)
+    return await service.allocate_inventory(id, data.asset_id, current_user.user_id)
+
+
+@router.post("/{id}/initiate-procurement", response_model=PRSchema)
+async def initiate_procurement(
+    id: int,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    service = PRService(db)
+    pr = await service.pr_repo.get_by_id(id)
+    if not pr:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
+        
+    check_pr_access(pr, current_user)
+    return await service.initiate_procurement(id, current_user.user_id)

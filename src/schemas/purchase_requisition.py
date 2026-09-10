@@ -8,8 +8,8 @@ class PRItemBase(BaseModel):
     category: str = Field(..., description="Catalog category, e.g. IT, Office Supplies")
     item_name: str = Field(..., description="Name of the item requested")
     specification: Optional[str] = Field(None, description="Technical specifications description")
-    quantity: int = Field(..., gt=0, description="Quantity requested")
-    unit_price: Decimal = Field(..., gt=0, description="Estimated unit price cost")
+    quantity: int = Field(1, gt=0, description="Quantity requested")
+    unit_price: Optional[Decimal] = Field(0.00, ge=0, description="Estimated unit price cost")
 
 
 class PRItemCreate(PRItemBase):
@@ -60,6 +60,9 @@ class PRUpdate(BaseModel):
     project_code: Optional[str] = None
     items: Optional[List[PRItemCreate]] = None
 
+class PRAllocateInventoryRequest(BaseModel):
+    asset_id: int = Field(..., description="ID of the asset to allocate")
+
 
 class PRSchema(PRBase):
     model_config = ConfigDict(from_attributes=True)
@@ -73,6 +76,8 @@ class PRSchema(PRBase):
     technical_spec_signoff: Optional[bool] = None
     technical_spec_signoff_by: Optional[int] = None
     technical_spec_signoff_at: Optional[datetime] = None
+    is_inventory_allocation: Optional[bool] = False
+    allocated_asset_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
     items: List[PRItemSchema] = []

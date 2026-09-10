@@ -166,29 +166,18 @@ class ApprovalService:
             requestor_is_admin = any(r.role_name == "Admin" for r in requestor.roles)
             requestor_is_ceo = any(r.role_name == "CEO" for r in requestor.roles)
 
-        if requestor_is_ceo:
-            fm_role_id = await self.get_role_id_by_name("Finance Manager", 6)
-            steps_to_create.append({"step_number": 1, "approver_role_id": fm_role_id, "approver_id": None})
-        elif requestor_is_cfo:
-            ceo_role_id = await self.get_role_id_by_name("CEO", 5)
-            steps_to_create.append({"step_number": 1, "approver_role_id": ceo_role_id, "approver_id": None})
-        elif requestor_is_fm or requestor_is_admin:
-            cfo_role_id = await self.get_role_id_by_name("CFO", 5)
-            steps_to_create.append({"step_number": 1, "approver_role_id": cfo_role_id, "approver_id": None})
-        else:
-            manager_role_id = await self.get_role_id_by_name("Manager", 2)
-            finance_role_id = await self.get_role_id_by_name("Finance Manager", 6)
-            cfo_role_id = await self.get_role_id_by_name("CFO", 5)
+        admin_role_id = await self.get_role_id_by_name("Admin", 4)
+        manager_role_id = await self.get_role_id_by_name("Manager", 2)
 
-            # Step 1: Manager Approval (Team Manager or designated)
-            steps_to_create.append({"step_number": 1, "approver_role_id": manager_role_id, "approver_id": manager_id if manager_id != pr.requestor_id else None})
+        step_counter = 1
+        
+        # Step 1: Manager Approval (Skip if requestor is CEO or has no manager)
+        if manager_id and manager_id != pr.requestor_id and not requestor_is_ceo:
+            steps_to_create.append({"step_number": step_counter, "approver_role_id": manager_role_id, "approver_id": manager_id})
+            step_counter += 1
 
-            # Step 2: Finance Manager Approval
-            steps_to_create.append({"step_number": 2, "approver_role_id": finance_role_id, "approver_id": None})
-
-            # Step 3: > $5000 requires CFO
-            if pr.total_estimated_amount > Decimal("5000.00"):
-                steps_to_create.append({"step_number": 3, "approver_role_id": cfo_role_id, "approver_id": None})
+        # Step 2: Admin Approval (Inventory Check)
+        steps_to_create.append({"step_number": step_counter, "approver_role_id": admin_role_id, "approver_id": None})
 
         # Create overall workflow
         workflow = ApprovalWorkflow(
@@ -382,7 +371,7 @@ class ApprovalService:
             )
         return active_step
 
-    async def approve_step(self, pr_id: int, user_id: int, comments: Optional[str] = None) -> PurchaseRequisition:
+    async def approve_step(self, pr_id: int, user_id: int, comments: Optional[str] = None, physical_inspection_done: bool = False) -> PurchaseRequisition:
         pr = await self.pr_repo.get_by_id(pr_id)
         if not pr:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
@@ -395,6 +384,17 @@ class ApprovalService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Users cannot approve their own requests."
             )
+
+        # Physical inspection enforcement for Managers
+        from src.models.auth import Role
+        role_result = await self.db.execute(select(Role).where(Role.role_id == active_step.approver_role_id))
+        step_role = role_result.scalar_one_or_none()
+        if step_role and step_role.role_name == "Manager":
+            if not physical_inspection_done:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Physical inspection must be completed to approve this request."
+                )
 
         # Duplicate approval prevention
         existing_approval_query = select(ApprovalHistory).where(

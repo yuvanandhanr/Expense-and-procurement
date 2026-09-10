@@ -273,3 +273,68 @@ class PRService:
         await self.history_repo.create(w_hist)
 
         return await self.pr_repo.get_by_id(cloned_pr.pr_id)
+
+    async def allocate_inventory(self, pr_id: int, asset_id: int, user_id: int) -> PurchaseRequisition:
+        """
+        Admin allocates an existing asset from inventory to fulfill the PR.
+        This resolves the PR without going to Procurement.
+        """
+        pr = await self.pr_repo.get_by_id(pr_id)
+        if not pr:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
+        
+        # Approve the Admin step
+        active_step = await self.approval_service.get_active_step(pr_id)
+        from src.models.auth import Role
+        role_result = await self.db.execute(select(Role).where(Role.role_id == active_step.approver_role_id))
+        step_role = role_result.scalar_one_or_none()
+        if not step_role or step_role.role_name != "Admin":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only Admin can allocate inventory at this step.")
+            
+        await self.approval_service.approve_step(pr_id, user_id, comments=f"Allocated Asset ID {asset_id} from inventory.")
+        
+        # Update PR
+        pr.is_inventory_allocation = True
+        pr.allocated_asset_id = asset_id
+        pr.status = "Inventory Allocated"
+        await self.pr_repo.update(pr)
+        
+        # Update Asset status (e.g. to Reserved or pending assignment)
+        from src.models.assets import Asset
+        asset_result = await self.db.execute(select(Asset).where(Asset.asset_id == asset_id))
+        asset = asset_result.scalar_one_or_none()
+        if asset:
+            asset.status = "Assigned"
+            asset.assigned_to = pr.requestor_id
+        
+        return pr
+
+    async def initiate_procurement(self, pr_id: int, user_id: int) -> PurchaseRequisition:
+        """
+        Admin confirms no inventory available, escalates PR to Procurement/CFO.
+        """
+        pr = await self.pr_repo.get_by_id(pr_id)
+        if not pr:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
+            
+        # Add Step 3: CFO
+        workflow = await self.approval_service.workflow_repo.get_by_pr_id(pr_id)
+        cfo_role_id = await self.approval_service.get_role_id_by_name("CFO", 5)
+        
+        from src.models.approval import ApprovalStep
+        step = ApprovalStep(
+            workflow_id=workflow.workflow_id,
+            step_number=3,
+            approver_role_id=cfo_role_id,
+            approver_id=None,
+            status="Pending"
+        )
+        await self.approval_service.step_repo.create(step)
+        
+        # Approve Admin step
+        await self.approval_service.approve_step(pr_id, user_id, comments="No inventory available. Initiating procurement.")
+        
+        pr.status = "Pending CFO Approval"
+        await self.pr_repo.update(pr)
+        
+        return pr

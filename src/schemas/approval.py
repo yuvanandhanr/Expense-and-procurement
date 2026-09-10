@@ -115,6 +115,7 @@ class CommentSchema(CommentBase):
 # Actions Payload Schemas
 class PRApproveRequest(BaseModel):
     comments: Optional[str] = Field(None, description="Optional approval comments")
+    physical_inspection_done: Optional[bool] = Field(False, description="Whether physical inspection was completed by Manager")
 
 
 class PRRejectRequest(BaseModel):
