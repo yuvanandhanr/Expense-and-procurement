@@ -94,17 +94,21 @@ async def lifespan(app: FastAPI):
 
     await initialize_cache()
     
-    # 2.6 Run Alembic Migrations Programmatically
+    # 2.6 Run raw SQL patches for missing columns (robust fallback for SQLite/Render)
+    from sqlalchemy import text
     try:
-        from alembic import command
-        from alembic.config import Config
-        logger.info("Running automatic Alembic migrations...")
-        alembic_cfg = Config("alembic.ini")
-        # Need to run synchronously, so we use asyncio.to_thread
-        await asyncio.to_thread(command.upgrade, alembic_cfg, "head")
-        logger.info("Alembic migrations completed successfully.")
+        async with async_engine.begin() as conn:
+            try:
+                await conn.execute(text("ALTER TABLE purchase_requisitions ADD COLUMN is_inventory_allocation BOOLEAN;"))
+            except Exception:
+                pass
+            try:
+                await conn.execute(text("ALTER TABLE purchase_requisitions ADD COLUMN allocated_asset_id BIGINT;"))
+            except Exception:
+                pass
+        logger.info("Database schema patch applied successfully.")
     except Exception as e:
-        logger.error(f"Error running Alembic migrations on startup: {e}")
+        logger.error(f"Error applying database schema patch on startup: {e}")
 
     try:
         async with async_session() as session:
