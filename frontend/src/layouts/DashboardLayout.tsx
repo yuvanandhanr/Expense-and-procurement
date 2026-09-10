@@ -843,7 +843,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
 
             {/* Apple Role Pill Badge */}
             <div className="hidden md:flex items-center px-3 py-1 rounded-full bg-muted/60 border border-border/60">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary mr-2" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#0071E3] mr-2" />
               <span className="text-[11px] font-semibold text-foreground/90">
                 {user?.roles && user.roles.length > 0 ? user.roles[0].role_name : "User"}
               </span>
@@ -853,9 +853,9 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
             <div className="relative" ref={profileRef}>
               <button
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className="flex items-center space-x-2 p-1 rounded-full hover:ring-2 hover:ring-primary/40 transition-all active:scale-95"
+                className="flex items-center space-x-2 p-1 rounded-full hover:ring-2 hover:ring-[#0071E3]/40 transition-all active:scale-95"
               >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-primary-hover text-white font-bold flex items-center justify-center text-xs shadow-apple-sm border border-white/20">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#0071E3] to-[#0077ED] text-white font-bold flex items-center justify-center text-xs shadow-apple-sm border border-white/20">
                   {user?.first_name?.[0] || user?.email?.[0]?.toUpperCase() || "U"}
                 </div>
               </button>
