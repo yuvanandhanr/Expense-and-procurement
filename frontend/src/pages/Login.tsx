@@ -203,7 +203,7 @@ export const Login: React.FC = () => {
         
         {/* Apple Brand Identity Header */}
         <div className="text-center pt-2 pb-4 border-b border-border/50">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-primary to-primary-hover flex items-center justify-center text-white font-extrabold text-xl mx-auto shadow-apple-glow mb-3">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#0071E3] to-[#0077ED] flex items-center justify-center text-white font-extrabold text-xl mx-auto shadow-apple-glow mb-3">
             ✦
           </div>
           <h2 className="text-2xl font-extrabold tracking-tight text-foreground">
