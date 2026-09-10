@@ -1,6 +1,6 @@
 from typing import Optional, List
 from datetime import datetime, date
-from sqlalchemy import BigInteger, String, Text, DateTime, Date, ForeignKey, Boolean
+from sqlalchemy import BigInteger, String, Text, DateTime, Date, ForeignKey, Boolean, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.database.base import Base
 
@@ -31,6 +31,7 @@ class Asset(Base):
     warranty_expiry: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     amc_expiry: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    cost: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     status: Mapped[Optional[str]] = mapped_column(String(50), default="Available") # Available, Assigned, Under Maintenance, Disposed, Returned, Lost
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)

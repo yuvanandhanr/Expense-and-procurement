@@ -22,7 +22,7 @@ export default {
           foreground: "var(--text)",
         },
         primary: {
-          DEFAULT: "var(--primary)",
+          DEFAULT: "rgb(var(--primary-rgb) / <alpha-value>)",
           hover: "var(--primary-hover)",
           foreground: "#FFFFFF",
         },
@@ -55,7 +55,7 @@ export default {
         violet: "var(--primary)",
         pink: "var(--pink)",
         lime: "var(--lime)",
-        cyan: "var(--cyan)",
+        cyan: "rgb(var(--cyan-rgb) / <alpha-value>)",
       },
       borderRadius: {
         "3xl": "24px",

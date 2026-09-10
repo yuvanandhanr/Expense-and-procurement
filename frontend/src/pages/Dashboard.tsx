@@ -150,25 +150,25 @@ export const Dashboard: React.FC = () => {
                 Total Spend
               </span>
               <div className="flex items-center gap-1.5">
-                <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
-                <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-[#0071E3] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                <div className="w-8 h-8 rounded-xl bg-[#0071E3]/10 flex items-center justify-center text-[#0071E3] group-hover:scale-110 transition-transform">
                   <DollarSign className="w-4 h-4" />
                 </div>
               </div>
             </div>
             <div className="mt-3">
-              <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-primary transition-colors">
+              <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-[#0071E3] transition-colors">
                 ${totalExpenseSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-emerald-500">
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-emerald-500/10">
+              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-[#0071E3] transition-colors group-hover:text-[#0071E3]">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-[#0071E3]/10 transition-colors group-hover:bg-[#0071E3]/20 group-hover:text-[#0071E3]">
                   {expenses.length} Records
                 </span>
-                <span className="text-muted-foreground">in current ledger</span>
+                <span className="text-muted-foreground transition-colors group-hover:text-[#0071E3]">in current ledger</span>
               </div>
             </div>
           </div>
-          <div className="mt-3.5 pt-2.5 border-t border-border/40 text-[10px] text-muted-foreground/80 group-hover:text-primary flex items-center justify-between transition-colors">
+          <div className="mt-3.5 pt-2.5 border-t border-border/40 text-[10px] text-muted-foreground/80 group-hover:text-[#0071E3] flex items-center justify-between transition-colors">
             <span>Verified claims & reimbursements</span>
             <span className="font-bold flex items-center">View Ledger <ChevronRight className="w-3 h-3 ml-0.5" /></span>
           </div>
@@ -196,8 +196,8 @@ export const Dashboard: React.FC = () => {
               <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-amber-500 transition-colors">
                 {pendingApprovalsCount}
               </div>
-              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-amber-500">
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-500/10">
+              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-amber-500 transition-colors group-hover:text-amber-500">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-500/10 transition-colors group-hover:bg-amber-500/20 group-hover:text-amber-500">
                   {pendingApprovalsCount > 0 ? "Action Required" : "All Caught Up"}
                 </span>
               </div>
@@ -221,24 +221,24 @@ export const Dashboard: React.FC = () => {
                 Approval Velocity
               </span>
               <div className="flex items-center gap-1.5">
-                <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-cyan group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
-                <div className="w-8 h-8 rounded-xl bg-cyan/10 flex items-center justify-center text-cyan group-hover:scale-110 transition-transform">
+                <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-[#30B0C7] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                <div className="w-8 h-8 rounded-xl bg-[#30B0C7]/10 flex items-center justify-center text-[#30B0C7] group-hover:scale-110 transition-transform">
                   <TrendingUp className="w-4 h-4" />
                 </div>
               </div>
             </div>
             <div className="mt-3">
-              <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-cyan transition-colors">
-                1.4 <span className="text-base font-semibold text-muted-foreground">days</span>
+              <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-[#30B0C7] transition-colors">
+                1.4 <span className="text-base font-semibold text-muted-foreground transition-colors group-hover:text-[#30B0C7]">days</span>
               </div>
-              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-emerald-500">
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-emerald-500/10">
+              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-[#30B0C7] transition-colors group-hover:text-[#30B0C7]">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-[#30B0C7]/10 transition-colors group-hover:bg-[#30B0C7]/20 group-hover:text-[#30B0C7]">
                   Fast Turnaround
                 </span>
               </div>
             </div>
           </div>
-          <div className="mt-3.5 pt-2.5 border-t border-border/40 text-[10px] text-muted-foreground/80 group-hover:text-cyan flex items-center justify-between transition-colors">
+          <div className="mt-3.5 pt-2.5 border-t border-border/40 text-[10px] text-muted-foreground/80 group-hover:text-[#30B0C7] flex items-center justify-between transition-colors">
             <span>Average multi-tier turnaround</span>
             <span className="font-bold flex items-center">Analytics <ChevronRight className="w-3 h-3 ml-0.5" /></span>
           </div>
@@ -266,8 +266,10 @@ export const Dashboard: React.FC = () => {
               <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-purple-500 transition-colors">
                 {assignedAssetsCount}
               </div>
-              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-muted-foreground">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1" /> Verified Registry
+              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-purple-500 transition-colors group-hover:text-purple-500">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-purple-500/10 transition-colors group-hover:bg-purple-500/20 group-hover:text-purple-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500 mr-1.5 transition-colors group-hover:bg-purple-500" /> Verified Registry
+                </span>
               </div>
             </div>
           </div>

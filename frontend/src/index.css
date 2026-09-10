@@ -16,11 +16,13 @@
     --text-dim: #515154;
     --text-faint: #86868B;
     --primary: #0071E3;
+    --primary-rgb: 0, 113, 227;
     --primary-hover: #0077ED;
     --violet: #0071E3;
     --pink: #FF2D55;
     --lime: #34C759;
     --cyan: #30B0C7;
+    --cyan-rgb: 48, 176, 199;
     --amber: #FF9500;
     
     --shadow-card: 0 4px 24px -2px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -39,11 +41,13 @@
     --text-dim: #A1A1A6;
     --text-faint: #6E6E73;
     --primary: #0A84FF;
+    --primary-rgb: 10, 132, 255;
     --primary-hover: #409CFF;
     --violet: #0A84FF;
     --pink: #FF375F;
     --lime: #30D158;
     --cyan: #64D2FF;
+    --cyan-rgb: 100, 210, 255;
     --amber: #FF9F0A;
     
     --shadow-card: 0 8px 32px -4px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);

@@ -81,14 +81,20 @@ class AssetCreate(BaseModel):
     purchase_date: Optional[date] = None
     warranty_expiry: Optional[date] = None
     amc_expiry: Optional[date] = None
+    cost: Optional[float] = None
     location: Optional[str] = None
+    cost: Optional[float] = None
 
 
 class AssetUpdate(BaseModel):
-    status: Optional[str] = None # Available, Assigned, Under Maintenance, Disposed, Returned, Lost
+    status: Optional[str] = None
+    model: Optional[str] = None
+    category_id: Optional[int] = None
     location: Optional[str] = None
+    cost: Optional[float] = None
     warranty_expiry: Optional[date] = None
     amc_expiry: Optional[date] = None
+    cost: Optional[float] = None
 
 
 class AssetSchema(BaseModel):
@@ -108,7 +114,10 @@ class AssetSchema(BaseModel):
     purchase_date: Optional[date] = None
     warranty_expiry: Optional[date] = None
     amc_expiry: Optional[date] = None
+    cost: Optional[float] = None
     location: Optional[str] = None
+    cost: Optional[float] = None
+    cost: Optional[float] = None
     status: str
     created_at: datetime
     updated_at: datetime
