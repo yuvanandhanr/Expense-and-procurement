@@ -222,7 +222,7 @@ export const Login: React.FC = () => {
               onClick={() => { setActiveTab("employee"); setError(""); }}
               className={`flex-1 py-2 px-3 text-xs font-bold rounded-full transition-all duration-300 ${
                 activeTab === "employee"
-                  ? "bg-card text-foreground shadow-apple-sm border border-border/50 scale-[1.01]"
+                  ? "bg-[#0071E3] text-white shadow-apple-sm border border-[#0071E3]/50 scale-[1.01]"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -233,7 +233,7 @@ export const Login: React.FC = () => {
               onClick={() => { setActiveTab("vendor"); setError(""); }}
               className={`flex-1 py-2 px-3 text-xs font-bold rounded-full transition-all duration-300 ${
                 activeTab === "vendor"
-                  ? "bg-card text-foreground shadow-apple-sm border border-border/50 scale-[1.01]"
+                  ? "bg-[#0071E3] text-white shadow-apple-sm border border-[#0071E3]/50 scale-[1.01]"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -261,9 +261,11 @@ export const Login: React.FC = () => {
                   type="button"
                   onClick={handleGoogleSignInClick}
                   disabled={isSubmitting}
-                  className="w-full py-3 px-4 rounded-2xl bg-card hover:bg-muted/80 text-foreground border border-border shadow-apple-sm hover:shadow-apple-md transition-all duration-300 font-semibold text-sm flex items-center justify-center gap-3 group active:scale-[0.99] cursor-pointer"
+                  className="w-full py-3 px-4 rounded-2xl bg-[#0071E3] hover:bg-[#0077ED] text-white shadow-apple-sm hover:shadow-apple-md transition-all duration-300 font-semibold text-sm flex items-center justify-center gap-3 group active:scale-[0.99] cursor-pointer"
                 >
-                  <GoogleIcon className="w-5 h-5 shrink-0 group-hover:scale-105 transition-transform" />
+                  <div className="bg-white p-1 rounded-full flex items-center justify-center">
+                    <GoogleIcon className="w-4 h-4 shrink-0 group-hover:scale-105 transition-transform" />
+                  </div>
                   <span>{isSubmitting ? "Authenticating..." : "Sign in with Google"}</span>
                 </button>
 
@@ -325,17 +327,17 @@ export const Login: React.FC = () => {
                       type="button"
                       onClick={() => handleCredentialResponse({ credential: acc.email })}
                       disabled={isSubmitting}
-                      className="apple-user-tile p-2.5 rounded-xl flex items-center justify-between text-left group cursor-pointer"
+                      className="bg-[#0071E3]/5 hover:bg-[#0071E3]/10 border border-[#0071E3]/10 transition-all duration-250 p-2.5 rounded-xl flex items-center justify-between text-left group cursor-pointer hover:border-[#0071E3]/30 hover:scale-[1.02]"
                     >
                       <div className="min-w-0 pr-1">
-                        <p className="text-xs font-bold text-foreground truncate group-hover:text-primary transition-colors">
+                        <p className="text-xs font-bold text-foreground truncate group-hover:text-[#0071E3] transition-colors">
                           {acc.name}
                         </p>
                         <span className={`inline-block px-1.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wider border mt-0.5 ${acc.badgeColor}`}>
                           {acc.role}
                         </span>
                       </div>
-                      <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+                      <ChevronRight className="w-3.5 h-3.5 text-[#0071E3]/40 group-hover:text-[#0071E3] group-hover:translate-x-0.5 transition-all shrink-0" />
                     </button>
                   ))}
                 </div>
