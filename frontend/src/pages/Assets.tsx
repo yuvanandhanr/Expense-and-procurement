@@ -12,6 +12,15 @@ export const Assets: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Category mapping
+  const categoryToId: Record<string, number> = {
+    "Laptop": 1,
+    "Monitor": 2,
+    "Hardware": 3,
+    "Software": 4,
+    "Furniture": 5
+  };
+
   // Filter State
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -100,7 +109,8 @@ export const Assets: React.FC = () => {
         await api.put(`/assets/${editingAssetId}`, {
           model: newAsset.name,
           status: newAsset.status,
-          cost: Number(newAsset.cost)
+          cost: Number(newAsset.cost),
+          category_id: categoryToId[newAsset.category] || null
         });
         toast.success("Asset updated successfully!");
       } else {
@@ -108,7 +118,8 @@ export const Assets: React.FC = () => {
           asset_number: `AST-${Math.floor(Math.random() * 1000000)}`,
           asset_tag: `TAG-${Math.floor(Math.random() * 1000000)}`,
           model: newAsset.name,
-          category_id: null,
+          category_id: categoryToId[newAsset.category] || null,
+          cost: Number(newAsset.cost),
           status: newAsset.status
         });
         toast.success("Asset added successfully!");

@@ -376,7 +376,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         {/* Apple Sidebar Header & Logo */}
         <div className="h-16 flex items-center justify-between px-5 border-b border-border/60">
           <div className="flex items-center space-x-3 overflow-hidden">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-primary to-primary-hover flex items-center justify-center text-white font-extrabold text-sm shadow-apple-sm shadow-primary/20">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#0071E3] to-[#0077ED] flex items-center justify-center text-white font-extrabold text-sm shadow-apple-sm shadow-primary/20">
               ✦
             </div>
             <div className="flex flex-col">
@@ -411,7 +411,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
                         to={item.path}
                         className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 group ${
                           isActive
-                            ? "bg-primary text-white shadow-apple-sm shadow-primary/25"
+                            ? "bg-[#0071E3] text-white shadow-apple-sm shadow-primary/25"
                             : "text-muted-foreground hover:bg-muted/60 hover:text-foreground active:scale-[0.98]"
                         }`}
                       >
@@ -439,7 +439,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
           <aside className="relative w-72 bg-card/90 backdrop-blur-2xl text-card-foreground flex flex-col h-full border-r border-border p-4 animate-slide-right shadow-2xl">
             <div className="flex items-center justify-between pb-4 border-b border-border/50">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-xl bg-primary flex items-center justify-center text-white font-bold text-xs">
+                <div className="w-7 h-7 rounded-xl bg-[#0071E3] flex items-center justify-center text-white font-bold text-xs">
                   ✦
                 </div>
                 <span className="font-bold text-sm tracking-tight">ProcureSync</span>
@@ -467,7 +467,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
                             to={item.path}
                             onClick={() => setIsMobileSidebarOpen(false)}
                             className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold ${
-                              isActive ? "bg-primary text-white shadow-apple-sm shadow-primary/25" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                              isActive ? "bg-[#0071E3] text-white shadow-apple-sm shadow-primary/25" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                             }`}
                           >
                             <div className="flex items-center space-x-3">
