@@ -93,6 +93,18 @@ async def lifespan(app: FastAPI):
     from src.services.job_service import run_scheduler_loop
 
     await initialize_cache()
+    
+    # 2.6 Run Alembic Migrations Programmatically
+    try:
+        from alembic import command
+        from alembic.config import Config
+        logger.info("Running automatic Alembic migrations...")
+        alembic_cfg = Config("alembic.ini")
+        # Need to run synchronously, so we use asyncio.to_thread
+        await asyncio.to_thread(command.upgrade, alembic_cfg, "head")
+        logger.info("Alembic migrations completed successfully.")
+    except Exception as e:
+        logger.error(f"Error running Alembic migrations on startup: {e}")
 
     try:
         async with async_session() as session:

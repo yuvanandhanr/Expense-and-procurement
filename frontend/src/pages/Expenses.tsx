@@ -394,6 +394,7 @@ const Expenses: React.FC = () => {
                         >
                           {(() => {
                             if (["Approved", "Closed", "Rejected", "Returned for Correction"].includes(report.status)) return <><Eye className="w-3.5 h-3.5" /> View</>;
+                            if (isOwner(report)) return "View Details";
                             if (report.status === "Pending Manager Approval" && (hasRole("Manager") || hasRole("Admin"))) return "Need Approval";
                             if ((report.status === "Pending Finance Approval" || report.status === "Pending Finance Manager Approval") && (hasRole("Finance Manager") || hasRole("Finance") || hasRole("CFO") || hasRole("Admin"))) return "Need Approval";
                             if (report.status === "Pending CFO Approval" && (hasRole("CFO") || hasRole("Admin"))) return "Need Approval";

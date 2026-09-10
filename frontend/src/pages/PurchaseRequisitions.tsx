@@ -265,7 +265,7 @@ export const PurchaseRequisitions: React.FC = () => {
                             <Send className="w-3.5 h-3.5" /> Submit
                           </Button>
                         )}
-                        {(["Pending", "Under Review", "Submitted", "Pending Manager Approval", "Pending Finance Approval", "Pending CFO Approval", "Approved", "Completed"].includes(pr.status)) && (
+                        {pr.requestor_id !== user?.user_id && (["Pending", "Under Review", "Submitted", "Pending Manager Approval", "Pending Finance Approval", "Pending CFO Approval", "Approved", "Completed"].includes(pr.status)) && (
                           <Button
                             size="sm"
                             variant={["Approved", "Completed"].includes(pr.status) ? "secondary" : "primary"}
@@ -408,7 +408,7 @@ export const PurchaseRequisitions: React.FC = () => {
               </div>
             ))}
 
-            {user?.roles?.some(r => r.role_name === "Manager") && selectedPr.status === "Pending Manager Approval" && (
+            {selectedPr.requestor_id !== user?.user_id && user?.roles?.some(r => r.role_name === "Manager") && selectedPr.status === "Pending Manager Approval" && (
               <div className="flex items-center space-x-2 bg-muted/30 p-3 rounded-lg border border-border mt-4">
                 <input
                   type="checkbox"
@@ -423,7 +423,7 @@ export const PurchaseRequisitions: React.FC = () => {
               </div>
             )}
 
-            {user?.roles?.some(r => r.role_name === "Admin") && selectedPr.status === "Pending Admin Approval" && (
+            {selectedPr.requestor_id !== user?.user_id && user?.roles?.some(r => r.role_name === "Admin") && (selectedPr.status === "Pending Admin Approval" || selectedPr.status === "Under Review") && (
               <div className="mt-4 p-4 border border-border bg-muted/20 rounded-lg space-y-4">
                 <h4 className="font-bold text-sm">Inventory Check & Allocation</h4>
                 <div className="space-y-2">

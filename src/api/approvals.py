@@ -31,11 +31,7 @@ async def verify_approver_role(step: ApprovalStep, current_user: User, db: Async
     Enforces that the user has the required role (or Admin/CEO status) to approve/action the step.
     Prevents self-approval of own requests.
     """
-    user_roles = [role.role_name for role in current_user.roles]
-    if "Admin" in user_roles or "CEO" in user_roles:
-        return
-
-    # Check requestor self-approval
+    # Check requestor self-approval first
     workflow = await db.execute(select(ApprovalWorkflow).where(ApprovalWorkflow.workflow_id == step.workflow_id))
     workflow = workflow.scalar_one_or_none()
     if workflow:
@@ -46,6 +42,10 @@ async def verify_approver_role(step: ApprovalStep, current_user: User, db: Async
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You cannot approve your own request."
             )
+
+    user_roles = [role.role_name for role in current_user.roles]
+    if "Admin" in user_roles or "CEO" in user_roles:
+        return
 
     # Check if specifically assigned to this user
     if step.approver_id is not None and step.approver_id == current_user.user_id:

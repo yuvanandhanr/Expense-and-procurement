@@ -71,20 +71,29 @@ class ApprovalService:
             
             # If requestor is a Manager, Admin, CFO, CEO, or Finance Manager, skip Manager Approval
             if requestor_roles & {"Manager", "Admin", "CFO", "CEO", "Finance Manager"}:
-                # Determine if routing to CFO or Finance Manager
-                # Admin, CEO, Finance Manager route to CFO
-                # CFO, Manager route to Finance Manager
-                routes_to_cfo = bool(requestor_roles & {"Admin", "CEO", "Finance Manager"})
+                target_roles = []
                 
-                # If they have multiple roles (e.g. Manager and Admin), the higher role (Admin) takes precedence
-                if routes_to_cfo:
+                # CEO -> CFO
+                if "CEO" in requestor_roles:
                     target_roles = ["CFO"]
                     report.status = "Pending CFO Approval"
-                else:
+                # Admin -> CFO
+                elif "Admin" in requestor_roles:
+                    target_roles = ["CFO"]
+                    report.status = "Pending CFO Approval"
+                # Finance Manager -> CFO
+                elif "Finance Manager" in requestor_roles or "Finance" in requestor_roles:
+                    target_roles = ["CFO"]
+                    report.status = "Pending CFO Approval"
+                # CFO -> Finance Manager
+                elif "CFO" in requestor_roles:
+                    target_roles = ["Finance Manager", "Finance"]
+                    report.status = "Pending Finance Manager Approval"
+                # Manager -> Finance Manager
+                elif "Manager" in requestor_roles:
                     target_roles = ["Finance Manager", "Finance"]
                     report.status = "Pending Finance Manager Approval"
 
-                # Route directly to appropriate level
                 # Find an approver who is NOT the requestor
                 fm_query = select(User).join(User.roles).where(
                     Role.role_name.in_(target_roles),
@@ -92,8 +101,8 @@ class ApprovalService:
                     User.user_id != requestor.user_id
                 )
                 fm_result = await self.db.execute(fm_query)
-                finance_manager = fm_result.scalars().first()
-                approver_id = finance_manager.user_id if finance_manager else None
+                next_approver = fm_result.scalars().first()
+                approver_id = next_approver.user_id if next_approver else None
                 
                 approval_entry = ExpenseApproval(
                     expense_report_id=report.expense_report_id,
