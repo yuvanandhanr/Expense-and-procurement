@@ -4,7 +4,7 @@ import { Asset, User } from "../types";
 import { Card, CardContent, Badge, Skeleton, Button, Dialog, EmptyState, Input, Select } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
-import { ArrowRightLeft, Filter, Plus, Search, Edit2 } from "lucide-react";
+import { ArrowRightLeft, Filter, Plus, Search, Edit2, Layers, CheckCircle2, AlertCircle, Package } from "lucide-react";
 
 export const Assets: React.FC = () => {
   const { user } = useAuth();
@@ -24,6 +24,7 @@ export const Assets: React.FC = () => {
   // Filter State
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [activeTab, setActiveTab] = useState<string>("All");
 
   // Add Asset State
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
@@ -134,11 +135,33 @@ export const Assets: React.FC = () => {
     }
   };
 
+
+  const isAssignedAsset = (a: Asset) => (a.assigned_to_name && a.assigned_to_name !== "Unassigned") || a.status === "Assigned" || a.status === "Transferred";
+  const isOutOfServiceAsset = (a: Asset) => ["Out of Service", "Retired", "Damaged", "Disposed", "Lost", "Under Maintenance", "Reported"].includes(a.status);
+  const isUnassignedAsset = (a: Asset) => !isAssignedAsset(a) && !isOutOfServiceAsset(a);
+
+  const counts = {
+    all: assets.length,
+    assigned: assets.filter(isAssignedAsset).length,
+    unassigned: assets.filter(isUnassignedAsset).length,
+    outOfService: assets.filter(isOutOfServiceAsset).length,
+  };
+
   const filteredAssets = assets.filter(a => {
     const matchesSearch = a.asset_code.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           a.asset_name.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    let matchesTab = true;
+    if (activeTab === "Assigned") {
+      matchesTab = isAssignedAsset(a);
+    } else if (activeTab === "Unassigned") {
+      matchesTab = isUnassignedAsset(a);
+    } else if (activeTab === "Out of Service") {
+      matchesTab = isOutOfServiceAsset(a);
+    }
+
     const matchesStatus = statusFilter === "All" || a.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    return matchesSearch && matchesTab && matchesStatus;
   });
 
   return (
@@ -155,6 +178,74 @@ export const Assets: React.FC = () => {
             <span>Add Asset</span>
           </Button>
         )}
+      </div>
+
+
+      {/* Metric Category Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <button
+          onClick={() => setActiveTab("All")}
+          className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+            activeTab === "All"
+              ? "bg-primary/10 border-primary shadow-sm text-primary ring-1 ring-primary"
+              : "bg-card border-border hover:bg-accent/40 text-muted-foreground"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider">All Assets</span>
+            <Layers className="w-4 h-4 text-primary" />
+          </div>
+          <div className="text-2xl font-bold mt-2 text-foreground">{counts.all}</div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">Master Inventory List</div>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("Assigned")}
+          className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+            activeTab === "Assigned"
+              ? "bg-amber-500/10 border-amber-500 shadow-sm text-amber-500 ring-1 ring-amber-500"
+              : "bg-card border-border hover:bg-accent/40 text-muted-foreground"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-500">Assigned</span>
+            <CheckCircle2 className="w-4 h-4 text-amber-500" />
+          </div>
+          <div className="text-2xl font-bold mt-2 text-foreground">{counts.assigned}</div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">Allocated to Employees</div>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("Unassigned")}
+          className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+            activeTab === "Unassigned"
+              ? "bg-emerald-500/10 border-emerald-500 shadow-sm text-emerald-500 ring-1 ring-emerald-500"
+              : "bg-card border-border hover:bg-accent/40 text-muted-foreground"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-500">Unassigned</span>
+            <Package className="w-4 h-4 text-emerald-500" />
+          </div>
+          <div className="text-2xl font-bold mt-2 text-foreground">{counts.unassigned}</div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">Available for Assignment</div>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("Out of Service")}
+          className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+            activeTab === "Out of Service"
+              ? "bg-rose-500/10 border-rose-500 shadow-sm text-rose-500 ring-1 ring-rose-500"
+              : "bg-card border-border hover:bg-accent/40 text-muted-foreground"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-rose-500">Out of Service</span>
+            <AlertCircle className="w-4 h-4 text-rose-500" />
+          </div>
+          <div className="text-2xl font-bold mt-2 text-foreground">{counts.outOfService}</div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">Maintenance & Retired</div>
+        </button>
       </div>
 
       <Card>
