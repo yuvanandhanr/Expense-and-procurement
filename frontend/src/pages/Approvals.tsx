@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import { formatDate, getErrorMessage, isValidText } from "../utils/helpers";
 import { Check, X as XIcon } from "lucide-react";
 
-type TabType = "Requisitions" | "Expenses" | "Asset Incidents" | "Resignations";
+type TabType = "Requisitions" | "Reimbursements" | "Asset Incidents" | "Resignations";
 type StatusSubTab = "All" | "Approved" | "Rejected";
 
 export const Approvals: React.FC = () => {
@@ -59,7 +59,7 @@ export const Approvals: React.FC = () => {
       let endpoint = "";
       let payload: any = { comments: comment };
       
-      if (selectedWorkflow.entity_type === "ExpenseReport") {
+      if (selectedWorkflow.entity_type === "ExpenseReport" || selectedWorkflow.entity_type === "Expense") {
         endpoint = `/expenses/${selectedWorkflow.entity_id}/${actionType}`;
       } else if (selectedWorkflow.entity_type === "VendorInvoice") {
         endpoint = `/invoices/${selectedWorkflow.entity_id}/${actionType}`;
@@ -142,7 +142,7 @@ export const Approvals: React.FC = () => {
     }
 
     if (activeTab === "Requisitions") return wf.entity_type === "PurchaseRequisition";
-    if (activeTab === "Expenses") return wf.entity_type === "ExpenseReport";
+    if (activeTab === "Reimbursements") return wf.entity_type === "ExpenseReport" || wf.entity_type === "Expense";
     if (activeTab === "Asset Incidents") return wf.entity_type === "AssetIncident";
     if (activeTab === "Resignations") return wf.entity_type === "Resignation";
     return false;
@@ -187,7 +187,7 @@ export const Approvals: React.FC = () => {
 
       {/* Primary Category Tabs */}
       <div className="flex space-x-2 border-b border-border">
-        {(["Requisitions", "Expenses", "Asset Incidents", "Resignations"] as TabType[]).map((tab) => (
+        {(["Requisitions", "Reimbursements", "Asset Incidents", "Resignations"] as TabType[]).map((tab) => (
           <button
             key={tab}
             onClick={() => {
@@ -244,88 +244,112 @@ export const Approvals: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredWorkflows.map(wf => {
             const entityTypeStr = String(wf.entity_type || "");
-            const formattedEntityType = entityTypeStr === "AssetIncident" 
-              ? "ASSET INCIDENT" 
-              : entityTypeStr.replace(/([A-Z])/g, " $1").trim();
-            const workflowStepStr = wf.workflow_step || (entityTypeStr === "AssetIncident" ? "Request for Repair/Replacement" : `${formattedEntityType} Step`);
+            
+            let formattedTitle = "Purchase Requisition";
+            if (entityTypeStr === "ExpenseReport" || entityTypeStr === "Expense") formattedTitle = "Expense Reimbursement";
+            else if (entityTypeStr === "AssetIncident") formattedTitle = "Asset Incident";
+            else if (entityTypeStr === "Resignation") formattedTitle = "Resignation";
+            else if (entityTypeStr === "PurchaseRequisition") formattedTitle = "Purchase Requisition";
+            else formattedTitle = entityTypeStr.replace(/([A-Z])/g, " $1").trim();
+
+            const headerTag = entityTypeStr === "ExpenseReport" ? "EXPENSE REIMBURSEMENT" : formattedTitle.toUpperCase();
+
             const titleStr = typeof wf.title === "string" ? wf.title : "Untitled Request";
             const descStr = typeof wf.description === "string" ? wf.description : (typeof wf.justification === "string" ? wf.justification : "");
             const requesterStr = wf.requestor_name || wf.requester_name || wf.submitted_by || "Employee";
             const rawAmt = wf.total_amount ?? wf.amount ?? wf.estimated_cost;
             const amtNum = rawAmt !== undefined && rawAmt !== null ? Number(rawAmt) : null;
             const statusStr = String(wf.status || "");
-            const isPendingStatus = (["Pending", "Under Review", "Reported"].includes(statusStr)) || (statusStr.toLowerCase().includes("pending") && statusStr !== "Approved" && statusStr !== "Pending Fulfillment");
+            
+            const isApproved = isApprovedWf(wf);
+            const isRejected = isRejectedWf(wf);
+            const isPendingStatus = !isApproved && !isRejected && ((["Pending", "Under Review", "Reported"].includes(statusStr)) || (statusStr.toLowerCase().includes("pending") && statusStr !== "Approved" && statusStr !== "Pending Fulfillment"));
 
             return (
-              <Card key={wf.workflow_id || wf.entity_id} className="flex flex-col">
+              <Card key={wf.workflow_id || wf.entity_id} className="flex flex-col border border-border/80 shadow-sm hover:shadow-md transition-shadow">
                 <CardHeader className="pb-3 flex flex-col items-start gap-2">
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                      {formattedEntityType} #{wf.entity_id || wf.workflow_id}
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-0.5">
+                      {headerTag} #{wf.entity_id || wf.workflow_id}
                     </span>
-                    <CardTitle className="text-base">{workflowStepStr}</CardTitle>
+                    <CardTitle className="text-base font-bold">{formattedTitle}</CardTitle>
                   </div>
                   <StatusBadge status={statusStr} />
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col justify-between pt-0 space-y-4">
-                  <div className="text-sm space-y-3 mt-2">
+                  <div className="text-sm space-y-3 mt-1">
                     <div>
                       <span className="font-semibold text-foreground text-base">{titleStr}</span>
                     </div>
                     
                     {descStr && (
-                      <p className="text-muted-foreground text-xs line-clamp-2">{descStr}</p>
+                      <div className="space-y-0.5 bg-muted/20 p-2.5 rounded-lg border border-border/40">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Reason</span>
+                        <p className="text-foreground text-xs leading-relaxed font-normal line-clamp-3">{descStr}</p>
+                      </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-border/50">
+                    <div className="grid grid-cols-2 gap-3 text-xs pt-2 border-t border-border/50">
                       <div>
-                        <span className="text-muted-foreground block">Submitted By</span>
-                        <span className="font-medium text-foreground">{requesterStr}</span>
+                        <span className="text-muted-foreground font-medium block text-[11px] mb-0.5">Submitted By</span>
+                        <span className="font-semibold text-foreground text-xs block truncate">{requesterStr}</span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground block">Date</span>
-                        <span className="font-medium text-foreground">{formatDate(wf.created_at || wf.submission_date || wf.date)}</span>
+                        <span className="text-muted-foreground font-medium block text-[11px] mb-0.5">Date</span>
+                        <span className="font-semibold text-foreground text-xs block">{formatDate(wf.created_at || wf.submission_date || wf.date)}</span>
                       </div>
                     </div>
 
                     {amtNum !== null && !isNaN(amtNum) && (
-                      <div className="flex justify-between items-center bg-muted/40 p-2 rounded-lg border">
-                        <span className="text-muted-foreground text-xs">Total Amount:</span>
+                      <div className="flex justify-between items-center bg-muted/40 p-2 rounded-lg border border-border/50">
+                        <span className="text-muted-foreground text-xs font-medium">Total Amount:</span>
                         <span className="font-bold text-foreground">${amtNum.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                       </div>
                     )}
 
-                    {(statusStr === "Approved" && wf.updated_at) && (
-                      <div className="flex justify-between items-center bg-muted/40 p-2 rounded-lg border">
-                        <span className="text-muted-foreground text-xs">Approved Date:</span>
-                        <span className="text-xs">{formatDate(wf.updated_at)}</span>
+                    {isApproved && (
+                      <div className="flex justify-between items-center bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20 text-xs">
+                        <span className="text-emerald-700 dark:text-emerald-400 font-semibold">Approved Date:</span>
+                        <span className="font-bold text-emerald-800 dark:text-emerald-300">{formatDate(wf.updated_at || wf.actioned_at || wf.created_at)}</span>
+                      </div>
+                    )}
+
+                    {isRejected && (
+                      <div className="flex justify-between items-center bg-rose-500/10 p-2 rounded-lg border border-rose-500/20 text-xs">
+                        <span className="text-rose-700 dark:text-rose-400 font-semibold">
+                          {statusStr.toLowerCase().includes("return") ? "Returned Date:" : "Rejected Date:"}
+                        </span>
+                        <span className="font-bold text-rose-800 dark:text-rose-300">{formatDate(wf.updated_at || wf.actioned_at || wf.created_at)}</span>
                       </div>
                     )}
                   </div>
                   
                   {isPendingStatus && (
-                    <div className="flex space-x-2 pt-4 border-t border-border">
+                    <div className="flex items-center gap-2 pt-3 border-t border-border">
                       <Button 
                         variant="success" 
-                        className="flex-1 font-bold shadow-apple-sm"
+                        size="sm"
+                        className="flex-1 py-1.5 px-2 text-xs font-semibold shadow-apple-sm flex items-center justify-center gap-1"
                         onClick={() => { setSelectedWorkflow(wf); setActionType("approve"); }}
                       >
-                        <Check className="w-4 h-4" />
+                        <Check className="w-3.5 h-3.5 shrink-0" />
                         <span>Approve</span>
                       </Button>
                       <Button 
                         variant="warning" 
-                        className="flex-1 font-bold shadow-apple-sm border border-yellow-500 bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500 hover:text-white transition-colors"
+                        size="sm"
+                        className="flex-1 py-1.5 px-2 text-xs font-semibold shadow-apple-sm border border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white transition-all flex items-center justify-center gap-1"
                         onClick={() => { setSelectedWorkflow(wf); setActionType("return"); }}
                       >
                         <span>Return</span>
                       </Button>
                       <Button 
                         variant="danger" 
-                        className="flex-1 font-bold shadow-apple-sm"
+                        size="sm"
+                        className="flex-1 py-1.5 px-2 text-xs font-semibold shadow-apple-sm flex items-center justify-center gap-1"
                         onClick={() => { setSelectedWorkflow(wf); setActionType("reject"); }}
                       >
-                        <XIcon className="w-4 h-4" />
+                        <XIcon className="w-3.5 h-3.5 shrink-0" />
                         <span>Reject</span>
                       </Button>
                     </div>
@@ -354,17 +378,19 @@ export const Approvals: React.FC = () => {
                   )}
                   
                   {statusStr === "Pending Fulfillment" && entityTypeStr === "AssetIncident" && (
-                    <div className="flex space-x-2 pt-4 border-t border-border">
+                    <div className="flex items-center gap-2 pt-3 border-t border-border">
                       <Button 
                         variant="warning" 
-                        className="flex-1 font-bold shadow-apple-sm"
+                        size="sm"
+                        className="flex-1 py-1.5 px-2 text-xs font-semibold shadow-apple-sm"
                         onClick={() => { setSelectedWorkflow(wf); setActionType("repair"); }}
                       >
                         <span>Repair</span>
                       </Button>
                       <Button 
                         variant="info" 
-                        className="flex-1 font-bold shadow-apple-sm"
+                        size="sm"
+                        className="flex-1 py-1.5 px-2 text-xs font-semibold shadow-apple-sm"
                         onClick={() => { setSelectedWorkflow(wf); setActionType("replace"); }}
                       >
                         <span>Replace</span>
@@ -373,10 +399,11 @@ export const Approvals: React.FC = () => {
                   )}
 
                   {statusStr === "Waiting for Procurement" && entityTypeStr === "AssetIncident" && (
-                    <div className="flex space-x-2 pt-4 border-t border-border">
+                    <div className="flex items-center gap-2 pt-3 border-t border-border">
                       <Button 
                         variant="success" 
-                        className="flex-1 font-bold shadow-apple-sm"
+                        size="sm"
+                        className="flex-1 py-1.5 px-2 text-xs font-semibold shadow-apple-sm"
                         onClick={() => { setSelectedWorkflow(wf); setActionType("assign_replacement"); }}
                       >
                         <span>Assign Replacement</span>
