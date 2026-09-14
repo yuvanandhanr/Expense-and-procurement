@@ -291,7 +291,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       {
         title: "My Requests",
         items: [
-          { label: (isManager || isCEO) ? "Team Reimbursements" : "Employee Reimbursements", path: "/expenses", icon: FileText, show: isEmployee || isManager || isAdmin || isFinance || isCEO },
+          { label: "My Reimbursements", path: "/expenses", icon: FileText, show: isEmployee || isManager || isAdmin || isFinance || isCEO },
           { label: "Purchase Requisitions", path: "/prs", icon: FileText, show: isEmployee || isManager || isAdmin || isFinance || isCEO || isCFO },
           { label: "My Assets", path: "/my-assets", icon: HardDrive, show: isEmployee || isManager || isAdmin || isFinance || isCEO },
         ]

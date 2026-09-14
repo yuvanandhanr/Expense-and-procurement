@@ -295,7 +295,7 @@ const Expenses: React.FC = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            {isManager && !isFinance && !hasRole("Admin") ? "Team Reimbursements" : "Employee Reimbursements"}
+            My Reimbursements
           </h1>
           <p className="text-xs text-muted-foreground mt-1">Manage, verify, and track employee expense reports.</p>
         </div>
@@ -388,19 +388,14 @@ const Expenses: React.FC = () => {
                         )}
                         <Button 
                           size="sm" 
-                          onClick={() => setSelectedReportId(report.expense_report_id)}
                           variant={["Approved", "Closed", "Rejected", "Returned for Correction"].includes(report.status) ? "secondary" : "primary"}
+                          onClick={() => setSelectedReportId(report.expense_report_id)}
                           className="gap-1.5"
                         >
                           {(() => {
                             if (["Approved", "Closed", "Rejected", "Returned for Correction"].includes(report.status)) return <><Eye className="w-3.5 h-3.5" /> View</>;
-                            if (isOwner(report)) return "View Details";
-                            if (report.status === "Pending Manager Approval" && (hasRole("Manager") || hasRole("Admin"))) return "Need Approval";
-                            if ((report.status === "Pending Finance Approval" || report.status === "Pending Finance Manager Approval") && (hasRole("Finance Manager") || hasRole("Finance") || hasRole("CFO") || hasRole("Admin"))) return "Need Approval";
-                            if (report.status === "Pending CFO Approval" && (hasRole("CFO") || hasRole("Admin"))) return "Need Approval";
-                            if (report.status === "Payment Requested" && (hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin"))) return "Need Approval";
-                            if (!isOwner(report) && report.status !== "Draft") return <><Eye className="w-3.5 h-3.5" /> View</>;
-                            return "Review";
+                            if (report.status === "Draft") return "Edit Draft";
+                            return "View Details";
                           })()}
                         </Button>
                       </td>
@@ -495,12 +490,7 @@ const Expenses: React.FC = () => {
 
         const isPendingManager = report.status === "Pending Manager Approval" || report.status === "Pending Approval" || report.status === "Corrected Claim";
         const isPendingFinance = report.status === "Pending Finance Manager Approval" || report.status === "Pending Finance Approval" || report.status === "Pending Finance Verification";
-        const owner = isOwner(report);
-        const isZeroAmount = Number(report.total_amount || 0) <= 0;
 
-        // Cannot approve own claim and claim must have amount > 0
-        const canManagerAct = !owner && !isZeroAmount && isPendingManager && (hasRole("Manager") || hasRole("Admin") || hasRole("CEO"));
-        const canFinanceAct = !owner && !isZeroAmount && isPendingFinance && (hasRole("Finance Manager") || hasRole("Finance") || hasRole("CFO") || hasRole("Admin") || hasRole("CEO"));
 
         const steps = [
           { name: "Draft", key: "draft" },
@@ -677,41 +667,6 @@ const Expenses: React.FC = () => {
                 <div className="text-muted-foreground italic text-sm text-center p-4 bg-muted/30 rounded-xl mx-2">Draft report - Waiting for submission</div>
               )}
 
-            {/* Manager Review */}
-            {(report.status === "Pending Manager Approval" || report.status === "Corrected Claim") && !isOwner(report) && (hasRole("Manager") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin")) && (
-              <div className="flex flex-col gap-3 p-4 bg-amber-500/10 rounded-xl border border-amber-500/20">
-                <h4 className="font-semibold text-amber-800 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> Manager Review Required</h4>
-                <div className="flex gap-2">
-                  <Button onClick={() => managerActionMutation.mutate({ reportId: report.expense_report_id, action: 'approve', comments: 'Looks good' })} variant="success">Approve Claim</Button>
-                  <Button onClick={() => setManagerAction({ isOpen: true, action: 'return', reportId: report.expense_report_id })} variant="outline" className="bg-white text-black dark:text-black hover:bg-gray-200" style={{ color: 'black' }}>Return to Employee</Button>
-                  <Button onClick={() => setManagerAction({ isOpen: true, action: 'reject', reportId: report.expense_report_id })} variant="outline" className="bg-white text-red-600 hover:bg-red-50">Reject</Button>
-                </div>
-              </div>
-            )}
-
-            {/* Finance Review */}
-            {(report.status === "Pending Finance Verification" || report.status === "Pending Finance Approval" || report.status === "Pending Finance Manager Approval" || report.status === "Pending CFO Approval") && !isOwner(report) && (hasRole("Finance Manager") || hasRole("Finance") || hasRole("CFO") || hasRole("Admin")) && (
-              <div className="flex flex-col gap-3 p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
-                <h4 className="font-semibold text-blue-800 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> {report.status === "Pending CFO Approval" ? "CFO Review Required" : "Finance Review Required"}</h4>
-                <div className="flex gap-2">
-                  <Button onClick={() => managerActionMutation.mutate({ reportId: report.expense_report_id, action: 'approve', comments: 'Finance approved' })} variant="success">Approve Claim</Button>
-                  <Button onClick={() => setManagerAction({ isOpen: true, action: 'return', reportId: report.expense_report_id })} variant="outline" className="bg-white text-black dark:text-black hover:bg-gray-200" style={{ color: 'black' }}>Return to Employee</Button>
-                  <Button onClick={() => setManagerAction({ isOpen: true, action: 'reject', reportId: report.expense_report_id })} variant="outline" className="bg-white text-red-600 hover:bg-red-50">Reject</Button>
-                </div>
-              </div>
-            )}
-
-
-
-            {/* Payment */}
-            {report.status === "Payment Requested" && !isOwner(report) && (hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin")) && (
-              <div className="flex flex-col gap-3 p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-                <h4 className="font-semibold text-emerald-800 flex items-center gap-2"><DollarSign className="w-4 h-4" /> Payment Authorization</h4>
-                <div className="flex gap-2">
-                  <Button onClick={() => financeActionMutation.mutate({ reportId: report.expense_report_id, action: 'pay' })} variant="success">Authorize Payment</Button>
-                </div>
-              </div>
-            )}
 
             {/* Receipts List */}
             <div className="mt-6 space-y-3">

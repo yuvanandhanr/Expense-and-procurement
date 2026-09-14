@@ -123,11 +123,7 @@ async def list_expenses(
     current_user: User = Depends(get_current_user)
 ):
     repo = ExpenseRepository(db)
-    role_names = [r.role_name for r in current_user.roles]
-    if any(r in role_names for r in ["Admin", "Finance", "Finance Manager", "CFO", "CEO", "Manager"]):
-        reports = await repo.get_all_reports()
-    else:
-        reports = await repo.get_all_reports(employee_id=current_user.user_id)
+    reports = await repo.get_all_reports(employee_id=current_user.user_id)
         
     accessible_reports = [_present_report(report) for report in reports if _can_access_report(report, current_user)]
     

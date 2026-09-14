@@ -73,22 +73,7 @@ export const Login: React.FC = () => {
     }
   };
 
-  const handleGoogleSignInClick = () => {
-    if (window.google?.accounts?.id) {
-      try {
-        window.google.accounts.id.prompt((notification: any) => {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-             toast.error("Google Sign-In popup blocked. Please allow popups or try again.");
-          }
-        });
-        return;
-      } catch (e) {
-        console.warn("GSI prompt fallback", e);
-      }
-    }
-    // Fallback standard Google login
-    toast.error("Google Identity Services failed to load. Please refresh.");
-  };
+
 
   const handleCustomGoogleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -257,17 +242,8 @@ export const Login: React.FC = () => {
 
               {/* Primary Google OAuth Action */}
               <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={handleGoogleSignInClick}
-                  disabled={isSubmitting}
-                  className="w-full py-3 px-4 rounded-2xl bg-[#0071E3] hover:bg-[#0077ED] text-white shadow-apple-sm hover:shadow-apple-md transition-all duration-300 font-semibold text-sm flex items-center justify-center gap-3 group active:scale-[0.99] cursor-pointer"
-                >
-                  <div className="bg-white p-1 rounded-full flex items-center justify-center">
-                    <GoogleIcon className="w-4 h-4 shrink-0 group-hover:scale-105 transition-transform" />
-                  </div>
-                  <span>{isSubmitting ? "Authenticating..." : "Sign in with Google"}</span>
-                </button>
+                {/* Google SDK render container */}
+                <div id="google-signin-btn" className="w-full flex justify-center min-h-[44px]"></div>
 
                 {/* Custom Google Workspace Email Drawer */}
                 {!showEmailInput ? (
@@ -307,9 +283,6 @@ export const Login: React.FC = () => {
                     </div>
                   </form>
                 )}
-                
-                {/* Fallback container for Google SDK render if available */}
-                <div id="google-signin-btn" className="w-full flex justify-center empty:hidden"></div>
 
                 <div className="relative flex py-1 items-center">
                   <div className="flex-grow border-t border-border/60"></div>

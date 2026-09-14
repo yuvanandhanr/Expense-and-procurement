@@ -26,7 +26,7 @@ export const Dashboard: React.FC = () => {
         api.get("/expenses").catch(() => ({ data: [] })),
         api.get("/pr").catch(() => ({ data: [] })),
         api.get("/approvals").catch(() => ({ data: [] })),
-        api.get("/assets/my-assets").catch(() => api.get("/assets").catch(() => ({ data: [] })))
+        api.get("/assets/my-assets").catch(() => ({ data: [] }))
       ]);
 
       if (dashRes?.data) setData(dashRes.data);

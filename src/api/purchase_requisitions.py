@@ -68,14 +68,7 @@ async def list_prs(
     current_user: User = Depends(get_current_user)
 ):
     service = PRService(db)
-    user_roles = [role.role_name for role in current_user.roles]
-
-    if any(role in user_roles for role in ["Admin", "CFO", "Finance Manager", "Finance", "Procurement", "CEO"]):
-        prs = await service.pr_repo.list_all()
-    elif "Manager" in user_roles and current_user.department_id:
-        prs = await service.pr_repo.list_by_department(current_user.department_id)
-    else:
-        prs = await service.pr_repo.list_by_requestor(current_user.user_id)
+    prs = await service.pr_repo.list_by_requestor(current_user.user_id)
         
     return [pr for pr in prs if not (pr.status == "Draft" and pr.requestor_id != current_user.user_id)]
 

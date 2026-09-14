@@ -57,14 +57,8 @@ async def list_incidents(
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
-    user_roles = [r.role_name for r in current_user.roles]
-    
-    if any(r in user_roles for r in ["Admin", "IT", "CEO", "CFO"]):
-        stmt = select(AssetIncident)
-    elif "Manager" in user_roles:
-        stmt = select(AssetIncident).join(Asset).where(Asset.department_id == current_user.department_id)
-    else:
-        stmt = select(AssetIncident).where(AssetIncident.reporter_id == current_user.user_id)
+    # Only fetch incidents reported by the authenticated user in My Requests
+    stmt = select(AssetIncident).where(AssetIncident.reporter_id == current_user.user_id)
 
     result = await session.execute(stmt)
     return result.scalars().all()

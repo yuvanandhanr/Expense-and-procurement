@@ -73,13 +73,13 @@ class DashboardService:
             data["widgets"]["employee_reimbursements"] = await self._get_reimbursements_summary()
             data["widgets"]["vendor_invoices"] = await self._get_vendor_invoices_summary()
 
-        if role_upper == "EMPLOYEE":
-            data["widgets"]["my_purchase_requests"] = await self._get_employee_pr_summary(user_id)
-            data["widgets"]["my_reimbursements"] = await self._get_reimbursements_summary(employee_id=user_id)
-            data["widgets"]["my_monthly_trend"] = await self._get_employee_monthly_trend(employee_id=user_id)
-            data["widgets"]["my_requisitions"] = await self._get_employee_my_requisitions(user_id)
-            data["widgets"]["my_assets"] = await self._get_employee_my_assets(user_id)
-            data["widgets"]["recent_expenses"] = await self._get_employee_recent_expenses(user_id)
+        # Personal metrics for all roles ("My Requests")
+        data["widgets"]["my_purchase_requests"] = await self._get_employee_pr_summary(user_id)
+        data["widgets"]["my_reimbursements"] = await self._get_reimbursements_summary(employee_id=user_id)
+        data["widgets"]["my_monthly_trend"] = await self._get_employee_monthly_trend(employee_id=user_id)
+        data["widgets"]["my_requisitions"] = await self._get_employee_my_requisitions(user_id)
+        data["widgets"]["my_assets"] = await self._get_employee_my_assets(user_id)
+        data["widgets"]["recent_expenses"] = await self._get_employee_recent_expenses(user_id)
 
         # Real-time metrics computed directly
         return data

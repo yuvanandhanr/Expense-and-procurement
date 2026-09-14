@@ -21,6 +21,7 @@ export const Approvals: React.FC = () => {
   const [comment, setComment] = useState("");
   const [physicalInspectionDone, setPhysicalInspectionDone] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [allocateAssetId, setAllocateAssetId] = useState("");
 
   const fetchWorkflows = async () => {
     setLoading(true);
@@ -66,6 +67,7 @@ export const Approvals: React.FC = () => {
         payload = { action: actStr, resolution: comment, physical_inspection_done: physicalInspectionDone };
       } else {
         endpoint = `/pr/${selectedWorkflow.entity_id}/${actionType}`;
+        payload = { comments: comment, physical_inspection_done: physicalInspectionDone };
       }
       
       await api.post(endpoint, payload);
@@ -78,6 +80,32 @@ export const Approvals: React.FC = () => {
       fetchWorkflows();
     } catch (err: any) {
       toast.error(getErrorMessage(err, "Failed to process workflow action."));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAdminAction = async (type: "allocate" | "procure") => {
+    if (!selectedWorkflow) return;
+    setIsSubmitting(true);
+    try {
+      if (type === "allocate") {
+        if (!allocateAssetId) {
+          toast.error("Please provide an Asset ID to allocate.");
+          setIsSubmitting(false);
+          return;
+        }
+        await api.post(`/pr/${selectedWorkflow.entity_id}/allocate-inventory`, { asset_id: parseInt(allocateAssetId) });
+        toast.success("Asset allocated from inventory successfully!");
+      } else {
+        await api.post(`/pr/${selectedWorkflow.entity_id}/initiate-procurement`);
+        toast.success("Procurement initiated. Escalated to CFO.");
+      }
+      setSelectedWorkflow(null);
+      setAllocateAssetId("");
+      fetchWorkflows();
+    } catch (err: any) {
+      toast.error(getErrorMessage(err, "Failed to process admin action."));
     } finally {
       setIsSubmitting(false);
     }
@@ -221,6 +249,28 @@ export const Approvals: React.FC = () => {
                   </div>
                 )}
                 
+                {wf.status === "Pending Admin Approval" && wf.entity_type === "PurchaseRequisition" && user?.roles?.some(r => r.role_name === "Admin") && (
+                  <div className="mt-4 p-4 border border-border bg-muted/20 rounded-lg space-y-4">
+                    <h4 className="font-bold text-sm">Inventory Check & Allocation</h4>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase">Allocate from Available Inventory</label>
+                      <div className="flex gap-2">
+                        <Input 
+                          id="allocate-asset-id"
+                          placeholder="Enter Asset ID..." 
+                          value={allocateAssetId}
+                          onChange={(e) => setAllocateAssetId(e.target.value)}
+                        />
+                        <Button onClick={() => { setSelectedWorkflow(wf); handleAdminAction("allocate"); }} variant="primary" disabled={isSubmitting}>Allocate Asset</Button>
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t border-border">
+                      <p className="text-xs text-muted-foreground mb-2">If no suitable asset is found in inventory, initiate a new purchase.</p>
+                      <Button onClick={() => { setSelectedWorkflow(wf); handleAdminAction("procure"); }} variant="outline" className="w-full" disabled={isSubmitting}>Initiate Procurement (Route to CFO)</Button>
+                    </div>
+                  </div>
+                )}
+                
                 {wf.status === "Pending Fulfillment" && wf.entity_type === "AssetIncident" && (
                   <div className="flex space-x-2 pt-4 border-t border-border">
                     <Button 
@@ -264,7 +314,8 @@ export const Approvals: React.FC = () => {
         title={`${actionType ? actionType.charAt(0).toUpperCase() + actionType.slice(1) : ''} ${selectedWorkflow?.entity_type} #${selectedWorkflow?.entity_id}`}
       >
         <div className="space-y-4">
-          {selectedWorkflow?.status === "Reported" && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && (
+          {((selectedWorkflow?.status === "Reported" && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident") ||
+            (selectedWorkflow?.status === "Pending Manager Approval" && selectedWorkflow?.entity_type === "PurchaseRequisition" && actionType === "approve")) && (
             <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-xl border border-border/50">
               <input 
                 type="checkbox" 
