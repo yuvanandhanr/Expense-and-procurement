@@ -357,6 +357,8 @@ class ApprovalService:
                     "requestor_name": f"{requestor.first_name} {requestor.last_name}",
                     "title": pr.title,
                     "justification": pr.justification,
+                    "total_amount": pr.total_estimated_amount,
+                    "amount": pr.total_estimated_amount,
                     "past_approvers": past_approvers,
                     "pending_approvers": pending_approvers,
                     "steps": steps_to_return,

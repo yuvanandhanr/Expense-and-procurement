@@ -63,6 +63,8 @@ class InboxApprovalWorkflowSchema(BaseModel):
     requestor_name: str
     title: Optional[str] = None
     justification: Optional[str] = None
+    total_amount: Optional[Decimal] = None
+    amount: Optional[Decimal] = None
     past_approvers: List[str] = []
     steps: List[ApprovalStepSchema] = []
     can_approve: bool = False
