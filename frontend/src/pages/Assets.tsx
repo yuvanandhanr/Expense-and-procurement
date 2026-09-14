@@ -35,6 +35,7 @@ export const Assets: React.FC = () => {
   const [transferAsset, setTransferAsset] = useState<Asset | null>(null);
   const [selectedUser, setSelectedUser] = useState("");
   const [transferNotes, setTransferNotes] = useState("");
+  const [assigneeSearchQuery, setAssigneeSearchQuery] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isAdmin = user?.roles?.some(r => r.role_name === "Admin") || false;
@@ -136,6 +137,15 @@ export const Assets: React.FC = () => {
   };
 
 
+  const filteredAssigneeUsers = users
+    .filter(u => !u.roles?.some(r => r.role_name.toLowerCase().includes("vendor")))
+    .filter(u => {
+      if (!assigneeSearchQuery.trim()) return true;
+      const q = assigneeSearchQuery.toLowerCase();
+      const nameMatch = `${u.first_name} ${u.last_name}`.toLowerCase().includes(q);
+      const roleMatch = u.roles?.some(r => r.role_name.toLowerCase().includes(q)) || false;
+      return nameMatch || roleMatch;
+    });
   const isAssignedAsset = (a: Asset) => (a.assigned_to_name && a.assigned_to_name !== "Unassigned") || a.status === "Assigned" || a.status === "Transferred";
   const isOutOfServiceAsset = (a: Asset) => ["Out of Service", "Retired", "Damaged", "Disposed", "Lost", "Under Maintenance", "Reported"].includes(a.status);
   const isUnassignedAsset = (a: Asset) => !isAssignedAsset(a) && !isOutOfServiceAsset(a);
@@ -336,7 +346,7 @@ export const Assets: React.FC = () => {
                               <Button size="sm" variant="ghost" onClick={() => openEditModal(a)}>
                                 <Edit2 className="w-3.5 h-3.5" />
                               </Button>
-                              <Button size="sm" variant="outline" onClick={() => setTransferAsset(a)}>
+                              <Button size="sm" variant="outline" onClick={() => { setTransferAsset(a); setAssigneeSearchQuery(""); }}>
                                 <ArrowRightLeft className="w-3.5 h-3.5 mr-1.5" /> Assign
                               </Button>
                             </div>
@@ -398,7 +408,7 @@ export const Assets: React.FC = () => {
       </Dialog>
 
       {/* Transfer Asset Dialog */}
-      <Dialog isOpen={!!transferAsset} onClose={() => setTransferAsset(null)} title={transferAsset?.assigned_to_name && transferAsset.assigned_to_name !== "Unassigned" ? "Transfer Asset" : "Assign Asset"}>
+      <Dialog isOpen={!!transferAsset} onClose={() => { setTransferAsset(null); setAssigneeSearchQuery(""); }} title={transferAsset?.assigned_to_name && transferAsset.assigned_to_name !== "Unassigned" ? "Transfer Asset" : "Assign Asset"}>
         {transferAsset && (
           <div className="space-y-4">
             <div className="bg-muted/40 p-3 rounded-lg border border-border text-xs">
@@ -428,7 +438,7 @@ export const Assets: React.FC = () => {
             </div>
             
             <div className="flex justify-end space-x-3 pt-4 border-t border-border mt-4">
-              <Button variant="ghost" onClick={() => setTransferAsset(null)} disabled={isSubmitting}>
+              <Button variant="ghost" onClick={() => { setTransferAsset(null); setAssigneeSearchQuery(""); }} disabled={isSubmitting}>
                 Cancel
               </Button>
               <Button variant="primary" onClick={handleTransferSubmit} disabled={isSubmitting || !selectedUser}>
