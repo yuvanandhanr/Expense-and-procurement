@@ -322,7 +322,7 @@ export const Assets: React.FC = () => {
               onChange={e => setSelectedUser(e.target.value)}
               options={[
                 { value: "", label: "Select an employee..." },
-                ...users.map(u => ({ value: u.user_id.toString(), label: `${u.first_name} ${u.last_name} (${u.roles && u.roles.length > 0 ? u.roles.map(r => r.role_name).join(', ') : 'Employee'})` }))
+                ...users.filter(u => !u.roles?.some(r => r.role_name.toLowerCase().includes('vendor'))).map(u => ({ value: u.user_id.toString(), label: `${u.first_name} ${u.last_name} (${u.roles && u.roles.length > 0 ? u.roles.map(r => r.role_name).join(', ') : 'Employee'})` }))
               ]}
             />
 
