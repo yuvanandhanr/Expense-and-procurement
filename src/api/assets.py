@@ -15,6 +15,24 @@ class TransferRequest(BaseModel):
     new_employee_id: int
     notes: Optional[str] = None
 
+
+def resolve_category_name(a) -> str:
+    if a.category and a.category.category_name:
+        return a.category.category_name
+    if a.category_id == 4:
+        return 'Software'
+    elif a.category_id == 5:
+        return 'Furniture'
+    elif a.category_id in (1, 2, 3):
+        return 'Hardware'
+    
+    name = (a.model or '').lower()
+    if any(kw in name for kw in ['software', 'license', 'saas', 'app']):
+        return 'Software'
+    elif any(kw in name for kw in ['chair', 'desk', 'table', 'furniture', 'cabinet']):
+        return 'Furniture'
+    return 'Hardware'
+
 router = APIRouter(prefix="/assets", tags=["Assets"])
 @router.get("/my-assets")
 async def get_my_assets(
@@ -36,7 +54,7 @@ async def get_my_assets(
             "asset_id": a.asset_id,
             "asset_code": a.asset_number,
             "asset_name": a.model or "Hardware Asset",
-            "category": a.category.category_name if a.category else "Uncategorized",
+            "category": resolve_category_name(a),
             "serial_number": a.serial_number or a.asset_tag,
             "purchase_date": str(a.purchase_date) if a.purchase_date else "",
             "vendor_name": a.vendor.vendor_name if a.vendor else "Unknown",
@@ -69,7 +87,7 @@ async def get_assets(
             "asset_id": a.asset_id,
             "asset_code": a.asset_number,
             "asset_name": a.model or "Generic Asset",
-            "category": a.category.category_name if a.category else "Uncategorized",
+            "category": resolve_category_name(a),
             "assigned_to_id": a.assigned_employee_id,
             "assigned_to_name": f"{a.assigned_employee.first_name} {a.assigned_employee.last_name}" if a.assigned_employee else "Unassigned",
             "serial_number": a.serial_number or a.asset_tag,
@@ -111,7 +129,7 @@ async def create_asset(
         amc_expiry=data.amc_expiry,
         location=data.location,
         cost=data.cost,
-        status="Available"
+        status=data.status or "Unassigned"
     )
     
     session.add(new_asset)

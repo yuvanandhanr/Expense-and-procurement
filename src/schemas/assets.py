@@ -72,6 +72,7 @@ class AssetCreate(BaseModel):
     asset_number: str
     asset_tag: str
     category_id: Optional[int] = None
+    status: Optional[str] = None
     po_id: Optional[int] = None
     vendor_id: Optional[int] = None
     serial_number: Optional[str] = None

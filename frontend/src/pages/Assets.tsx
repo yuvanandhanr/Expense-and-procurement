@@ -38,6 +38,7 @@ export const Assets: React.FC = () => {
 
   const isAdmin = user?.roles?.some(r => r.role_name === "Admin") || false;
   const canViewAll = user?.roles?.some(r => ["Admin", "CEO", "CFO", "Finance Manager"].includes(r.role_name)) || false;
+  const canViewCost = user?.roles?.some(r => ["Admin", "CEO", "CFO"].includes(r.role_name)) || false;
 
   const fetchData = async () => {
     setLoading(true);
@@ -202,7 +203,7 @@ export const Assets: React.FC = () => {
                     <th className="p-4">Name</th>
                     <th className="p-4">Category</th>
                     {canViewAll && <th className="p-4">Assigned To</th>}
-                    {canViewAll && <th className="p-4">Cost</th>}
+                    {canViewCost && <th className="p-4">Cost</th>}
                     <th className="p-4">Status</th>
                     {isAdmin && <th className="p-4 text-right">Actions</th>}
                   </tr>
@@ -214,7 +215,7 @@ export const Assets: React.FC = () => {
                       <td className="p-4 font-semibold">{a.asset_name}</td>
                       <td className="p-4 text-muted-foreground">{a.category}</td>
                       {canViewAll && <td className="p-4 text-xs font-semibold">{a.assigned_to_name || "Unassigned"}</td>}
-                      {canViewAll && <td className="p-4 font-mono">${a.cost?.toLocaleString()}</td>}
+                      {canViewCost && <td className="p-4 font-mono">${a.cost?.toLocaleString()}</td>}
                       <td className="p-4">
                         <Badge 
                           variant={
@@ -233,15 +234,19 @@ export const Assets: React.FC = () => {
                             <Button size="sm" variant="ghost" disabled>
                               Unavailable
                             </Button>
+                          ) : ((a.assigned_to_name && a.assigned_to_name !== "Unassigned") || a.status === "Assigned" || a.status === "Transferred") ? (
+                            <div className="flex justify-end items-center gap-2">
+                              <Button size="sm" variant="ghost" disabled className="text-amber-400 opacity-80 cursor-not-allowed bg-amber-500/10 border border-amber-500/20">
+                                Transferred
+                              </Button>
+                            </div>
                           ) : (
                             <div className="flex justify-end items-center gap-2">
-                              {(!a.assigned_to_name || a.assigned_to_name === "Unassigned") && (
-                                <Button size="sm" variant="ghost" onClick={() => openEditModal(a)}>
-                                  <Edit2 className="w-3.5 h-3.5" />
-                                </Button>
-                              )}
+                              <Button size="sm" variant="ghost" onClick={() => openEditModal(a)}>
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </Button>
                               <Button size="sm" variant="outline" onClick={() => setTransferAsset(a)}>
-                                <ArrowRightLeft className="w-3.5 h-3.5 mr-1.5" /> {a.assigned_to_name && a.assigned_to_name !== "Unassigned" ? "Transfer" : "Assign"}
+                                <ArrowRightLeft className="w-3.5 h-3.5 mr-1.5" /> Assign
                               </Button>
                             </div>
                           )}
