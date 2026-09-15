@@ -110,7 +110,7 @@ async def get_pending_approvals(
                     "current_step_sequence": 1,
                     "workflow_step": workflow_step,
                     "status": report.status,
-                    "created_at": report.created_at or report.submission_date,
+                    "created_at": report.created_at,
                     "updated_at": report.updated_at,
                     "requestor_id": report.employee_id,
                     "requestor_name": requestor_name,
