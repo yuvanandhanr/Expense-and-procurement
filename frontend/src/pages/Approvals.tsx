@@ -7,14 +7,14 @@ import toast from "react-hot-toast";
 import { formatDate, getErrorMessage, isValidText } from "../utils/helpers";
 import { Check, X as XIcon } from "lucide-react";
 
-type TabType = "Requisitions" | "Reimbursements" | "Asset Incidents" | "Resignations";
+type TabType = "Reimbursements" | "Requisitions" | "Asset Incidents" | "Resignations";
 type StatusSubTab = "All" | "Submitted" | "Approved" | "Rejected";
 
 export const Approvals: React.FC = () => {
   const { user } = useAuth();
   const [workflows, setWorkflows] = useState<ApprovalWorkflow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabType>("Requisitions");
+  const [activeTab, setActiveTab] = useState<TabType>("Reimbursements");
   const [statusSubTab, setStatusSubTab] = useState<StatusSubTab>("All");
   
   // Action state
@@ -193,7 +193,7 @@ export const Approvals: React.FC = () => {
 
       {/* Primary Category Tabs */}
       <div className="flex space-x-2 border-b border-border">
-        {(["Requisitions", "Reimbursements", "Asset Incidents", "Resignations"] as TabType[]).map((tab) => (
+        {(["Reimbursements", "Requisitions", "Asset Incidents", "Resignations"] as TabType[]).map((tab) => (
           <button
             key={tab}
             onClick={() => {
