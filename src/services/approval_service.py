@@ -254,7 +254,6 @@ class ApprovalService:
             .join(PurchaseRequisition, ApprovalWorkflow.pr_id == PurchaseRequisition.pr_id)
             .join(UserModel, PurchaseRequisition.requestor_id == UserModel.user_id)
             .where(
-                ApprovalWorkflow.status.in_(["Pending", "Under Review"]),
                 PurchaseRequisition.total_estimated_amount > 0
             )
             .order_by(ApprovalWorkflow.created_at.desc())
@@ -319,8 +318,6 @@ class ApprovalService:
             elif can_approve:
                 can_view = True
             elif pr.requestor_id == user.user_id:
-                can_view = True
-            elif workflow.status == "Approved":
                 can_view = True
             else:
                 wf_hist = history_by_wf.get(workflow.workflow_id, [])

@@ -8,7 +8,7 @@ import { formatDate, getErrorMessage, isValidText } from "../utils/helpers";
 import { Check, X as XIcon } from "lucide-react";
 
 type TabType = "Requisitions" | "Reimbursements" | "Asset Incidents" | "Resignations";
-type StatusSubTab = "All" | "Approved" | "Rejected";
+type StatusSubTab = "All" | "Submitted" | "Approved" | "Rejected";
 
 export const Approvals: React.FC = () => {
   const { user } = useAuth();
@@ -129,6 +129,10 @@ export const Approvals: React.FC = () => {
     return s.includes("reject") || s.includes("denied") || s.includes("correction") || s.includes("returned");
   };
 
+  const isSubmittedWf = (wf: any) => {
+    return !isApprovedWf(wf) && !isRejectedWf(wf);
+  };
+
   // Base list of workflows for the selected category
   const baseCategoryWorkflows = (Array.isArray(workflows) ? workflows : []).filter((wf: any) => {
     if (!wf || typeof wf !== "object") return false;
@@ -151,6 +155,7 @@ export const Approvals: React.FC = () => {
   // Calculate counts for sub-tabs
   const subTabCounts = {
     All: baseCategoryWorkflows.length,
+    Submitted: baseCategoryWorkflows.filter(isSubmittedWf).length,
     Approved: baseCategoryWorkflows.filter(isApprovedWf).length,
     Rejected: baseCategoryWorkflows.filter(isRejectedWf).length,
   };
@@ -158,6 +163,7 @@ export const Approvals: React.FC = () => {
   // Filter category workflows by current status sub-tab
   const filteredWorkflows = baseCategoryWorkflows
     .filter((wf: any) => {
+      if (statusSubTab === "Submitted") return isSubmittedWf(wf);
       if (statusSubTab === "Approved") return isApprovedWf(wf);
       if (statusSubTab === "Rejected") return isRejectedWf(wf);
       return true; // "All"
@@ -205,9 +211,9 @@ export const Approvals: React.FC = () => {
         ))}
       </div>
 
-      {/* Status Sub-Tabs (All, Approved, Rejected) */}
+      {/* Status Sub-Tabs (All, Submitted, Approved, Rejected) */}
       <div className="flex items-center space-x-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50">
-        {(["All", "Approved", "Rejected"] as StatusSubTab[]).map((subTab) => (
+        {(["All", "Submitted", "Approved", "Rejected"] as StatusSubTab[]).map((subTab) => (
           <button
             key={subTab}
             onClick={() => setStatusSubTab(subTab)}

@@ -42,65 +42,48 @@ async def get_pending_approvals(
         try:
             from src.models.assets import AssetIncident, Asset
             
-            statuses = []
-            if has_manager:
-                statuses.append("Reported")
-            if has_admin or has_it:
-                statuses.extend(["Pending Fulfillment", "Waiting for Procurement"])
+            stmt = (
+                select(AssetIncident, Asset, UserModel)
+                .join(Asset, AssetIncident.asset_id == Asset.asset_id)
+                .join(UserModel, AssetIncident.reporter_id == UserModel.user_id)
+            )
+            
+            # If just a Manager, only see incidents in their department
+            if has_manager and not has_admin and not has_it:
+                if current_user.department_id is not None:
+                    stmt = stmt.where(Asset.department_id == current_user.department_id)
                 
-            if statuses:
-                stmt = (
-                    select(AssetIncident, Asset, UserModel)
-                    .join(Asset, AssetIncident.asset_id == Asset.asset_id)
-                    .join(UserModel, AssetIncident.reporter_id == UserModel.user_id)
-                    .where(AssetIncident.status.in_(statuses))
-                )
-                
-                # If just a Manager, only see incidents in their department
-                if has_manager and not has_admin and not has_it:
-                    if current_user.department_id is not None:
-                        stmt = stmt.where(Asset.department_id == current_user.department_id)
-                    
-                result = await db.execute(stmt)
-                for incident, asset, reporter in result.all():
-                    workflow_step = "Manager Review" if incident.status == "Reported" else "Pending Fulfillment"
-                    asset_name_str = getattr(asset, "model", None) or "Asset"
-                    reporter_name = f"{reporter.first_name} {reporter.last_name}" if reporter else "Employee"
-                    cost_val = getattr(incident, "estimated_cost", None)
-                    
-                    pending_workflows.append({
-                        "workflow_id": incident.incident_id,
-                        "entity_type": "AssetIncident",
-                        "entity_id": incident.incident_id,
-                        "current_step_sequence": 1,
-                        "workflow_step": workflow_step,
-                        "status": incident.status,
-                        "created_at": incident.created_at,
-                        "updated_at": incident.updated_at,
-                        "requestor_id": incident.reporter_id,
-                        "requestor_name": reporter_name,
-                        "title": f"{incident.incident_type} Issue: {asset_name_str} ({getattr(asset, "asset_tag", "ASSET")})",
-                        "justification": incident.description,
-                        "total_amount": cost_val,
-                        "amount": cost_val,
-                        "past_approvers": [],
-                        "pending_approvers": ["Admin/Manager"],
-                        "steps": [],
-                        "can_approve": True
-                    })
+            result = await db.execute(stmt)
+            for incident, asset, reporter in result.all():
+                workflow_step = "Manager Review" if incident.status == "Reported" else "Pending Fulfillment"
+                asset_name_str = getattr(asset, "model", None) or "Asset"
+                reporter_name = f"{reporter.first_name} {reporter.last_name}" if reporter else "Employee"
+                cost_val = getattr(incident, "estimated_cost", None)
+                pending_workflows.append({
+                    "workflow_id": incident.incident_id,
+                    "entity_type": "AssetIncident",
+                    "entity_id": incident.incident_id,
+                    "current_step_sequence": 1,
+                    "workflow_step": workflow_step,
+                    "status": incident.status,
+                    "created_at": incident.created_at,
+                    "updated_at": incident.updated_at,
+                    "requestor_id": incident.reporter_id,
+                    "requestor_name": reporter_name,
+                    "title": f"{incident.incident_type} Issue: {asset_name_str} ({getattr(asset, 'asset_tag', 'ASSET')})",
+                    "justification": incident.description,
+                    "total_amount": cost_val,
+                    "amount": cost_val,
+                    "past_approvers": [],
+                    "pending_approvers": ["Admin/Manager"],
+                    "steps": [],
+                    "can_approve": True
+                })
         except Exception as e:
             logger.error(f"Error fetching pending Asset Incidents: {e}", exc_info=True)
 
-    # Fetch pending Expense Reports for the current user
-    expense_statuses = []
-    if has_manager or has_admin:
-        expense_statuses.append("Pending Manager Approval")
-    if has_finance_mgr or has_cfo or has_admin:
-        expense_statuses.extend(["Pending Finance Approval", "Pending Finance Manager Approval", "Payment Requested"])
-    if has_cfo or has_admin:
-        expense_statuses.append("Pending CFO Approval")
-
-    if expense_statuses:
+    # Fetch Expense Reports for the current user based on roles
+    if has_manager or has_finance_mgr or has_cfo or has_admin:
         try:
             from src.models.expense import ExpenseReport
             
@@ -108,14 +91,13 @@ async def get_pending_approvals(
                 select(ExpenseReport, UserModel)
                 .join(UserModel, ExpenseReport.employee_id == UserModel.user_id)
                 .where(
-                    ExpenseReport.status.in_(expense_statuses),
                     ExpenseReport.employee_id != current_user.user_id
                 )
             )
             
             result = await db.execute(stmt)
             for report, requestor in result.all():
-                if has_manager and not (has_admin or has_cfo or has_finance_mgr) and report.status == "Pending Manager Approval":
+                if has_manager and not (has_admin or has_cfo or has_finance_mgr):
                     if requestor.manager_id != current_user.user_id:
                         continue
 
