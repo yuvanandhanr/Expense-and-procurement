@@ -219,13 +219,13 @@ export const Approvals: React.FC = () => {
             onClick={() => setStatusSubTab(subTab)}
             className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
               statusSubTab === subTab
-                ? "bg-background text-foreground shadow-sm font-bold"
+                ? "bg-primary text-primary-foreground shadow-sm font-bold"
                 : "text-muted-foreground hover:text-foreground hover:bg-background/50"
             }`}
           >
             <span>{subTab}</span>
             <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-              statusSubTab === subTab ? "bg-primary/10 text-primary font-bold" : "bg-muted text-muted-foreground"
+              statusSubTab === subTab ? "bg-primary-foreground/20 text-primary-foreground font-bold" : "bg-muted text-muted-foreground"
             }`}>
               {subTabCounts[subTab]}
             </span>
