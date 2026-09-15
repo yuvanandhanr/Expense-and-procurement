@@ -130,25 +130,36 @@ export const MyAssets: React.FC = () => {
       </div>
 
       <div className="flex items-center justify-between mb-4 mt-6">
-        <div className="flex items-center space-x-2 bg-card p-3 rounded-lg border border-border">
-          <span className="text-xs font-semibold text-muted-foreground uppercase px-2">View:</span>
+        <div className="flex items-center space-x-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50">
           <button
             onClick={() => setActiveTab("Assets")}
-            className={`px-3 py-1 text-xs font-bold rounded-full transition-all ${activeTab === "Assets"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-accent"
-              }`}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
+              activeTab === "Assets"
+                ? "bg-background text-foreground shadow-sm font-bold"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+            }`}
           >
-            My Assets
+            <span>My Assets</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+              activeTab === "Assets" ? "bg-primary/10 text-primary font-bold" : "bg-muted text-muted-foreground"
+            }`}>
+              {assets.length}
+            </span>
           </button>
           <button
             onClick={() => setActiveTab("Incidents")}
-            className={`px-3 py-1 text-xs font-bold rounded-full transition-all ${activeTab === "Incidents"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-accent"
-              }`}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
+              activeTab === "Incidents"
+                ? "bg-background text-foreground shadow-sm font-bold"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+            }`}
           >
-            My Asset Incidents
+            <span>My Asset Incidents</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+              activeTab === "Incidents" ? "bg-primary/10 text-primary font-bold" : "bg-muted text-muted-foreground"
+            }`}>
+              {incidents.length}
+            </span>
           </button>
         </div>
       </div>

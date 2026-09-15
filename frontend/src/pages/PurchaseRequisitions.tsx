@@ -169,6 +169,17 @@ export const PurchaseRequisitions: React.FC = () => {
     return <Badge variant="neutral">{status}</Badge>;
   };
 
+  const subTabCounts: Record<string, number> = {
+    All: prs.length,
+    Draft: prs.filter((pr) => pr.status === "Draft").length,
+    Submitted: prs.filter((pr) => {
+      const s = pr.status.toLowerCase();
+      return s.includes("pending") || s === "submitted" || s === "under review";
+    }).length,
+    Approved: prs.filter((pr) => pr.status === "Approved" || pr.status === "Completed").length,
+    Rejected: prs.filter((pr) => pr.status === "Rejected" || pr.status === "Cancelled").length,
+  };
+
   const filteredPrs = prs.filter((pr) => {
     if (statusFilter === "All") return true;
     if (statusFilter === "Submitted") {
@@ -195,18 +206,23 @@ export const PurchaseRequisitions: React.FC = () => {
       </div>
 
       {/* Filters & Controls */}
-      <div className="flex items-center space-x-2 bg-card p-3 rounded-lg border border-border">
-        <span className="text-xs font-semibold text-muted-foreground uppercase px-2">Filter State:</span>
+      <div className="flex items-center space-x-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50">
         {["All", "Draft", "Submitted", "Approved", "Rejected"].map((status) => (
           <button
             key={status}
             onClick={() => setStatusFilter(status)}
-            className={`px-3 py-1 text-xs font-bold rounded-full transition-all ${statusFilter === status
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-accent"
-              }`}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
+              statusFilter === status
+                ? "bg-background text-foreground shadow-sm font-bold"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+            }`}
           >
-            {status}
+            <span>{status}</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+              statusFilter === status ? "bg-primary/10 text-primary font-bold" : "bg-muted text-muted-foreground"
+            }`}>
+              {subTabCounts[status]}
+            </span>
           </button>
         ))}
       </div>
