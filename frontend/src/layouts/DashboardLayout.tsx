@@ -291,15 +291,15 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       {
         title: "My Requests",
         items: [
-          { label: "My Reimbursements", path: "/expenses", icon: FileText, show: isEmployee || isManager || isAdmin || isFinance || isCEO },
-          { label: "Purchase Requisitions", path: "/prs", icon: FileText, show: isEmployee || isManager || isAdmin || isFinance || isCEO || isCFO },
-          { label: "My Assets", path: "/my-assets", icon: HardDrive, show: isEmployee || isManager || isAdmin || isFinance || isCEO },
+          { label: "My Reimbursements", path: "/expenses", icon: FileText, show: true },
+          { label: "Purchase Requisitions", path: "/prs", icon: FileText, show: true },
+          { label: "My Assets", path: "/my-assets", icon: HardDrive, show: true },
         ]
       },
       {
         title: "Approvals",
         items: [
-          { label: isCFO ? "Approval Queue" : "Pending Approvals", path: "/approvals", icon: CheckSquare, show: isManager || isFinance || isCFO || isAdmin || isCEO },
+          { label: "Pending Approvals", path: "/approvals", icon: CheckSquare, show: isManager || isFinance || isCFO || isAdmin || isCEO },
         ]
       },
       {

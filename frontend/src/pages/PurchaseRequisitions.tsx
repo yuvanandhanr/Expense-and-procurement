@@ -276,20 +276,20 @@ export const PurchaseRequisitions: React.FC = () => {
                       </td>
                       <td className="p-4 text-xs text-muted-foreground whitespace-nowrap">{formatDate(pr.created_at)}</td>
                       <td className="p-4 whitespace-nowrap">
-                        {pr.status === "Draft" && (
+                        {pr.status === "Draft" ? (
                           <Button size="sm" variant="outline" onClick={() => handleSubmit(pr.pr_id)} className="gap-1.5">
                             <Send className="w-3.5 h-3.5" /> Submit
                           </Button>
-                        )}
-                        {pr.requestor_id !== user?.user_id && (["Pending", "Under Review", "Submitted", "Pending Manager Approval", "Pending Finance Approval", "Pending CFO Approval", "Approved", "Completed"].includes(pr.status)) && (
+                        ) : (
                           <Button
                             size="sm"
-                            variant={["Approved", "Completed"].includes(pr.status) ? "secondary" : "primary"}
+                            variant={["Approved", "Completed", "Rejected", "Cancelled"].includes(pr.status) ? "secondary" : "primary"}
                             onClick={() => setSelectedPr(pr)}
                             className="gap-1.5 shadow-apple-sm"
                           >
                             <Eye className="w-3.5 h-3.5" />
-                            {["Approved", "Completed"].includes(pr.status) ? "View" : "Review"}
+                            {["Approved", "Completed", "Rejected", "Cancelled"].includes(pr.status) ? "View" : 
+                             (pr.requestor_id === user?.user_id ? "View Details" : "Review")}
                           </Button>
                         )}
                       </td>
