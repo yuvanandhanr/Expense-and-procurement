@@ -69,27 +69,23 @@ class ApprovalService:
             
             requestor_roles = {r.role_name for r in requestor.roles} if requestor else set()
             
-            # If requestor is a Manager, Admin, CFO, CEO, or Finance Manager, skip Manager Approval
+            # If requestor is a Manager, Admin, CFO, CEO, or Finance Manager
             if requestor_roles & {"Manager", "Admin", "CFO", "CEO", "Finance Manager"}:
                 target_roles = []
                 
-                # CEO -> CFO
                 if "CEO" in requestor_roles:
                     target_roles = ["CFO"]
                     report.status = "Pending CFO Approval"
-                # Admin -> CFO
                 elif "Admin" in requestor_roles:
                     target_roles = ["CFO"]
                     report.status = "Pending CFO Approval"
-                # Finance Manager -> CFO
                 elif "Finance Manager" in requestor_roles or "Finance" in requestor_roles:
                     target_roles = ["CFO"]
                     report.status = "Pending CFO Approval"
-                # CFO -> Finance Manager
                 elif "CFO" in requestor_roles:
+                    # Keep CFO logic unchanged as requested
                     target_roles = ["Finance Manager", "Finance"]
                     report.status = "Pending Finance Manager Approval"
-                # Manager -> Finance Manager
                 elif "Manager" in requestor_roles:
                     target_roles = ["Finance Manager", "Finance"]
                     report.status = "Pending Finance Manager Approval"
@@ -113,7 +109,7 @@ class ApprovalService:
             else:
                 # Employee submits -> Manager
                 approver_id = manager_id
-                # Enforce that approver cannot be the requestor (fallback logic)
+                # Enforce that approver cannot be the requestor
                 if approver_id == requestor.user_id:
                     approver_id = None
                     

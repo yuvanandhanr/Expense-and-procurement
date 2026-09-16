@@ -591,7 +591,7 @@ async def approve_expense(
         
         # Find a Finance Manager who is not the submitter
         fm_query = select(User).join(User.roles).where(
-            Role.role_name.in_(["Finance Manager", "Finance", "CFO", "Admin"]), 
+            Role.role_name.in_(["Finance Manager", "Finance"]), 
             User.status == "Active",
             User.user_id != report.employee_id
         )
@@ -604,7 +604,14 @@ async def approve_expense(
             status="Pending"
         )
         db.add(fm_approval)
-    elif report.status in ["Pending Finance Manager Approval", "Pending Finance Approval", "Pending CFO Approval"]:
+    elif report.status in ["Pending Finance Manager Approval", "Pending Finance Approval"]:
+        # When Finance Manager approves, check if the requestor is CEO, Admin, or Finance Manager
+        # which means it requires CFO approval
+        # Actually, in initialize_approval_flow, CEO/Admin/Finance Manager goes directly to CFO
+        # So "Pending Finance Approval" is only for Manager/Employee claims, or if CFO routed it to Finance
+        report.status = "Payment Requested"
+        report.payment_status = "Pending Payment"
+    elif report.status == "Pending CFO Approval":
         report.status = "Payment Requested"
         report.payment_status = "Pending Payment"
     else:

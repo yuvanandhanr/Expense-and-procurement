@@ -24,6 +24,25 @@ export const Approvals: React.FC = () => {
   const [physicalInspectionDone, setPhysicalInspectionDone] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allocateAssetId, setAllocateAssetId] = useState("");
+  
+  // Preview state
+  const [previewWorkflow, setPreviewWorkflow] = useState<any>(null);
+  const [receiptDetails, setReceiptDetails] = useState<any>(null);
+  const [loadingReceipt, setLoadingReceipt] = useState(false);
+
+  const handleViewReceipt = async (wf: any) => {
+    setPreviewWorkflow(wf);
+    setLoadingReceipt(true);
+    try {
+      const response = await api.get(`/expenses/${wf.entity_id}`);
+      setReceiptDetails(response.data);
+    } catch (err) {
+      console.error("Failed to fetch receipt details:", err);
+      toast.error("Could not load receipt details.");
+    } finally {
+      setLoadingReceipt(false);
+    }
+  };
 
   const fetchWorkflows = async () => {
     setLoading(true);
@@ -246,6 +265,68 @@ export const Approvals: React.FC = () => {
              <EmptyState title={`No ${statusSubTab === "All" ? "" : statusSubTab.toLowerCase() + " "}${activeTab.toLowerCase()}.`} description="You are all caught up!" />
           </CardContent>
         </Card>
+      ) : activeTab === "Reimbursements" ? (
+        <div className="bg-white rounded-xl shadow-sm border border-border overflow-hidden">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-border/80 text-xs text-muted-foreground uppercase tracking-wider bg-muted/20">
+                <th className="px-6 py-4 font-semibold">Report ID</th>
+                <th className="px-6 py-4 font-semibold">Purpose</th>
+                <th className="px-6 py-4 font-semibold">Total Amount</th>
+                <th className="px-6 py-4 font-semibold">Status</th>
+                <th className="px-6 py-4 font-semibold">Created By</th>
+                <th className="px-6 py-4 font-semibold text-center">Receipt</th>
+                <th className="px-6 py-4 font-semibold text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/50 text-sm">
+              {filteredWorkflows.map(wf => {
+                const titleStr = typeof wf.title === "string" ? wf.title : "Untitled Request";
+                const descStr = typeof wf.description === "string" ? wf.description : (typeof wf.justification === "string" ? wf.justification : "");
+                const requesterStr = wf.requestor_name || wf.requester_name || wf.submitted_by || "Employee";
+                const rawAmt = wf.total_amount ?? wf.amount ?? wf.estimated_cost;
+                const amtNum = rawAmt !== undefined && rawAmt !== null ? Number(rawAmt) : null;
+                const statusStr = String(wf.status || "");
+                
+                const isApproved = isApprovedWf(wf);
+                const isRejected = isRejectedWf(wf);
+                const isPendingStatus = !isApproved && !isRejected && ((["Pending", "Under Review", "Reported"].includes(statusStr)) || (statusStr.toLowerCase().includes("pending") && statusStr !== "Approved" && statusStr !== "Pending Fulfillment"));
+
+                return (
+                  <tr key={wf.workflow_id || wf.entity_id} className="hover:bg-muted/10 transition-colors">
+                    <td className="px-6 py-4 font-semibold text-primary">#{wf.entity_id || wf.workflow_id}</td>
+                    <td className="px-6 py-4">
+                      <div className="font-semibold text-foreground">{titleStr}</div>
+                      {descStr && <div className="text-xs text-muted-foreground mt-1 line-clamp-1">{descStr}</div>}
+                    </td>
+                    <td className="px-6 py-4 font-bold">
+                      {amtNum !== null && !isNaN(amtNum) ? `$${amtNum.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "-"}
+                    </td>
+                    <td className="px-6 py-4"><StatusBadge status={statusStr} /></td>
+                    <td className="px-6 py-4">
+                      <div className="text-xs font-semibold">{requesterStr}</div>
+                      <div className="text-[10px] text-muted-foreground">{formatDate(wf.created_at || wf.submission_date || wf.date)}</div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <Button variant="outline" size="sm" onClick={() => handleViewReceipt(wf)} className="text-xs shadow-sm">View Receipt</Button>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      {isPendingStatus ? (
+                        <div className="flex justify-end gap-2">
+                          <Button variant="success" size="sm" onClick={() => { setSelectedWorkflow(wf); setActionType("approve"); }} className="px-3 shadow-sm text-xs"><Check className="w-3.5 h-3.5 mr-1" /> Approve</Button>
+                          <Button variant="warning" size="sm" onClick={() => { setSelectedWorkflow(wf); setActionType("return"); }} className="px-3 shadow-sm text-xs bg-amber-500/10 text-amber-600 border border-amber-500/30 hover:bg-amber-500 hover:text-white">Return</Button>
+                          <Button variant="danger" size="sm" onClick={() => { setSelectedWorkflow(wf); setActionType("reject"); }} className="px-3 shadow-sm text-xs"><XIcon className="w-3.5 h-3.5 mr-1" /> Reject</Button>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-xs italic">No actions available</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredWorkflows.map(wf => {
@@ -464,6 +545,66 @@ export const Approvals: React.FC = () => {
             >
               {isSubmitting ? "Processing..." : `Confirm ${actionType ? actionType.charAt(0).toUpperCase() + actionType.slice(1) : ""}`}
             </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Receipt Preview Dialog */}
+      <Dialog 
+        isOpen={!!previewWorkflow} 
+        onClose={() => { setPreviewWorkflow(null); setReceiptDetails(null); }}
+        title={`Receipt Preview - Reimbursement #${previewWorkflow?.entity_id}`}
+      >
+        <div className="space-y-4">
+          {loadingReceipt ? (
+            <div className="p-8 text-center text-muted-foreground">Loading receipt data...</div>
+          ) : receiptDetails ? (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center bg-muted/20 p-4 rounded-xl border border-border">
+                <div>
+                  <h3 className="font-bold text-lg">{receiptDetails.merchant_name || receiptDetails.purpose || "Expense"}</h3>
+                  <p className="text-sm text-muted-foreground">{formatDate(receiptDetails.transaction_date || receiptDetails.created_at)}</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-primary">${Number(receiptDetails.total_amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Verified Total</div>
+                </div>
+              </div>
+              
+              <div className="bg-muted/10 p-4 rounded-xl border border-border text-sm space-y-2">
+                <p><span className="font-semibold">Reason:</span> {receiptDetails.justification}</p>
+                {receiptDetails.department_id && <p><span className="font-semibold">Dept ID:</span> {receiptDetails.department_id}</p>}
+                {receiptDetails.project_id && <p><span className="font-semibold">Project ID:</span> {receiptDetails.project_id}</p>}
+              </div>
+
+              {receiptDetails.receipts && receiptDetails.receipts.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Attached Receipts ({receiptDetails.receipts.length})</h4>
+                  {receiptDetails.receipts.map((receipt: any, idx: number) => (
+                    <div key={idx} className="flex gap-4 p-3 border border-border rounded-lg items-center">
+                      <div className="w-16 h-16 bg-muted rounded flex items-center justify-center shrink-0">
+                        {receipt.file_url ? (
+                           <img src={receipt.file_url} alt="Receipt" className="w-full h-full object-cover rounded" />
+                        ) : (
+                           <span className="text-xs text-muted-foreground">No File</span>
+                        )}
+                      </div>
+                      <div className="flex-1 text-xs space-y-1">
+                        <p className="font-semibold text-sm">{receipt.merchant_name}</p>
+                        <p className="text-muted-foreground">Date: {formatDate(receipt.transaction_date)} • Category: {receipt.category}</p>
+                        {receipt.ocr_confidence && <p className="text-emerald-600">OCR Confidence: {(receipt.ocr_confidence * 100).toFixed(2)}%</p>}
+                        {receipt.total_amount && <p className="font-medium text-foreground">OCR Extracted: ${Number(receipt.total_amount).toFixed(2)}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="p-8 text-center text-muted-foreground">Failed to load receipt data.</div>
+          )}
+          <div className="flex justify-end pt-2 border-t border-border">
+            <Button variant="outline" onClick={() => setPreviewWorkflow(null)}>Close</Button>
           </div>
         </div>
       </Dialog>
