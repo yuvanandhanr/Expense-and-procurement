@@ -98,7 +98,9 @@ async def get_pending_approvals(
             result = await db.execute(stmt)
             for report, requestor in result.all():
                 if has_manager and not (has_admin or has_cfo or has_finance_mgr):
-                    if requestor.manager_id != current_user.user_id:
+                    is_direct_manager = (requestor.manager_id == current_user.user_id)
+                    is_same_dept = True if current_user.department_id is None else (requestor.department_id == current_user.department_id)
+                    if not (is_direct_manager or is_same_dept):
                         continue
 
                 workflow_step = report.status
