@@ -138,6 +138,36 @@ export const Approvals: React.FC = () => {
   };
 
   // Helper status checkers
+  const isPendingForUser = (wf: any) => {
+    const s = String(wf?.status || "");
+    if (!s.toLowerCase().includes("pending")) return false;
+    
+    const roles = user?.roles?.map(r => r.role_name) || [];
+    if (s === "Pending Manager Approval") return roles.includes("Manager");
+    if (s === "Pending Finance Approval" || s === "Pending Finance Manager Approval") return roles.includes("Finance") || roles.includes("Finance Manager");
+    if (s === "Pending CFO Approval") return roles.includes("CFO");
+    if (s === "Pending Admin Approval") return roles.includes("Admin");
+    return false;
+  };
+
+  const getActionText = (wf: any) => {
+    const s = String(wf?.status || "");
+    if (isApprovedWf(wf) || isRejectedWf(wf) || isReturnedWf(wf) || s === "Payment Requested" || s === "Closed") {
+      return "View";
+    }
+    
+    if (isPendingForUser(wf)) {
+      return "Need Approval";
+    }
+    
+    if (s.includes("Pending")) {
+      const pendingRole = s.replace("Pending ", "").replace(" Approval", "");
+      return `Need ${pendingRole} Approval`;
+    }
+    
+    return "View";
+  };
+
   const isApprovedWf = (wf: any) => {
     const s = String(wf?.status || "").toLowerCase();
     return s.includes("approved") || s === "pass" || s === "completed" || s === "fulfilled";
@@ -314,13 +344,17 @@ export const Approvals: React.FC = () => {
                       <div className="text-[10px] text-muted-foreground">{formatDate(wf.created_at || wf.submission_date || wf.date)}</div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {isPendingStatus ? (
+                      {getActionText(wf) === "Need Approval" ? (
                         <Button variant="primary" size="sm" onClick={() => handleOpenDetails(wf)} className="px-4 shadow-sm text-xs font-bold rounded-full">
                           Need Approval
                         </Button>
-                      ) : (
+                      ) : getActionText(wf) === "View" ? (
                         <Button variant="outline" size="sm" onClick={() => handleOpenDetails(wf)} className="px-4 shadow-sm text-xs rounded-full">
                           <span className="mr-1">👁</span> View
+                        </Button>
+                      ) : (
+                        <Button variant="secondary" size="sm" onClick={() => handleOpenDetails(wf)} className="px-4 shadow-sm text-xs font-medium rounded-full opacity-80">
+                          {getActionText(wf)}
                         </Button>
                       )}
                     </td>
@@ -653,7 +687,7 @@ export const Approvals: React.FC = () => {
           <div className="flex justify-between items-center pt-4 border-t border-border mt-4 bg-background">
             <Button variant="outline" onClick={() => setPreviewWorkflow(null)}>Close</Button>
             
-            {previewWorkflow && !isApprovedWf(previewWorkflow) && !isRejectedWf(previewWorkflow) && !isReturnedWf(previewWorkflow) && (
+            {previewWorkflow && isPendingForUser(previewWorkflow) && (
                <div className="flex items-center gap-2">
                  <Button variant="danger" onClick={() => { setPreviewWorkflow(null); setSelectedWorkflow(previewWorkflow); setActionType("reject"); }}>Reject</Button>
                  <Button variant="warning" onClick={() => { setPreviewWorkflow(null); setSelectedWorkflow(previewWorkflow); setActionType("return"); }}>Return for Correction</Button>
