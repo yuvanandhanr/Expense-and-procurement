@@ -8,7 +8,7 @@ import { formatDate, getErrorMessage, isValidText } from "../utils/helpers";
 import { Check, X as XIcon } from "lucide-react";
 
 type TabType = "Reimbursements" | "Requisitions" | "Asset Incidents" | "Resignations";
-type StatusSubTab = "All" | "Submitted" | "Approved" | "Rejected";
+type StatusSubTab = "All" | "Submitted" | "Approved" | "Rejected" | "Return for Correction";
 
 export const Approvals: React.FC = () => {
   const { user } = useAuth();
@@ -30,7 +30,7 @@ export const Approvals: React.FC = () => {
   const [receiptDetails, setReceiptDetails] = useState<any>(null);
   const [loadingReceipt, setLoadingReceipt] = useState(false);
 
-  const handleViewReceipt = async (wf: any) => {
+  const handleOpenDetails = async (wf: any) => {
     setPreviewWorkflow(wf);
     setLoadingReceipt(true);
     try {
@@ -145,11 +145,16 @@ export const Approvals: React.FC = () => {
 
   const isRejectedWf = (wf: any) => {
     const s = String(wf?.status || "").toLowerCase();
-    return s.includes("reject") || s.includes("denied") || s.includes("correction") || s.includes("returned");
+    return s.includes("reject") || s.includes("denied");
+  };
+
+  const isReturnedWf = (wf: any) => {
+    const s = String(wf?.status || "").toLowerCase();
+    return s.includes("correction") || s.includes("returned");
   };
 
   const isSubmittedWf = (wf: any) => {
-    return !isApprovedWf(wf) && !isRejectedWf(wf);
+    return !isApprovedWf(wf) && !isRejectedWf(wf) && !isReturnedWf(wf);
   };
 
   // Base list of workflows for the selected category
@@ -172,11 +177,12 @@ export const Approvals: React.FC = () => {
   });
 
   // Calculate counts for sub-tabs
-  const subTabCounts = {
+  const subTabCounts: Record<StatusSubTab, number> = {
     All: baseCategoryWorkflows.length,
     Submitted: baseCategoryWorkflows.filter(isSubmittedWf).length,
     Approved: baseCategoryWorkflows.filter(isApprovedWf).length,
     Rejected: baseCategoryWorkflows.filter(isRejectedWf).length,
+    "Return for Correction": baseCategoryWorkflows.filter(isReturnedWf).length,
   };
 
   // Filter category workflows by current status sub-tab
@@ -185,6 +191,7 @@ export const Approvals: React.FC = () => {
       if (statusSubTab === "Submitted") return isSubmittedWf(wf);
       if (statusSubTab === "Approved") return isApprovedWf(wf);
       if (statusSubTab === "Rejected") return isRejectedWf(wf);
+      if (statusSubTab === "Return for Correction") return isReturnedWf(wf);
       return true; // "All"
     })
     .sort((a: any, b: any) => {
@@ -230,9 +237,9 @@ export const Approvals: React.FC = () => {
         ))}
       </div>
 
-      {/* Status Sub-Tabs (All, Submitted, Approved, Rejected) */}
-      <div className="flex items-center space-x-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50">
-        {(["All", "Submitted", "Approved", "Rejected"] as StatusSubTab[]).map((subTab) => (
+      {/* Status Sub-Tabs */}
+      <div className="flex flex-wrap items-center gap-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50">
+        {(["All", "Submitted", "Approved", "Rejected", ...(activeTab === "Reimbursements" ? ["Return for Correction"] : [])] as StatusSubTab[]).map((subTab) => (
           <button
             key={subTab}
             onClick={() => setStatusSubTab(subTab)}
@@ -275,7 +282,6 @@ export const Approvals: React.FC = () => {
                 <th className="px-6 py-4 font-semibold">Total Amount</th>
                 <th className="px-6 py-4 font-semibold">Status</th>
                 <th className="px-6 py-4 font-semibold">Created By</th>
-                <th className="px-6 py-4 font-semibold text-center">Receipt</th>
                 <th className="px-6 py-4 font-semibold text-right">Actions</th>
               </tr>
             </thead>
@@ -290,7 +296,7 @@ export const Approvals: React.FC = () => {
                 
                 const isApproved = isApprovedWf(wf);
                 const isRejected = isRejectedWf(wf);
-                const isPendingStatus = !isApproved && !isRejected && ((["Pending", "Under Review", "Reported"].includes(statusStr)) || (statusStr.toLowerCase().includes("pending") && statusStr !== "Approved" && statusStr !== "Pending Fulfillment"));
+                const isPendingStatus = !isApproved && !isRejected && !isReturnedWf(wf) && ((["Pending", "Under Review", "Reported"].includes(statusStr)) || (statusStr.toLowerCase().includes("pending") && statusStr !== "Approved" && statusStr !== "Pending Fulfillment"));
 
                 return (
                   <tr key={wf.workflow_id || wf.entity_id} className="hover:bg-muted/10 transition-colors">
@@ -307,18 +313,15 @@ export const Approvals: React.FC = () => {
                       <div className="text-xs font-semibold">{requesterStr}</div>
                       <div className="text-[10px] text-muted-foreground">{formatDate(wf.created_at || wf.submission_date || wf.date)}</div>
                     </td>
-                    <td className="px-6 py-4 text-center">
-                      <Button variant="outline" size="sm" onClick={() => handleViewReceipt(wf)} className="text-xs shadow-sm">View Receipt</Button>
-                    </td>
                     <td className="px-6 py-4 text-right">
                       {isPendingStatus ? (
-                        <div className="flex justify-end gap-2">
-                          <Button variant="success" size="sm" onClick={() => { setSelectedWorkflow(wf); setActionType("approve"); }} className="px-3 shadow-sm text-xs"><Check className="w-3.5 h-3.5 mr-1" /> Approve</Button>
-                          <Button variant="warning" size="sm" onClick={() => { setSelectedWorkflow(wf); setActionType("return"); }} className="px-3 shadow-sm text-xs bg-amber-500/10 text-amber-600 border border-amber-500/30 hover:bg-amber-500 hover:text-white">Return</Button>
-                          <Button variant="danger" size="sm" onClick={() => { setSelectedWorkflow(wf); setActionType("reject"); }} className="px-3 shadow-sm text-xs"><XIcon className="w-3.5 h-3.5 mr-1" /> Reject</Button>
-                        </div>
+                        <Button variant="primary" size="sm" onClick={() => handleOpenDetails(wf)} className="px-4 shadow-sm text-xs font-bold rounded-full">
+                          Need Approval
+                        </Button>
                       ) : (
-                        <span className="text-muted-foreground text-xs italic">No actions available</span>
+                        <Button variant="outline" size="sm" onClick={() => handleOpenDetails(wf)} className="px-4 shadow-sm text-xs rounded-full">
+                          <span className="mr-1">👁</span> View
+                        </Button>
                       )}
                     </td>
                   </tr>
@@ -549,62 +552,114 @@ export const Approvals: React.FC = () => {
         </div>
       </Dialog>
 
-      {/* Receipt Preview Dialog */}
+      {/* Reimbursement Detail View Dialog */}
       <Dialog 
         isOpen={!!previewWorkflow} 
         onClose={() => { setPreviewWorkflow(null); setReceiptDetails(null); }}
-        title={`Receipt Preview - Reimbursement #${previewWorkflow?.entity_id}`}
+        title={previewWorkflow?.title || "Reimbursement Details"}
       >
-        <div className="space-y-4">
+        <div className="space-y-6">
           {loadingReceipt ? (
-            <div className="p-8 text-center text-muted-foreground">Loading receipt data...</div>
+            <div className="p-12 flex items-center justify-center flex-col gap-4 text-muted-foreground">
+               <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+               <p className="font-semibold text-sm">Loading reimbursement details...</p>
+            </div>
           ) : receiptDetails ? (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center bg-muted/20 p-4 rounded-xl border border-border">
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="font-bold text-lg">{receiptDetails.merchant_name || receiptDetails.purpose || "Expense"}</h3>
-                  <p className="text-sm text-muted-foreground">{formatDate(receiptDetails.transaction_date || receiptDetails.created_at)}</p>
+                  <StatusBadge status={receiptDetails.status} />
+                  <p className="text-xs font-semibold text-muted-foreground mt-2">Created: {formatDate(receiptDetails.created_at)}</p>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-primary">${Number(receiptDetails.total_amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                  <div className="text-3xl font-bold text-primary">${Number(receiptDetails.total_amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
                   <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Verified Total</div>
                 </div>
               </div>
               
-              <div className="bg-muted/10 p-4 rounded-xl border border-border text-sm space-y-2">
-                <p><span className="font-semibold">Reason:</span> {receiptDetails.justification}</p>
-                {receiptDetails.department_id && <p><span className="font-semibold">Dept ID:</span> {receiptDetails.department_id}</p>}
-                {receiptDetails.project_id && <p><span className="font-semibold">Project ID:</span> {receiptDetails.project_id}</p>}
+              {/* Progress Timeline */}
+              <div className="py-6 px-4 w-full">
+                <div className="flex items-center justify-between relative">
+                  <div className="absolute left-[5%] right-[5%] top-1/2 -translate-y-1/2 h-1 bg-muted rounded-full z-0" />
+                  
+                  {["Draft", "Submitted", "Manager", "Finance", "Payment", "Closed"].map((step, idx) => {
+                    let currentStepIdx = 1; // Default to Submitted
+                    const s = (receiptDetails.status || "").toLowerCase();
+                    if (s.includes("draft")) currentStepIdx = 0;
+                    else if (s.includes("manager")) currentStepIdx = 2;
+                    else if (s.includes("finance")) currentStepIdx = 3;
+                    else if (s.includes("payment")) currentStepIdx = 4;
+                    else if (s.includes("closed") || s.includes("paid")) currentStepIdx = 5;
+
+                    const isActive = idx === currentStepIdx;
+                    const isCompleted = idx < currentStepIdx;
+                    return (
+                      <div key={idx} className="relative z-10 flex flex-col items-center gap-2">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-sm ${isActive ? "bg-primary text-primary-foreground ring-4 ring-primary/20 scale-110" : isCompleted ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground border-2 border-background"}`}>
+                          {isCompleted ? <Check className="w-4 h-4" /> : idx + 1}
+                        </div>
+                        <span className={`text-[10px] uppercase tracking-wider font-bold ${isActive ? "text-primary" : "text-muted-foreground"}`}>{step}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
-              {receiptDetails.receipts && receiptDetails.receipts.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Attached Receipts ({receiptDetails.receipts.length})</h4>
-                  {receiptDetails.receipts.map((receipt: any, idx: number) => (
-                    <div key={idx} className="flex gap-4 p-3 border border-border rounded-lg items-center">
-                      <div className="w-16 h-16 bg-muted rounded flex items-center justify-center shrink-0">
-                        {receipt.file_url ? (
-                           <img src={receipt.file_url} alt="Receipt" className="w-full h-full object-cover rounded" />
-                        ) : (
-                           <span className="text-xs text-muted-foreground">No File</span>
-                        )}
-                      </div>
-                      <div className="flex-1 text-xs space-y-1">
-                        <p className="font-semibold text-sm">{receipt.merchant_name}</p>
-                        <p className="text-muted-foreground">Date: {formatDate(receipt.transaction_date)} • Category: {receipt.category}</p>
-                        {receipt.ocr_confidence && <p className="text-emerald-600">OCR Confidence: {(receipt.ocr_confidence * 100).toFixed(2)}%</p>}
-                        {receipt.total_amount && <p className="font-medium text-foreground">OCR Extracted: ${Number(receipt.total_amount).toFixed(2)}</p>}
-                      </div>
-                    </div>
-                  ))}
+              {/* Details & OCR */}
+              <div className="space-y-4">
+                <div className="pl-4 border-l-2 border-primary/30">
+                  <p className="text-sm italic font-medium text-foreground">"{receiptDetails.justification}"</p>
                 </div>
-              )}
+
+                <div className="flex gap-4 p-3 bg-muted/20 border border-border rounded-xl text-xs font-semibold text-muted-foreground">
+                  <div className="flex items-center gap-1.5"><span className="text-primary bg-primary/10 p-1 rounded">🏢</span> Dept: {receiptDetails.department_id || "N/A"}</div>
+                  <div className="flex items-center gap-1.5"><span className="text-primary bg-primary/10 p-1 rounded">📁</span> Proj: {receiptDetails.project_id || "N/A"}</div>
+                </div>
+
+                {receiptDetails.receipts && receiptDetails.receipts.length > 0 && (
+                  <div className="space-y-3 pt-2">
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="text-primary bg-primary/10 p-1 rounded">📄</span> Attached Receipts ({receiptDetails.receipts.length})
+                    </h4>
+                    {receiptDetails.receipts.map((receipt: any, idx: number) => (
+                      <div key={idx} className="flex gap-4 p-4 border border-border rounded-xl items-center hover:border-primary/30 transition-colors shadow-sm">
+                        <div className="w-20 h-20 bg-muted/50 rounded-lg flex items-center justify-center shrink-0 border border-border/50 overflow-hidden">
+                          {receipt.file_url ? (
+                             <img src={receipt.file_url} alt="Receipt" className="w-full h-full object-cover" />
+                          ) : (
+                             <span className="text-xs font-semibold text-muted-foreground">No File</span>
+                          )}
+                        </div>
+                        <div className="flex-1 text-xs space-y-1.5">
+                          <p className="font-bold text-sm text-foreground">{receipt.merchant_name}</p>
+                          <p className="text-muted-foreground font-medium">Date: <span className="text-foreground">{formatDate(receipt.transaction_date)}</span> • Category: <span className="text-foreground">{receipt.category}</span></p>
+                          {receipt.ocr_confidence && <p className="text-emerald-600 font-semibold bg-emerald-500/10 w-fit px-2 py-0.5 rounded-full mt-1 text-[10px]">OCR Confidence: {(receipt.ocr_confidence * 100).toFixed(2)}%</p>}
+                          {receipt.total_amount && <p className="text-muted-foreground mt-1 text-[11px]">OCR Extracted: <span className="font-bold text-foreground">${Number(receipt.total_amount).toFixed(2)}</span></p>}
+                        </div>
+                        <div className="text-right">
+                          <div className="font-bold text-base text-foreground">${Number(receipt.total_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
-            <div className="p-8 text-center text-muted-foreground">Failed to load receipt data.</div>
+            <div className="p-8 text-center text-muted-foreground">Failed to load reimbursement details.</div>
           )}
-          <div className="flex justify-end pt-2 border-t border-border">
+          
+          <div className="flex justify-between items-center pt-4 border-t border-border mt-4 bg-background">
             <Button variant="outline" onClick={() => setPreviewWorkflow(null)}>Close</Button>
+            
+            {previewWorkflow && !isApprovedWf(previewWorkflow) && !isRejectedWf(previewWorkflow) && !isReturnedWf(previewWorkflow) && (
+               <div className="flex items-center gap-2">
+                 <Button variant="danger" onClick={() => { setPreviewWorkflow(null); setSelectedWorkflow(previewWorkflow); setActionType("reject"); }}>Reject</Button>
+                 <Button variant="warning" onClick={() => { setPreviewWorkflow(null); setSelectedWorkflow(previewWorkflow); setActionType("return"); }}>Return for Correction</Button>
+                 <Button variant="success" onClick={() => { setPreviewWorkflow(null); setSelectedWorkflow(previewWorkflow); setActionType("approve"); }}>Approve</Button>
+               </div>
+            )}
           </div>
         </div>
       </Dialog>
