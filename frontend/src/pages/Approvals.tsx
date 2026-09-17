@@ -5,7 +5,7 @@ import { Button, Card, CardHeader, CardTitle, CardContent, StatusBadge, Skeleton
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
 import { formatDate, getErrorMessage, isValidText } from "../utils/helpers";
-import { Check, X as XIcon } from "lucide-react";
+import { Check, X as XIcon, Eye } from "lucide-react";
 
 type TabType = "Reimbursements" | "Requisitions" | "Asset Incidents" | "Resignations";
 type StatusSubTab = "All" | "Submitted" | "Approved" | "Rejected" | "Return for Correction";
@@ -349,8 +349,8 @@ export const Approvals: React.FC = () => {
                           Need Approval
                         </Button>
                       ) : getActionText(wf) === "View" ? (
-                        <Button variant="outline" size="sm" onClick={() => handleOpenDetails(wf)} className="px-4 shadow-sm text-xs rounded-full">
-                          <span className="mr-1">👁</span> View
+                        <Button variant="outline" size="sm" onClick={() => handleOpenDetails(wf)} className="px-4 shadow-sm text-xs rounded-full flex items-center justify-center">
+                          <Eye className="w-3.5 h-3.5 mr-1" /> View
                         </Button>
                       ) : (
                         <Button variant="secondary" size="sm" onClick={() => handleOpenDetails(wf)} className="px-4 shadow-sm text-xs font-medium rounded-full opacity-80">
@@ -643,21 +643,21 @@ export const Approvals: React.FC = () => {
                       <div key={idx} className="relative z-10 flex flex-col items-center gap-3">
                         {/* Connecting Line Segment (left of circle) */}
                         {idx > 0 && (
-                          <div className={`absolute right-full top-4 -translate-y-1/2 h-[2px] w-[calc(100vw/6)] sm:w-24 ${lineError ? 'bg-red-400' : lineActive ? 'bg-violet-400' : 'bg-transparent'}`} style={{ zIndex: -1 }} />
+                          <div className={`absolute right-full top-4 -translate-y-1/2 h-[2px] w-[calc(100vw/6)] sm:w-24 ${lineError ? 'bg-red-400' : lineActive ? 'bg-violet-200' : 'bg-transparent'}`} style={{ zIndex: -1 }} />
                         )}
 
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-sm ${
                           isError 
                             ? "bg-red-500 text-white ring-4 ring-red-500/20" 
                             : isActive 
-                              ? "bg-white text-violet-600 border-2 border-violet-500 ring-4 ring-violet-500/20 scale-110" 
+                              ? "bg-blue-600 text-white ring-4 ring-blue-600/20 scale-110" 
                               : isCompleted 
-                                ? "bg-gradient-to-br from-violet-400 to-purple-600 text-white" 
+                                ? "bg-violet-100 text-violet-700" 
                                 : "bg-white text-muted-foreground border-2 border-muted"
                         }`}>
                           {idx + 1}
                         </div>
-                        <span className={`text-[9px] uppercase tracking-wider font-bold ${isError ? "text-red-500" : isActive ? "text-violet-600" : isCompleted ? "text-foreground" : "text-muted-foreground"}`}>{step}</span>
+                        <span className={`text-[9px] uppercase tracking-wider font-bold ${isError ? "text-red-500" : isActive ? "text-blue-600" : isCompleted ? "text-violet-700" : "text-muted-foreground"}`}>{step}</span>
                       </div>
                     );
                   })}
@@ -674,6 +674,14 @@ export const Approvals: React.FC = () => {
                   <div className="flex items-center gap-2"><span className="text-violet-500 bg-violet-500/10 p-1.5 rounded-lg">🏢</span> Dept: {receiptDetails.department_id || "N/A"}</div>
                   <div className="flex items-center gap-2"><span className="text-violet-500 bg-violet-500/10 p-1.5 rounded-lg">📁</span> Proj: {receiptDetails.project_id || "N/A"}</div>
                 </div>
+
+                {previewWorkflow && isPendingForUser(previewWorkflow) && (
+                   <div className="flex items-center gap-2 pt-2 pb-2">
+                     <Button variant="danger" onClick={() => { setPreviewWorkflow(null); setSelectedWorkflow(previewWorkflow); setActionType("reject"); }}>Reject</Button>
+                     <Button variant="success" onClick={() => { setPreviewWorkflow(null); setSelectedWorkflow(previewWorkflow); setActionType("approve"); }}>Approve</Button>
+                     <Button variant="warning" onClick={() => { setPreviewWorkflow(null); setSelectedWorkflow(previewWorkflow); setActionType("return"); }}>Return for Correction</Button>
+                   </div>
+                )}
 
                 {receiptDetails.receipts && receiptDetails.receipts.length > 0 && (
                   <div className="space-y-4 pt-2">
@@ -708,16 +716,8 @@ export const Approvals: React.FC = () => {
             <div className="p-8 text-center text-muted-foreground">Failed to load reimbursement details.</div>
           )}
           
-          <div className="flex justify-between items-center pt-4 border-t border-border mt-4 bg-background">
+          <div className="flex justify-end items-center pt-4 border-t border-border mt-4 bg-background">
             <Button variant="outline" onClick={() => setPreviewWorkflow(null)}>Close</Button>
-            
-            {previewWorkflow && isPendingForUser(previewWorkflow) && (
-               <div className="flex items-center gap-2">
-                 <Button variant="danger" onClick={() => { setPreviewWorkflow(null); setSelectedWorkflow(previewWorkflow); setActionType("reject"); }}>Reject</Button>
-                 <Button variant="warning" onClick={() => { setPreviewWorkflow(null); setSelectedWorkflow(previewWorkflow); setActionType("return"); }}>Return for Correction</Button>
-                 <Button variant="success" onClick={() => { setPreviewWorkflow(null); setSelectedWorkflow(previewWorkflow); setActionType("approve"); }}>Approve</Button>
-               </div>
-            )}
           </div>
         </div>
       </Dialog>
