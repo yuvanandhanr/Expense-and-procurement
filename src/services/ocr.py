@@ -248,7 +248,7 @@ class OCRService:
                 "receipt_number": receipt_number,
                 "category": category,
                 "total_amount": total_amount,
-                "confidence": min(confidence, Decimal("100.00")),
+                "confidence": min(confidence, Decimal("99.85")),
                 "raw_text": text
             }
         except Exception as e:
