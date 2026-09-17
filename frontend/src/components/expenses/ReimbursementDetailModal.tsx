@@ -78,7 +78,7 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                     <div key={idx} className="relative z-10 flex flex-col items-center gap-3">
                       {/* Connecting Line Segment (left of circle) */}
                       {idx > 0 && (
-                        <div className={`absolute right-full top-4 -translate-y-1/2 h-[2px] w-[calc(100vw/6)] sm:w-24 ${lineError ? 'bg-red-400' : lineActive ? 'bg-purple-400' : 'bg-transparent'}`} style={{ zIndex: -1 }} />
+                        <div className={`absolute right-full top-4 -translate-y-1/2 h-[2px] w-[calc(100vw/6)] sm:w-24 ${lineError ? 'bg-red-400' : lineActive ? 'bg-slate-200' : 'bg-transparent'}`} style={{ zIndex: -1 }} />
                       )}
 
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-sm ${
@@ -87,7 +87,7 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                           : isActive 
                             ? "bg-white text-blue-500 border-2 border-blue-500 ring-4 ring-blue-500/20 scale-110" 
                             : isCompleted 
-                              ? "bg-gradient-to-br from-purple-400 to-purple-600 text-white shadow-md shadow-purple-500/30" 
+                              ? ["bg-blue-700", "bg-blue-600", "bg-blue-500", "bg-blue-400", "bg-blue-300", "bg-blue-200"][idx] + " text-white shadow-md shadow-blue-500/20" 
                               : "bg-white text-muted-foreground border-2 border-muted"
                       }`}>
                         {idx + 1}
@@ -106,27 +106,27 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
               </div>
 
               <div className="flex gap-6 p-4 bg-white border border-border rounded-2xl text-sm font-semibold text-muted-foreground shadow-sm">
-                <div className="flex items-center gap-2"><span className="text-violet-500 bg-violet-500/10 p-1.5 rounded-lg">🏢</span> Dept: {receiptDetails.department_id || "N/A"}</div>
-                <div className="flex items-center gap-2"><span className="text-violet-500 bg-violet-500/10 p-1.5 rounded-lg">📁</span> Proj: {receiptDetails.project_code || receiptDetails.project_id || "N/A"}</div>
+                <div className="flex items-center gap-2"><span className="text-blue-500 bg-blue-500/10 p-1.5 rounded-lg">🏢</span> Dept: {receiptDetails.department_id || "N/A"}</div>
+                <div className="flex items-center gap-2"><span className="text-blue-500 bg-blue-500/10 p-1.5 rounded-lg">📁</span> Proj: {receiptDetails.project_code || receiptDetails.project_id || "N/A"}</div>
               </div>
 
               {/* ACTION BUTTONS (Placed above attached receipts) */}
               {isPendingForUser && (
                  <div className="flex items-center gap-3 pt-2 pb-2">
                    <Button 
-                     className="bg-emerald-500 hover:bg-emerald-600 text-white border border-emerald-700 shadow-sm transition-colors" 
+                     className="flex-1 bg-green-100 hover:bg-green-200 text-green-800 border border-green-600 shadow-sm transition-colors" 
                      onClick={() => onAction("approve")}
                    >
                      Approve
                    </Button>
                    <Button 
-                     className="bg-amber-500 hover:bg-amber-600 text-white border border-amber-700 shadow-sm transition-colors"
+                     className="flex-1 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border border-yellow-600 shadow-sm transition-colors"
                      onClick={() => onAction("return")}
                    >
                      Return for Correction
                    </Button>
                    <Button 
-                     className="bg-rose-600 hover:bg-rose-700 text-white border border-rose-800 shadow-sm transition-colors"
+                     className="flex-1 bg-red-100 hover:bg-red-200 text-red-800 border border-red-600 shadow-sm transition-colors"
                      onClick={() => onAction("reject")}
                    >
                      Reject
@@ -141,10 +141,7 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                   </h4>
                   {receiptDetails.receipts.map((receipt: any, idx: number) => {
                     
-                    // Normalize OCR Confidence to 0-100%
-                    let conf = receipt.ocr_confidence || 0;
-                    if (conf <= 1 && conf > 0) conf = conf * 100;
-                    conf = Math.min(100, Math.max(0, conf));
+                    const conf = receipt.ocr_confidence != null ? Number(receipt.ocr_confidence) : null;
                     
                     const extractedAmount = (receipt.ocr_amount && Number(receipt.ocr_amount) > 0) 
                       ? `$${Number(receipt.ocr_amount).toFixed(2)}` 
@@ -159,8 +156,16 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                       <div key={idx} className="flex gap-6 p-5 bg-white border border-border rounded-2xl items-start hover:shadow-md transition-shadow shadow-sm">
                         <div className="w-32 h-32 bg-white rounded-xl flex items-center justify-center shrink-0 border border-border/80 overflow-hidden p-1 shadow-sm">
                           {finalUrl ? (
-                             <a href={finalUrl} target="_blank" rel="noopener noreferrer" className="w-full h-full block">
-                               <img src={finalUrl} alt="Receipt" className="w-full h-full object-cover rounded-lg hover:opacity-80 transition-opacity" />
+                             <a href={finalUrl} target="_blank" rel="noopener noreferrer" className="w-full h-full block bg-muted/20">
+                               <img 
+                                 src={finalUrl} 
+                                 alt="Receipt" 
+                                 className="w-full h-full object-cover rounded-lg hover:opacity-80 transition-opacity" 
+                                 onError={(e) => {
+                                   (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5NDkzYjgiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cmVjdCB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHg9IjMiIHk9IjMiIHJ4PSIyIiByeT0iMiIvPjxjaXJjbGUgY3g9IjkuIiBjeT0iOSIgcj0iMiIvPjxwYXRoIGQ9Im0yMSAxNS0zLjA4Ni0zLjA4NmEtMiAyIDAgMCAwLTIuODI4IDBsLTUuNzg2IDUuNzg2Ii8+PC9zdmc+'; // fallback icon
+                                   (e.target as HTMLImageElement).className = "w-10 h-10 object-contain mx-auto mt-10 opacity-50";
+                                 }}
+                               />
                              </a>
                           ) : (
                              <span className="text-xs font-semibold text-muted-foreground flex flex-col items-center gap-2"><span className="text-2xl text-blue-400">🧾</span>No File</span>
@@ -169,7 +174,11 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                         <div className="flex-1 text-xs space-y-2 pt-1">
                           <p className="font-bold text-base text-foreground">{receipt.merchant_name || "Unknown Merchant"}</p>
                           <p className="text-muted-foreground font-medium text-xs">Date: <span className="text-foreground">{formatDate(receipt.transaction_date || receipt.receipt_date)}</span> • Category: <span className="text-foreground">{receipt.category || "Uncategorized"}</span></p>
-                          {conf > 0 && <p className="text-emerald-600 font-semibold text-[11px]">OCR Confidence: {conf.toFixed(2)}%</p>}
+                          {conf !== null && conf > 0 ? (
+                            <p className="text-emerald-600 font-semibold text-[11px]">OCR Confidence: {conf.toFixed(2)}%</p>
+                          ) : (
+                            <p className="text-muted-foreground font-semibold text-[11px]">OCR Confidence: Not available</p>
+                          )}
                           <p className="text-muted-foreground text-xs mt-1">OCR Extracted Amount: <span className="font-bold text-foreground">{extractedAmount}</span></p>
                         </div>
                         <div className="text-right pt-1">

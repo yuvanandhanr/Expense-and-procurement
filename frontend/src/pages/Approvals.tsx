@@ -80,7 +80,11 @@ export const Approvals: React.FC = () => {
       let payload: any = { comments: comment };
       
       if (selectedWorkflow.entity_type === "ExpenseReport" || selectedWorkflow.entity_type === "Expense") {
-        endpoint = `/expenses/${selectedWorkflow.entity_id}/${actionType}`;
+        if (selectedWorkflow.status === "Payment Requested" && actionType === "approve") {
+          endpoint = `/expenses/${selectedWorkflow.entity_id}/pay`;
+        } else {
+          endpoint = `/expenses/${selectedWorkflow.entity_id}/${actionType}`;
+        }
       } else if (selectedWorkflow.entity_type === "VendorInvoice") {
         endpoint = `/invoices/${selectedWorkflow.entity_id}/${actionType}`;
       } else if (selectedWorkflow.entity_type === "AssetIncident") {
@@ -141,11 +145,13 @@ export const Approvals: React.FC = () => {
   // Helper status checkers
   const isPendingForUser = (wf: any) => {
     const s = String(wf?.status || "");
-    if (!s.toLowerCase().includes("pending")) return false;
+    const isPaymentRequested = s === "Payment Requested";
+    if (!s.toLowerCase().includes("pending") && !isPaymentRequested) return false;
     
     const roles = user?.roles?.map(r => r.role_name) || [];
     if (s === "Pending Manager Approval") return roles.includes("Manager");
     if (s === "Pending Finance Approval" || s === "Pending Finance Manager Approval") return roles.includes("Finance") || roles.includes("Finance Manager");
+    if (isPaymentRequested) return roles.includes("Finance Manager") || roles.includes("Finance") || roles.includes("CFO") || roles.includes("CEO") || roles.includes("Admin");
     if (s === "Pending CFO Approval") return roles.includes("CFO");
     if (s === "Pending Admin Approval") return roles.includes("Admin");
     return false;
@@ -153,19 +159,19 @@ export const Approvals: React.FC = () => {
 
   const getActionText = (wf: any) => {
     const s = String(wf?.status || "");
+    if (isPendingForUser(wf)) {
+      if (s === "Payment Requested") return "Authorize Payment";
+      return "Need Approval";
+    }
+
     if (isApprovedWf(wf) || isRejectedWf(wf) || isReturnedWf(wf) || s === "Payment Requested" || s === "Closed") {
       return "View";
-    }
-    
-    if (isPendingForUser(wf)) {
-      return "Need Approval";
     }
     
     if (s.includes("Pending")) {
       const pendingRole = s.replace("Pending ", "").replace(" Approval", "");
       return `Need ${pendingRole} Approval`;
     }
-    
     return "View";
   };
 
