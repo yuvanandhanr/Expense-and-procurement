@@ -6,6 +6,7 @@ import { api } from "../services/api";
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Skeleton, Badge, StatusBadge, Dialog, HeroTimestamp, EmptyState } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
 import { isValidText } from "../utils/helpers";
+import { ReimbursementDetailModal } from "../components/expenses/ReimbursementDetailModal";
 
 const Expenses: React.FC = () => {
   const { hasRole, user } = useAuth();
@@ -496,6 +497,19 @@ const Expenses: React.FC = () => {
       {selectedReportId && (() => {
         const report = expenses.find(r => Number(r.expense_report_id) === Number(selectedReportId));
         if (!report) return null;
+
+        const isEditable = report.status === "Draft" || report.status === "Returned for Correction";
+        if (!isEditable) {
+          return (
+            <ReimbursementDetailModal
+              isOpen={!!selectedReportId}
+              onClose={() => setSelectedReportId(null)}
+              receiptDetails={report}
+              isPendingForUser={false} // Only read-only for employees here
+              onAction={() => {}}
+            />
+          );
+        }
 
         const isRejected = report.status === "Rejected";
         const isReturned = report.status === "Returned for Correction";

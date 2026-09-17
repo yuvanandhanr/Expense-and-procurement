@@ -6,6 +6,7 @@ import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
 import { formatDate, getErrorMessage, isValidText } from "../utils/helpers";
 import { Check, X as XIcon, Eye } from "lucide-react";
+import { ReimbursementDetailModal } from "../components/expenses/ReimbursementDetailModal";
 
 type TabType = "Reimbursements" | "Requisitions" | "Asset Incidents" | "Resignations";
 type StatusSubTab = "All" | "Submitted" | "Approved" | "Rejected" | "Return for Correction";
@@ -587,140 +588,20 @@ export const Approvals: React.FC = () => {
       </Dialog>
 
       {/* Reimbursement Detail View Dialog */}
-      <Dialog 
-        isOpen={!!previewWorkflow} 
-        onClose={() => { setPreviewWorkflow(null); setReceiptDetails(null); }}
-        title={previewWorkflow?.title || "Reimbursement Details"}
-      >
-        <div className="space-y-6">
-          {loadingReceipt ? (
-            <div className="p-12 flex items-center justify-center flex-col gap-4 text-muted-foreground">
-               <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-               <p className="font-semibold text-sm">Loading reimbursement details...</p>
-            </div>
-          ) : receiptDetails ? (
-            <div className="space-y-6">
-              {/* Header */}
-              <div className="flex justify-between items-center">
-                <div>
-                  <StatusBadge status={receiptDetails.status} />
-                  <span className="text-sm font-medium text-muted-foreground ml-3">Created: {formatDate(receiptDetails.created_at)}</span>
-                </div>
-                <div className="text-right">
-                  <div className="text-4xl font-bold text-violet-600 tracking-tight">${Number(receiptDetails.total_amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Verified Total</div>
-                </div>
-              </div>
-              
-              {/* Progress Timeline */}
-              <div className="py-8 px-4 w-full">
-                <div className="flex items-center justify-between relative max-w-lg mx-auto">
-                  {/* Base Line */}
-                  <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-muted z-0" />
-                  
-                  {["Draft", "Submitted", "Manager", "Finance", "Payment", "Closed"].map((step, idx) => {
-                    let currentStepIdx = 1;
-                    const s = (receiptDetails.status || "").toLowerCase();
-                    const isRejectedOrReturned = s.includes("reject") || s.includes("return");
-
-                    if (s.includes("draft")) currentStepIdx = 0;
-                    else if (s.includes("manager")) currentStepIdx = 2;
-                    else if (s.includes("finance")) currentStepIdx = 3;
-                    else if (s.includes("payment")) currentStepIdx = 4;
-                    else if (s.includes("closed") || s.includes("paid")) currentStepIdx = 5;
-                    
-                    // If rejected, highlight all steps from current onwards in red
-                    const isError = isRejectedOrReturned && idx >= currentStepIdx;
-
-                    const isActive = idx === currentStepIdx && !isRejectedOrReturned;
-                    const isCompleted = idx <= currentStepIdx && !isError;
-                    
-                    // Connecting line color
-                    const lineActive = isCompleted && idx > 0;
-                    const lineError = isError && idx > 0;
-
-                    return (
-                      <div key={idx} className="relative z-10 flex flex-col items-center gap-3">
-                        {/* Connecting Line Segment (left of circle) */}
-                        {idx > 0 && (
-                          <div className={`absolute right-full top-4 -translate-y-1/2 h-[2px] w-[calc(100vw/6)] sm:w-24 ${lineError ? 'bg-red-400' : lineActive ? 'bg-violet-200' : 'bg-transparent'}`} style={{ zIndex: -1 }} />
-                        )}
-
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-sm ${
-                          isError 
-                            ? "bg-red-500 text-white ring-4 ring-red-500/20" 
-                            : isActive 
-                              ? "bg-blue-600 text-white ring-4 ring-blue-600/20 scale-110" 
-                              : isCompleted 
-                                ? "bg-violet-100 text-violet-700" 
-                                : "bg-white text-muted-foreground border-2 border-muted"
-                        }`}>
-                          {idx + 1}
-                        </div>
-                        <span className={`text-[9px] uppercase tracking-wider font-bold ${isError ? "text-red-500" : isActive ? "text-blue-600" : isCompleted ? "text-violet-700" : "text-muted-foreground"}`}>{step}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Details & OCR */}
-              <div className="space-y-6 pt-4">
-                <div className="pl-4 border-l-2 border-violet-400">
-                  <p className="text-sm italic font-medium text-foreground">"{receiptDetails.justification}"</p>
-                </div>
-
-                <div className="flex gap-6 p-4 bg-white border border-border rounded-2xl text-sm font-semibold text-muted-foreground shadow-sm">
-                  <div className="flex items-center gap-2"><span className="text-violet-500 bg-violet-500/10 p-1.5 rounded-lg">🏢</span> Dept: {receiptDetails.department_id || "N/A"}</div>
-                  <div className="flex items-center gap-2"><span className="text-violet-500 bg-violet-500/10 p-1.5 rounded-lg">📁</span> Proj: {receiptDetails.project_id || "N/A"}</div>
-                </div>
-
-                {previewWorkflow && isPendingForUser(previewWorkflow) && (
-                   <div className="flex items-center gap-2 pt-2 pb-2">
-                     <Button variant="danger" onClick={() => { setPreviewWorkflow(null); setSelectedWorkflow(previewWorkflow); setActionType("reject"); }}>Reject</Button>
-                     <Button variant="success" onClick={() => { setPreviewWorkflow(null); setSelectedWorkflow(previewWorkflow); setActionType("approve"); }}>Approve</Button>
-                     <Button variant="warning" onClick={() => { setPreviewWorkflow(null); setSelectedWorkflow(previewWorkflow); setActionType("return"); }}>Return for Correction</Button>
-                   </div>
-                )}
-
-                {receiptDetails.receipts && receiptDetails.receipts.length > 0 && (
-                  <div className="space-y-4 pt-2">
-                    <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
-                      <span className="text-blue-500">📄</span> Attached Receipts ({receiptDetails.receipts.length})
-                    </h4>
-                    {receiptDetails.receipts.map((receipt: any, idx: number) => (
-                      <div key={idx} className="flex gap-6 p-5 bg-white border border-border rounded-2xl items-center hover:shadow-md transition-shadow shadow-sm">
-                        <div className="w-24 h-24 bg-white rounded-xl flex items-center justify-center shrink-0 border border-border/80 overflow-hidden p-1 shadow-sm">
-                          {receipt.file_url ? (
-                             <img src={receipt.file_url} alt="Receipt" className="w-full h-full object-cover rounded-lg" />
-                          ) : (
-                             <span className="text-xs font-semibold text-muted-foreground flex flex-col items-center gap-2"><span className="text-2xl text-blue-400">🧾</span>No File</span>
-                          )}
-                        </div>
-                        <div className="flex-1 text-xs space-y-2">
-                          <p className="font-bold text-base text-foreground">{receipt.merchant_name}</p>
-                          <p className="text-muted-foreground font-medium text-xs">Date: <span className="text-foreground">{formatDate(receipt.transaction_date)}</span> • Category: <span className="text-foreground">{receipt.category}</span></p>
-                          {receipt.ocr_confidence && <p className="text-emerald-600 font-semibold text-[11px]">OCR Confidence: {(receipt.ocr_confidence * 100).toFixed(2)}%</p>}
-                          {receipt.total_amount && <p className="text-muted-foreground text-xs mt-1">OCR Extracted: <span className="font-bold text-foreground">${Number(receipt.total_amount).toFixed(2)}</span></p>}
-                        </div>
-                        <div className="text-right">
-                          <div className="font-bold text-xl text-foreground">${Number(receipt.total_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="p-8 text-center text-muted-foreground">Failed to load reimbursement details.</div>
-          )}
-          
-          <div className="flex justify-end items-center pt-4 border-t border-border mt-4 bg-background">
-            <Button variant="outline" onClick={() => setPreviewWorkflow(null)}>Close</Button>
-          </div>
-        </div>
-      </Dialog>
+      {previewWorkflow && (
+        <ReimbursementDetailModal
+          isOpen={!!previewWorkflow}
+          onClose={() => { setPreviewWorkflow(null); setReceiptDetails(null); }}
+          receiptDetails={receiptDetails}
+          isPendingForUser={isPendingForUser(previewWorkflow)}
+          loading={loadingReceipt}
+          onAction={(action) => {
+            setPreviewWorkflow(null); 
+            setSelectedWorkflow(previewWorkflow); 
+            setActionType(action);
+          }}
+        />
+      )}
     </div>
   );
 };
