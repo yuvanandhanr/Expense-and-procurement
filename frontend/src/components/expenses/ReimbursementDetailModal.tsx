@@ -114,22 +114,19 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
               {isPendingForUser && (
                  <div className="flex items-center gap-3 pt-2 pb-2">
                    <Button 
-                     variant="outline" 
-                     className="border-green-600 text-green-700 bg-green-50 hover:bg-green-100 hover:text-green-800 hover:border-green-700 shadow-sm transition-colors" 
+                     className="bg-emerald-500 hover:bg-emerald-600 text-white border border-emerald-700 shadow-sm transition-colors" 
                      onClick={() => onAction("approve")}
                    >
                      Approve
                    </Button>
                    <Button 
-                     variant="outline"
-                     className="border-yellow-500 text-yellow-700 bg-yellow-50 hover:bg-yellow-100 hover:text-yellow-800 hover:border-yellow-600 shadow-sm transition-colors"
+                     className="bg-amber-500 hover:bg-amber-600 text-white border border-amber-700 shadow-sm transition-colors"
                      onClick={() => onAction("return")}
                    >
                      Return for Correction
                    </Button>
                    <Button 
-                     variant="danger" 
-                     className="shadow-sm transition-colors"
+                     className="bg-rose-600 hover:bg-rose-700 text-white border border-rose-800 shadow-sm transition-colors"
                      onClick={() => onAction("reject")}
                    >
                      Reject
@@ -155,12 +152,15 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                         ? `$${Number(receipt.total_amount).toFixed(2)}`
                         : "Not detected";
                     
+                    const rawUrl = receipt.file_url || receipt.image_path;
+                    const finalUrl = rawUrl ? (rawUrl.startsWith('http') ? rawUrl : `${import.meta.env.VITE_API_URL?.replace('/api/v1', '') || ''}${rawUrl}`) : null;
+                    
                     return (
                       <div key={idx} className="flex gap-6 p-5 bg-white border border-border rounded-2xl items-start hover:shadow-md transition-shadow shadow-sm">
                         <div className="w-32 h-32 bg-white rounded-xl flex items-center justify-center shrink-0 border border-border/80 overflow-hidden p-1 shadow-sm">
-                          {receipt.file_url ? (
-                             <a href={receipt.file_url} target="_blank" rel="noopener noreferrer" className="w-full h-full block">
-                               <img src={receipt.file_url} alt="Receipt" className="w-full h-full object-cover rounded-lg hover:opacity-80 transition-opacity" />
+                          {finalUrl ? (
+                             <a href={finalUrl} target="_blank" rel="noopener noreferrer" className="w-full h-full block">
+                               <img src={finalUrl} alt="Receipt" className="w-full h-full object-cover rounded-lg hover:opacity-80 transition-opacity" />
                              </a>
                           ) : (
                              <span className="text-xs font-semibold text-muted-foreground flex flex-col items-center gap-2"><span className="text-2xl text-blue-400">🧾</span>No File</span>
@@ -186,11 +186,6 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
         ) : (
           <div className="p-8 text-center text-muted-foreground">Failed to load reimbursement details.</div>
         )}
-        
-        {/* Footer */}
-        <div className="flex items-center pt-4 mt-4 bg-background">
-          <Button variant="outline" onClick={onClose} className="border-none shadow-none text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors px-2">Close</Button>
-        </div>
       </div>
     </Dialog>
   );
