@@ -78,21 +78,21 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                     <div key={idx} className="relative z-10 flex flex-col items-center gap-3">
                       {/* Connecting Line Segment (left of circle) */}
                       {idx > 0 && (
-                        <div className={`absolute right-full top-4 -translate-y-1/2 h-[2px] w-[calc(100vw/6)] sm:w-24 ${lineError ? 'bg-red-400' : lineActive ? 'bg-violet-200' : 'bg-transparent'}`} style={{ zIndex: -1 }} />
+                        <div className={`absolute right-full top-4 -translate-y-1/2 h-[2px] w-[calc(100vw/6)] sm:w-24 ${lineError ? 'bg-red-400' : lineActive ? 'bg-purple-400' : 'bg-transparent'}`} style={{ zIndex: -1 }} />
                       )}
 
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-sm ${
                         isError 
                           ? "bg-red-500 text-white ring-4 ring-red-500/20" 
                           : isActive 
-                            ? "bg-blue-600 text-white ring-4 ring-blue-600/20 scale-110" 
+                            ? "bg-white text-blue-500 border-2 border-blue-500 ring-4 ring-blue-500/20 scale-110" 
                             : isCompleted 
-                              ? "bg-violet-100 text-violet-700" 
+                              ? "bg-gradient-to-br from-purple-400 to-purple-600 text-white shadow-md shadow-purple-500/30" 
                               : "bg-white text-muted-foreground border-2 border-muted"
                       }`}>
                         {idx + 1}
                       </div>
-                      <span className={`text-[9px] uppercase tracking-wider font-bold ${isError ? "text-red-500" : isActive ? "text-blue-600" : isCompleted ? "text-violet-700" : "text-muted-foreground"}`}>{step}</span>
+                      <span className={`text-[9px] uppercase tracking-wider font-bold ${isError ? "text-red-500" : isActive ? "text-blue-500" : isCompleted ? "text-gray-700" : "text-muted-foreground"}`}>{step}</span>
                     </div>
                   );
                 })}
