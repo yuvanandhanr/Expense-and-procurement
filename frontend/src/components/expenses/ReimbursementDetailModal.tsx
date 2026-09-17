@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Dialog, StatusBadge, Button } from "../ui";
 import { formatDate } from "../../utils/helpers";
 
@@ -19,9 +19,12 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
   onAction,
   loading = false,
 }) => {
+  const [previewReceipt, setPreviewReceipt] = useState<string | null>(null);
+
   if (!isOpen) return null;
 
   return (
+    <>
     <Dialog 
       isOpen={isOpen} 
       onClose={onClose}
@@ -49,12 +52,9 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
             </div>
             
             {/* Progress Timeline */}
-            <div className="py-8 px-4 w-full">
-              <div className="flex items-center justify-between relative max-w-lg mx-auto">
-                {/* Base Line */}
-                <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-muted z-0" />
-                
-                {["Draft", "Submitted", "Manager", "Finance", "Payment", "Closed"].map((step, idx) => {
+            <div className="pt-8 pb-4 px-4 w-full">
+              <div className="flex items-center justify-between relative max-w-lg mx-auto w-full">
+                {["Draft", "Submitted", "Manager", "Finance", "Payment", "Closed"].map((step, idx, arr) => {
                   let currentStepIdx = 1;
                   const s = (receiptDetails.status || "").toLowerCase();
                   const isRejectedOrReturned = s.includes("reject") || s.includes("return");
@@ -70,38 +70,41 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                   const isActive = idx === currentStepIdx && !isRejectedOrReturned;
                   const isCompleted = idx <= currentStepIdx && !isError;
                   
-                  // Connecting line color
-                  const lineActive = isCompleted && idx > 0;
-                  const lineError = isError && idx > 0;
+                  // Connecting line logic
+                  const lineCompleted = isCompleted && !isActive;
+                  const lineError = isError;
 
                   return (
-                    <div key={idx} className="relative z-10 flex flex-col items-center gap-3">
-                      {/* Connecting Line Segment (left of circle) */}
-                      {idx > 0 && (
-                        <div className={`absolute right-full top-4 -translate-y-1/2 h-[2px] w-[calc(100vw/6)] sm:w-24 ${lineError ? 'bg-red-400' : lineActive ? 'bg-slate-200' : 'bg-transparent'}`} style={{ zIndex: -1 }} />
-                      )}
-
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-sm ${
-                        isError 
-                          ? "bg-red-500 text-white ring-4 ring-red-500/20" 
-                          : isActive 
-                            ? "bg-white text-blue-500 border-2 border-blue-500 ring-4 ring-blue-500/20 scale-110" 
-                            : isCompleted 
-                              ? ["bg-blue-700", "bg-blue-600", "bg-blue-500", "bg-blue-400", "bg-blue-300", "bg-blue-200"][idx] + " text-white shadow-md shadow-blue-500/20" 
-                              : "bg-white text-muted-foreground border-2 border-muted"
-                      }`}>
-                        {idx + 1}
+                    <React.Fragment key={idx}>
+                      <div className="relative z-10 flex flex-col items-center gap-3 shrink-0">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-sm ${
+                          isError 
+                            ? "bg-red-500 text-white ring-4 ring-red-500/20" 
+                            : isActive 
+                              ? "bg-white text-blue-500 border-2 border-blue-500 ring-4 ring-blue-500/20 scale-110" 
+                              : isCompleted 
+                                ? ["bg-blue-700", "bg-blue-600", "bg-blue-500", "bg-blue-400", "bg-blue-300", "bg-blue-200"][idx] + " text-white shadow-md shadow-blue-500/20" 
+                                : "bg-white text-muted-foreground border-2 border-muted"
+                        }`}>
+                          {idx + 1}
+                        </div>
+                        <span className={`absolute top-11 text-[9px] uppercase tracking-wider font-bold whitespace-nowrap ${isError ? "text-red-500" : isActive ? "text-blue-500" : isCompleted ? "text-gray-700" : "text-muted-foreground"}`}>{step}</span>
                       </div>
-                      <span className={`text-[9px] uppercase tracking-wider font-bold ${isError ? "text-red-500" : isActive ? "text-blue-500" : isCompleted ? "text-gray-700" : "text-muted-foreground"}`}>{step}</span>
-                    </div>
+                      
+                      {/* Connecting Line Segment */}
+                      {idx < arr.length - 1 && (
+                        <div className={`flex-1 h-[2px] mx-1 ${lineError ? 'bg-red-400' : lineCompleted ? 'bg-slate-200' : 'bg-transparent'}`} />
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </div>
+              <div className="h-6"></div> {/* Spacer for absolute text */}
             </div>
 
             {/* Details & OCR */}
             <div className="space-y-6 pt-4">
-              <div className="pl-4 border-l-2 border-violet-400">
+              <div className="pl-4 py-1 border-l-4 border-blue-500" style={{ boxShadow: '-6px 0px 8px -4px rgba(59,130,246,0.3)' }}>
                 <p className="text-sm italic font-medium text-foreground">"{receiptDetails.justification}"</p>
               </div>
 
@@ -112,21 +115,21 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
 
               {/* ACTION BUTTONS (Placed above attached receipts) */}
               {isPendingForUser && (
-                 <div className="flex items-center gap-3 pt-2 pb-2">
+                 <div className="flex items-center gap-3 pt-2 pb-2 justify-start">
                    <Button 
-                     className="flex-1 bg-green-100 hover:bg-green-200 text-green-800 border border-green-600 shadow-sm transition-colors" 
+                     className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white border-2 border-green-700 shadow-sm transition-colors rounded-full font-semibold" 
                      onClick={() => onAction("approve")}
                    >
                      Approve
                    </Button>
                    <Button 
-                     className="flex-1 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border border-yellow-600 shadow-sm transition-colors"
+                     className="px-6 py-2 bg-yellow-600 hover:bg-yellow-700 text-white border-2 border-yellow-700 shadow-sm transition-colors rounded-full font-semibold"
                      onClick={() => onAction("return")}
                    >
                      Return for Correction
                    </Button>
                    <Button 
-                     className="flex-1 bg-red-100 hover:bg-red-200 text-red-800 border border-red-600 shadow-sm transition-colors"
+                     className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white border-2 border-red-700 shadow-sm transition-colors rounded-full font-semibold"
                      onClick={() => onAction("reject")}
                    >
                      Reject
@@ -150,13 +153,22 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                         : "Not detected";
                     
                     const rawUrl = receipt.file_url || receipt.image_path;
-                    const finalUrl = rawUrl ? (rawUrl.startsWith('http') ? rawUrl : `${import.meta.env.VITE_API_URL?.replace('/api/v1', '') || ''}${rawUrl}`) : null;
+                    let finalUrl = null;
+                    if (rawUrl) {
+                       if (rawUrl.startsWith('http')) {
+                          finalUrl = rawUrl;
+                       } else {
+                          const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/api\/v1\/?$/, '') || '';
+                          const path = rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`;
+                          finalUrl = `${baseUrl}${path}`;
+                       }
+                    }
                     
                     return (
                       <div key={idx} className="flex gap-6 p-5 bg-white border border-border rounded-2xl items-start hover:shadow-md transition-shadow shadow-sm">
                         <div className="w-32 h-32 bg-white rounded-xl flex items-center justify-center shrink-0 border border-border/80 overflow-hidden p-1 shadow-sm">
                           {finalUrl ? (
-                             <a href={finalUrl} target="_blank" rel="noopener noreferrer" className="w-full h-full block bg-muted/20">
+                             <button onClick={() => setPreviewReceipt(finalUrl)} className="w-full h-full block bg-muted/20 cursor-pointer">
                                <img 
                                  src={finalUrl} 
                                  alt="Receipt" 
@@ -166,7 +178,7 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                                    (e.target as HTMLImageElement).className = "w-10 h-10 object-contain mx-auto mt-10 opacity-50";
                                  }}
                                />
-                             </a>
+                             </button>
                           ) : (
                              <span className="text-xs font-semibold text-muted-foreground flex flex-col items-center gap-2"><span className="text-2xl text-blue-400">🧾</span>No File</span>
                           )}
@@ -197,5 +209,27 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
         )}
       </div>
     </Dialog>
+
+    {/* Receipt Preview Overlay */}
+    {previewReceipt && (
+      <div 
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" 
+        onClick={() => setPreviewReceipt(null)}
+      >
+        <div className="relative max-w-4xl max-h-[95vh] bg-white p-2 rounded-xl shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+           <button 
+             onClick={() => setPreviewReceipt(null)} 
+             className="absolute -top-4 -right-4 w-10 h-10 bg-white rounded-full flex items-center justify-center text-black font-bold shadow-md hover:bg-gray-100 transition-colors z-10 text-xl"
+           >
+             ✕
+           </button>
+           <div className="flex-1 overflow-auto rounded-lg bg-gray-50 flex items-center justify-center">
+             <img src={previewReceipt} className="max-w-full max-h-[90vh] object-contain rounded-lg" alt="Full Receipt" />
+           </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
+
