@@ -169,24 +169,28 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                         <div className="w-32 h-32 bg-white rounded-xl flex items-center justify-center shrink-0 border border-border/80 overflow-hidden p-1 shadow-sm">
                           {finalUrl ? (
                              <button 
-                               onClick={(e) => {
-                                 const img = e.currentTarget.querySelector('img');
-                                 setPreviewReceipt(img?.src || finalUrl);
-                               }} 
-                               className="w-full h-full block bg-muted/20 cursor-pointer"
+                               onClick={() => setPreviewReceipt(finalUrl)} 
+                               className="w-full h-full block bg-muted/20 cursor-pointer flex items-center justify-center relative group"
                              >
-                               <img 
-                                 src={finalUrl} 
-                                 alt="Receipt" 
-                                 className="w-full h-full object-cover rounded-lg hover:opacity-80 transition-opacity" 
-                                 onError={(e) => {
-                                   (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5NDkzYjgiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cmVjdCB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHg9IjMiIHk9IjMiIHJ4PSIyIiByeT0iMiIvPjxjaXJjbGUgY3g9IjkuIiBjeT0iOSIgcj0iMiIvPjxwYXRoIGQ9Im0yMSAxNS0zLjA4Ni0zLjA4NmEtMiAyIDAgMCAwLTIuODI4IDBsLTUuNzg2IDUuNzg2Ii8+PC9zdmc+'; // fallback icon
-                                   (e.target as HTMLImageElement).className = "w-10 h-10 object-contain mx-auto mt-10 opacity-50";
-                                 }}
-                               />
+                               {finalUrl.toLowerCase().endsWith('.pdf') ? (
+                                 <div className="flex flex-col items-center justify-center gap-2 text-red-500 group-hover:scale-105 transition-transform">
+                                   <FileText className="w-12 h-12" />
+                                   <span className="text-[10px] font-bold">PDF</span>
+                                 </div>
+                               ) : (
+                                 <img 
+                                   src={finalUrl} 
+                                   alt="Receipt" 
+                                   className="w-full h-full object-cover rounded-lg hover:opacity-80 transition-opacity" 
+                                   onError={(e) => {
+                                     (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5NDkzYjgiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cmVjdCB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHg9IjMiIHk9IjMiIHJ4PSIyIiByeT0iMiIvPjxjaXJjbGUgY3g9IjkuIiBjeT0iOSIgcj0iMiIvPjxwYXRoIGQ9Im0yMSAxNS0zLjA4Ni0zLjA4NmEtMiAyIDAgMCAwLTIuODI4IDBsLTUuNzg2IDUuNzg2Ii8+PC9zdmc+'; // fallback icon
+                                     (e.target as HTMLImageElement).className = "w-10 h-10 object-contain mx-auto mt-10 opacity-50";
+                                   }}
+                                 />
+                               )}
                              </button>
                           ) : (
-                             <span className="text-xs font-semibold text-muted-foreground flex flex-col items-center gap-2"><span className="text-2xl text-blue-400">🧾</span>No File</span>
+                             <span className="text-xs font-semibold text-muted-foreground flex flex-col items-center gap-2"><FileText className="w-8 h-8 text-muted-foreground/50" />No File</span>
                           )}
                         </div>
                         <div className="flex-1 text-xs space-y-2 pt-1">
@@ -230,15 +234,19 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
              ✕
            </button>
            <div className="flex-1 overflow-auto rounded-lg bg-gray-50 flex items-center justify-center p-4">
-             <img 
-               src={previewReceipt} 
-               className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-sm" 
-               alt="Full Receipt" 
-               onError={(e) => {
-                 (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5NDkzYjgiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cmVjdCB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHg9IjMiIHk9IjMiIHJ4PSIyIiByeT0iMiIvPjxjaXJjbGUgY3g9IjkuIiBjeT0iOSIgcj0iMiIvPjxwYXRoIGQ9Im0yMSAxNS0zLjA4Ni0zLjA4NmEtMiAyIDAgMCAwLTIuODI4IDBsLTUuNzg2IDUuNzg2Ii8+PC9zdmc+';
-                 (e.target as HTMLImageElement).className = "max-w-xs max-h-xs object-contain mx-auto opacity-50";
-               }}
-             />
+             {previewReceipt.toLowerCase().endsWith('.pdf') ? (
+               <iframe src={previewReceipt} className="w-full h-[85vh] rounded-lg border-none" title="PDF Preview" />
+             ) : (
+               <img 
+                 src={previewReceipt} 
+                 className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-sm" 
+                 alt="Preview" 
+                 onError={(e) => {
+                   (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5NDkzYjgiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cmVjdCB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHg9IjMiIHk9IjMiIHJ4PSIyIiByeT0iMiIvPjxjaXJjbGUgY3g9IjkuIiBjeT0iOSIgcj0iMiIvPjxwYXRoIGQ9Im0yMSAxNS0zLjA4Ni0zLjA4NmEtMiAyIDAgMCAwLTIuODI4IDBsLTUuNzg2IDUuNzg2Ii8+PC9zdmc+';
+                   (e.target as HTMLImageElement).className = "max-w-xs max-h-xs object-contain mx-auto opacity-50";
+                 }}
+               />
+             )}
            </div>
         </div>
       </div>

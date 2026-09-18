@@ -769,13 +769,22 @@ const Expenses: React.FC = () => {
                       <div
                         className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/60 rounded-xl border border-border flex items-center justify-center overflow-hidden shrink-0 group relative shadow-inner cursor-pointer"
                         onClick={() => {
-                            const fullUrl = receipt.image_path.startsWith('http') ? receipt.image_path : `${import.meta.env.VITE_API_URL.replace('/api/v1', '')}${receipt.image_path}`;
+                            const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/api\/v1\/?$/, '') || '';
+                            const path = receipt.image_path.startsWith('/') ? receipt.image_path : `/${receipt.image_path}`;
+                            const fullUrl = receipt.image_path.startsWith('http') ? receipt.image_path : `${baseUrl}${path}`;
                             setPreviewReceiptUrl(fullUrl);
                         }}
                       >
                         {receipt.image_path ? (
                           <>
-                            <img src={receipt.image_path.startsWith('http') ? receipt.image_path : `${import.meta.env.VITE_API_URL.replace('/api/v1', '')}${receipt.image_path}`} alt="Receipt" className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity" />
+                            {receipt.image_path.toLowerCase().endsWith('.pdf') ? (
+                              <div className="flex flex-col items-center justify-center gap-1 text-red-500">
+                                <FileText className="w-8 h-8" />
+                                <span className="text-[9px] font-bold">PDF</span>
+                              </div>
+                            ) : (
+                              <img src={receipt.image_path.startsWith('http') ? receipt.image_path : `${import.meta.env.VITE_API_URL?.replace(/\/api\/v1\/?$/, '') || ''}${receipt.image_path.startsWith('/') ? '' : '/'}${receipt.image_path}`} alt="Receipt" className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity" />
+                            )}
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                               <Eye className="w-5 h-5 text-white" />
                             </div>
@@ -1031,7 +1040,11 @@ const Expenses: React.FC = () => {
       <Dialog isOpen={!!previewReceiptUrl} onClose={() => setPreviewReceiptUrl(null)} title="Receipt Preview" maxWidthClass="max-w-4xl">
         <div className="flex items-center justify-center bg-black/10 dark:bg-black/50 rounded-xl overflow-hidden p-2 min-h-[50vh]">
           {previewReceiptUrl && (
-            <img src={previewReceiptUrl} alt="Receipt Preview" className="max-w-full max-h-[80vh] object-contain rounded-lg" />
+            previewReceiptUrl.toLowerCase().endsWith('.pdf') ? (
+              <iframe src={previewReceiptUrl} className="w-full h-[80vh] rounded-lg border-none" title="PDF Preview" />
+            ) : (
+              <img src={previewReceiptUrl} alt="Receipt Preview" className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-sm" />
+            )
           )}
         </div>
       </Dialog>
