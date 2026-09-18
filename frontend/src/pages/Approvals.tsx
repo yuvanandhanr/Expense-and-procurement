@@ -101,14 +101,20 @@ export const Approvals: React.FC = () => {
         payload = { comments: comment, physical_inspection_done: physicalInspectionDone };
       }
       
-      await api.post(endpoint, payload);
+      const res = await api.post(endpoint, payload);
       toast.success(`Workflow successfully ${actionType}d!`);
       
-      setSelectedWorkflow(null);
+      fetchWorkflows();
+      
+      if (res.data && res.data.new_report_status === "Payment Requested" && selectedWorkflow?.entity_type === "ExpenseReport") {
+         setSelectedWorkflow((prev: any) => ({...prev, status: "Payment Requested"}));
+      } else {
+         setSelectedWorkflow(null);
+      }
+      
       setActionType(null);
       setComment("");
       setPhysicalInspectionDone(false);
-      fetchWorkflows();
     } catch (err: any) {
       toast.error(getErrorMessage(err, "Failed to process workflow action."));
     } finally {

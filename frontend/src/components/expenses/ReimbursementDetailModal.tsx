@@ -55,16 +55,38 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
             {/* Progress Timeline */}
             <div className="pt-8 pb-4 px-4 w-full">
               <div className="flex items-center justify-between relative max-w-lg mx-auto w-full">
-                {["Draft", "Submitted", "Manager", "Finance", "Payment", "Closed"].map((step, idx, arr) => {
+                {(() => {
+                  const roles = receiptDetails.employee?.roles?.map((r: any) => (r.role_name || "").toLowerCase()) || [];
+                  const desig = (receiptDetails.requestor_designation || "").toLowerCase();
+                  
+                  const isRole = (role: string) => desig.includes(role) || roles.some((r: string) => r.includes(role));
+                  
+                  let steps = ["Draft", "Submitted", "Manager", "Finance", "Payment", "Closed"];
+                  
+                  if (isRole("ceo") || isRole("admin") || isRole("cfo") || isRole("finance manager")) {
+                    steps = ["Draft", "Submitted", "CFO", "Payment", "Closed"];
+                  } else if (isRole("manager")) {
+                    steps = ["Draft", "Submitted", "Finance", "Payment", "Closed"];
+                  }
+                  
+                  return steps.map((step, idx, arr) => {
                   let currentStepIdx = 1;
                   const s = (receiptDetails.status || "").toLowerCase();
                   const isRejectedOrReturned = s.includes("reject") || s.includes("return");
 
-                  if (s.includes("draft")) currentStepIdx = 0;
-                  else if (s.includes("manager")) currentStepIdx = 2;
-                  else if (s.includes("finance")) currentStepIdx = 3;
-                  else if (s.includes("payment")) currentStepIdx = 4;
-                  else if (s.includes("closed") || s.includes("paid") || s.includes("approved")) currentStepIdx = 5;
+                  if (s.includes("draft")) currentStepIdx = steps.indexOf("Draft");
+                  else if (s.includes("manager approval")) currentStepIdx = steps.indexOf("Manager");
+                  else if (s.includes("finance manager approval") || s.includes("finance approval")) {
+                    currentStepIdx = steps.indexOf("Finance");
+                    if (currentStepIdx === -1) currentStepIdx = steps.indexOf("CFO");
+                  }
+                  else if (s.includes("cfo approval")) currentStepIdx = steps.indexOf("CFO");
+                  else if (s.includes("payment")) currentStepIdx = steps.indexOf("Payment");
+                  else if (s.includes("closed") || s.includes("paid") || s.includes("approved")) currentStepIdx = steps.indexOf("Closed");
+                  
+                  if (currentStepIdx === -1) {
+                    if (isRejectedOrReturned) currentStepIdx = 1;
+                  }
                   
                   // If rejected, highlight all steps from current onwards in red
                   const isError = isRejectedOrReturned && idx >= currentStepIdx;
@@ -98,7 +120,8 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                       )}
                     </React.Fragment>
                   );
-                })}
+                });
+              })()}
               </div>
               <div className="h-6"></div> {/* Spacer for absolute text */}
             </div>
