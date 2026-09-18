@@ -420,7 +420,7 @@ const Expenses: React.FC = () => {
                         )}
                         <Button 
                           size="sm" 
-                          variant={["Approved", "Closed", "Rejected", "Returned for Correction"].includes(report.status) ? "secondary" : "primary"}
+                          variant={["Approved", "Closed", "Rejected", "Returned for Correction"].includes(report.status) ? "view" : "primary"}
                           onClick={() => setSelectedReportId(report.expense_report_id)}
                           className="gap-1.5"
                         >

@@ -249,7 +249,7 @@ export const MyAssets: React.FC = () => {
                         </td>
                         <td className="p-4 text-xs">{new Date(inc.created_at).toLocaleDateString()}</td>
                         <td className="p-4 text-right flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => openViewModal(inc)} title="View Details">
+                          <Button variant="view" size="sm" onClick={() => openViewModal(inc)} title="View Details">
                             <Eye className="w-4 h-4" />
                           </Button>
                           {inc.status === "Returned for Correction" && (

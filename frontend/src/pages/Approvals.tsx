@@ -347,7 +347,7 @@ export const Approvals: React.FC = () => {
                     </td>
                     <td className="px-6 py-4"><StatusBadge status={statusStr} /></td>
                     <td className="px-6 py-4">
-                      <div className="text-xs font-semibold">{requesterStr}</div>
+                      <div className="text-xs font-semibold">{requesterStr} {wf.requestor_designation ? <span className="text-muted-foreground font-normal">({wf.requestor_designation})</span> : ""}</div>
                       <div className="text-[10px] text-muted-foreground">{formatDate(wf.created_at || wf.submission_date || wf.date)}</div>
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -356,7 +356,7 @@ export const Approvals: React.FC = () => {
                           Need Approval
                         </Button>
                       ) : getActionText(wf) === "View" ? (
-                        <Button variant="outline" size="sm" onClick={() => handleOpenDetails(wf)} className="px-4 shadow-sm text-xs rounded-full flex items-center justify-center">
+                        <Button variant="view" size="sm" onClick={() => handleOpenDetails(wf)} className="px-4 shadow-sm text-xs rounded-full flex items-center justify-center">
                           <Eye className="w-3.5 h-3.5 mr-1" /> View
                         </Button>
                       ) : (

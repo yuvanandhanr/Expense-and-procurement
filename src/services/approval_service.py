@@ -348,6 +348,7 @@ class ApprovalService:
                     "updated_at": workflow.updated_at,
                     "requestor_id": pr.requestor_id,
                     "requestor_name": f"{requestor.first_name} {requestor.last_name}",
+                    "requestor_designation": requestor.designation if hasattr(requestor, 'designation') and requestor.designation else "",
                     "title": pr.title,
                     "justification": pr.justification,
                     "total_amount": pr.total_estimated_amount,

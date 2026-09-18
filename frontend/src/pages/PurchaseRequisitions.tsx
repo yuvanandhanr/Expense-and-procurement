@@ -287,7 +287,7 @@ export const PurchaseRequisitions: React.FC = () => {
                         ) : (
                           <Button
                             size="sm"
-                            variant={["Approved", "Completed", "Rejected", "Cancelled"].includes(pr.status) ? "secondary" : "primary"}
+                            variant={["Approved", "Completed", "Rejected", "Cancelled"].includes(pr.status) ? "view" : "primary"}
                             onClick={() => setSelectedPr(pr)}
                             className="gap-1.5 shadow-apple-sm"
                           >
