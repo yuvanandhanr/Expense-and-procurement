@@ -464,7 +464,7 @@ export const Approvals: React.FC = () => {
                         onClick={() => { setSelectedWorkflow(wf); setActionType("approve"); }}
                       >
                         <Check className="w-3.5 h-3.5 shrink-0" />
-                        <span>Approve</span>
+                        <span>{wf.status === "Payment Requested" ? "Authorize Payment" : "Approve"}</span>
                       </Button>
                       <Button 
                         variant="return" 
@@ -570,24 +570,35 @@ export const Approvals: React.FC = () => {
               </label>
             </div>
           )}
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Comments {(actionType === "reject" || actionType === "return" || selectedWorkflow?.entity_type === "AssetIncident") && <span className="text-red-500">*</span>}
-            </label>
-            <Input 
-              value={comment} 
-              onChange={(e) => setComment(e.target.value)} 
-              placeholder={(actionType === "reject" || actionType === "return" || selectedWorkflow?.entity_type === "AssetIncident") ? "Resolution / Reason (required)..." : "Add a note..."} 
-            />
-          </div>
+          {actionType === "approve" ? (
+            <div className="py-4 text-center">
+              <p className="text-lg font-medium text-foreground">
+                Do you want to {selectedWorkflow?.status === "Payment Requested" ? "authorize payment for" : "approve"} this {selectedWorkflow?.entity_type}?
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                This action cannot be undone.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Comments {(actionType === "reject" || actionType === "return" || selectedWorkflow?.entity_type === "AssetIncident") && <span className="text-red-500">*</span>}
+              </label>
+              <Input 
+                value={comment} 
+                onChange={(e) => setComment(e.target.value)} 
+                placeholder={(actionType === "reject" || actionType === "return" || selectedWorkflow?.entity_type === "AssetIncident") ? "Resolution / Reason (required)..." : "Add a note..."} 
+              />
+            </div>
+          )}
           <div className="flex justify-end space-x-2">
             <Button variant="close" onClick={() => { setSelectedWorkflow(null); setActionType(null); setPhysicalInspectionDone(false); }}>Cancel</Button>
             <Button 
-              variant={actionType === "approve" ? "primary" : actionType === "reject" ? "danger" : actionType === "return" ? "warning" : "outline"} 
+              variant={actionType === "approve" ? "approve" : actionType === "reject" ? "reject" : actionType === "return" ? "return" : "outline"} 
               onClick={handleAction} 
               disabled={isSubmitting || ((actionType === "reject" || actionType === "return" || selectedWorkflow?.entity_type === "AssetIncident") && !comment.trim()) || (selectedWorkflow?.status === "Reported" && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && !physicalInspectionDone)}
             >
-              {isSubmitting ? "Processing..." : `Confirm ${actionType ? actionType.charAt(0).toUpperCase() + actionType.slice(1) : ""}`}
+              {isSubmitting ? "Processing..." : (actionType === "approve" && selectedWorkflow?.status === "Payment Requested" ? "Authorize Payment" : `Confirm ${actionType ? actionType.charAt(0).toUpperCase() + actionType.slice(1) : ""}`)}
             </Button>
           </div>
         </div>

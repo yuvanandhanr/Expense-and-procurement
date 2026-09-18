@@ -128,7 +128,7 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
               {isPendingForUser && (
                  <div className="flex items-center gap-3 pt-2 pb-2 justify-start">
                    <Button variant="approve" onClick={() => onAction("approve")}>
-                     Approve
+                     {receiptDetails.status === "Payment Requested" ? "Authorize Payment" : "Approve"}
                    </Button>
                    <Button variant="return" onClick={() => onAction("return")}>
                      Return for Correction
