@@ -556,18 +556,21 @@ const Expenses: React.FC = () => {
               {/* Header Section */}
               <div className="flex items-center justify-between px-2">
                 <div className="flex items-center gap-4">
-                  <Badge variant={
-                    report.status === 'Approved' || report.status === 'Closed' ? 'success' :
-                      (report.status.includes('Rejected') || report.status.includes('Returned')) ? 'error' :
-                        (report.status.includes('Pending') || report.status.includes('Review')) ? 'info' :
-                          'neutral'
-                  }>{report.status}</Badge>
+                  <Badge 
+                    variant={
+                      report.status === 'Approved' || report.status === 'Closed' ? 'success' :
+                        (report.status.includes('Rejected') || report.status.includes('Returned')) ? 'error' :
+                          (report.status.includes('Pending') || report.status.includes('Review')) ? 'info' :
+                            'neutral'
+                    }
+                    className={report.status === 'Draft' ? 'bg-blue-100 text-blue-600 border-none' : ''}
+                  >{report.status}</Badge>
                   <span className="text-sm text-muted-foreground font-medium">
                     Created: {new Date(report.created_at).toLocaleDateString()}
                   </span>
                 </div>
                 <div className="text-right">
-                  <div className="text-3xl font-black text-purple-600 dark:text-purple-400">
+                  <div className="text-3xl font-black text-blue-600">
                     ${Number(report.total_amount).toFixed(2)}
                   </div>
                   <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">Verified Total</div>
