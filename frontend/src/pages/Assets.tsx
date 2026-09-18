@@ -399,7 +399,7 @@ export const Assets: React.FC = () => {
             ]}
           />
           <div className="flex justify-end space-x-2 pt-4">
-            <Button variant="ghost" onClick={() => setIsAssetModalOpen(false)}>Cancel</Button>
+            <Button variant="close" size="sm" onClick={() => setIsAssetModalOpen(false)}>Cancel</Button>
             <Button variant="primary" onClick={handleSaveAsset} disabled={isSubmitting || !newAsset.name || !newAsset.category || !newAsset.cost || Number(newAsset.cost) <= 0}>
               {isSubmitting ? "Saving..." : "Save Asset"}
             </Button>
@@ -438,9 +438,7 @@ export const Assets: React.FC = () => {
             </div>
             
             <div className="flex justify-end space-x-3 pt-4 border-t border-border mt-4">
-              <Button variant="ghost" onClick={() => { setTransferAsset(null); setAssigneeSearchQuery(""); }} disabled={isSubmitting}>
-                Cancel
-              </Button>
+              <Button variant="close" size="sm" onClick={() => { setTransferAsset(null); setAssigneeSearchQuery(""); }} disabled={isSubmitting}>Cancel</Button>
               <Button variant="primary" onClick={handleTransferSubmit} disabled={isSubmitting || !selectedUser}>
                 {isSubmitting ? "Processing..." : (transferAsset?.assigned_to_name && transferAsset.assigned_to_name !== "Unassigned" ? "Transfer Asset" : "Assign Asset")}
               </Button>

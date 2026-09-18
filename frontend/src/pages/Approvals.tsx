@@ -581,7 +581,7 @@ export const Approvals: React.FC = () => {
             />
           </div>
           <div className="flex justify-end space-x-2">
-            <Button variant="ghost" onClick={() => { setSelectedWorkflow(null); setActionType(null); setPhysicalInspectionDone(false); }}>Cancel</Button>
+            <Button variant="close" size="sm" onClick={() => { setSelectedWorkflow(null); setActionType(null); setPhysicalInspectionDone(false); }}>Cancel</Button>
             <Button 
               variant={actionType === "approve" ? "primary" : actionType === "reject" ? "danger" : actionType === "return" ? "warning" : "outline"} 
               onClick={handleAction} 

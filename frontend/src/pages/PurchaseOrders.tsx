@@ -166,9 +166,7 @@ export const PurchaseOrders: React.FC = () => {
             />
 
             <div className="flex justify-end space-x-2 pt-4 border-t border-border">
-              <Button variant="outline" type="button" onClick={() => setVerifyDialogItem(null)}>
-                Cancel
-              </Button>
+              <Button variant="close" size="sm" type="button" onClick={() => setVerifyDialogItem(null)}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Verifying..." : "Verify & Claim"}
               </Button>

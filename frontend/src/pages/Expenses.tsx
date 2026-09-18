@@ -486,7 +486,7 @@ const Expenses: React.FC = () => {
             ></textarea>
           </div>
           <div className="pt-4 flex justify-end gap-2 border-t border-border">
-            <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+            <Button variant="close" size="sm" type="button"  onClick={() => setIsCreateOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={createReportMutation.isPending || !newReport.purpose.trim() || !newReport.justification.trim()}>Create Report</Button>
           </div>
         </form>
@@ -889,7 +889,7 @@ const Expenses: React.FC = () => {
       onChange={e => setManagerComments(e.target.value)}
     />
     <div className="flex justify-end gap-2 pt-4 border-t border-border">
-      <Button variant="ghost" onClick={() => setManagerAction({ isOpen: false, action: null, reportId: null })}>Cancel</Button>
+      <Button variant="close" size="sm" onClick={() => setManagerAction({ isOpen: false, action: null, reportId: null })}>Cancel</Button>
       <Button
         disabled={!managerComments.trim() || managerActionMutation.isPending}
         onClick={() => {
@@ -973,7 +973,7 @@ const Expenses: React.FC = () => {
       ></textarea>
     </div>
     <div className="pt-4 flex justify-end gap-2 border-t border-border">
-      <Button type="button" variant="ghost" onClick={() => setIsEditDetailsOpen(false)}>Cancel</Button>
+      <Button variant="close" size="sm" type="button"  onClick={() => setIsEditDetailsOpen(false)}>Cancel</Button>
       <Button type="submit" disabled={updateReportMutation.isPending || !editDetails.purpose.trim() || !editDetails.justification.trim()}>Save Changes</Button>
     </div>
   </form>

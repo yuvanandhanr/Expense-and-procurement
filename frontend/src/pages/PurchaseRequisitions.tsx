@@ -332,9 +332,7 @@ export const PurchaseRequisitions: React.FC = () => {
             />
           </div>
           <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
-              Cancel
-            </Button>
+            <Button variant="close" size="sm" type="button"  onClick={() => setIsCreateOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Submitting..." : "Submit Requisition"}
             </Button>
@@ -476,9 +474,7 @@ export const PurchaseRequisitions: React.FC = () => {
             )}
 
             <div className="flex justify-end space-x-2 pt-4 border-t border-border">
-              <Button variant="outline" onClick={() => setSelectedPr(null)}>
-                Close
-              </Button>
+              <Button variant="close" size="sm" onClick={() => setSelectedPr(null)}>Close</Button>
               {(!["Approved", "Completed", "Cancelled", "Rejected"].includes(selectedPr.status)) && (
                 selectedPr.requestor_id === user?.user_id || selectedPr.requested_by === user?.user_id ? (
                   <Button variant="danger" disabled={isSubmitting} onClick={() => handleAction("cancel")} className="gap-1.5 font-bold">

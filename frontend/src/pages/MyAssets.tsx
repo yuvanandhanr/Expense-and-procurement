@@ -312,7 +312,7 @@ export const MyAssets: React.FC = () => {
           </div>
 
           <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => setIsIncidentModalOpen(false)}>Cancel</Button>
+            <Button variant="close" size="sm" type="button"  onClick={() => setIsIncidentModalOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={isSubmitting || !incidentDescription}>Submit Report</Button>
           </div>
         </form>
@@ -355,7 +355,7 @@ export const MyAssets: React.FC = () => {
           </div>
 
             <div className="flex justify-end space-x-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
+              <Button variant="close" size="sm" type="button"  onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting || !incidentDescription}>Resubmit Report</Button>
             </div>
           </form>
@@ -413,7 +413,7 @@ export const MyAssets: React.FC = () => {
               )}
 
               <div className="flex justify-end pt-2">
-                <Button onClick={() => setIsViewModalOpen(false)}>Close</Button>
+                <Button variant="close" size="sm" onClick={() => setIsViewModalOpen(false)}>Close</Button>
               </div>
             </div>
           )}

@@ -231,9 +231,7 @@ export const Invoices: React.FC = () => {
           </div>
 
           <div className="flex justify-end space-x-3 pt-4 border-t border-border">
-            <Button variant="ghost" onClick={() => setIsUploadModalOpen(false)} disabled={isSubmitting}>
-              Cancel
-            </Button>
+            <Button variant="close" size="sm" onClick={() => setIsUploadModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
             <Button variant="primary" onClick={handleUploadInvoice} disabled={isSubmitting || !uploadFile}>
               {isSubmitting ? "Uploading..." : "Submit Invoice"}
             </Button>
@@ -310,9 +308,7 @@ export const Invoices: React.FC = () => {
             )}
 
             <div className="flex justify-end space-x-3 pt-4 border-t border-border">
-              <Button variant="outline" onClick={() => setSelectedInvoice(null)} disabled={isSubmitting}>
-                Cancel
-              </Button>
+              <Button variant="close" size="sm" onClick={() => setSelectedInvoice(null)} disabled={isSubmitting}>Cancel</Button>
               <Button 
                 variant="danger" 
                 onClick={() => handleApproveReject(selectedInvoice.invoice_id, "reject")}
