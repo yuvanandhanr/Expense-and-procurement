@@ -250,7 +250,7 @@ export const Dialog: React.FC<DialogProps> = ({ isOpen, onClose, title, children
           <h2 className="text-lg font-bold tracking-tight text-foreground">{title}</h2>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-all active:scale-95 text-xs font-bold"
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-green-500 text-white hover:bg-green-600 transition-all active:scale-95 text-xs font-bold shadow-md"
             title="Close"
           >
             ✕
