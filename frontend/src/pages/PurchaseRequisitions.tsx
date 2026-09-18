@@ -45,7 +45,7 @@ export const PurchaseRequisitions: React.FC = () => {
     fetchPRs();
   }, []);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent, isDraft: boolean = false) => {
     e.preventDefault();
     if (!title || !justification) {
       toast.error("Please fill in the required fields (Title and Justification).");
@@ -74,12 +74,16 @@ export const PurchaseRequisitions: React.FC = () => {
         ]
       });
 
-      // Auto-submit the PR to trigger the workflow
-      if (res.data && res.data.pr_id) {
-        await api.post(`/pr/${res.data.pr_id}/submit`);
+      if (!isDraft) {
+        // Auto-submit the PR to trigger the workflow
+        if (res.data && res.data.pr_id) {
+          await api.post(`/pr/${res.data.pr_id}/submit`);
+        }
+        toast.success("My Requisition created and submitted successfully!");
+      } else {
+        toast.success("My Requisition saved as draft!");
       }
 
-      toast.success("My Requisition created and submitted successfully!");
       setIsCreateOpen(false);
       // Reset form
       setTitle("");
@@ -304,7 +308,7 @@ export const PurchaseRequisitions: React.FC = () => {
 
       {/* Creation Modal */}
       <Dialog isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Create My Requisition">
-        <form onSubmit={handleCreate} className="space-y-4">
+        <form onSubmit={(e) => handleCreate(e, false)} className="space-y-4">
           <Input
             id="title"
             label="What do you need?"
@@ -333,6 +337,9 @@ export const PurchaseRequisitions: React.FC = () => {
           </div>
           <div className="flex justify-end space-x-2 pt-3">
             <Button variant="close" type="button"  onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+            <Button type="button" variant="secondary" disabled={isSubmitting} onClick={(e) => handleCreate(e, true)}>
+              {isSubmitting ? "Saving..." : "Save as Draft"}
+            </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Submitting..." : "Submit Requisition"}
             </Button>
