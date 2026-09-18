@@ -3,7 +3,7 @@ import { CheckCircle2, Clock, XCircle, AlertCircle, FileText, Check, ArrowUpRigh
 
 // --- Apple Button Component ---
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "success" | "danger" | "ghost" | "outline" | "close";
+  variant?: "primary" | "secondary" | "success" | "danger" | "ghost" | "outline" | "close" | "approve" | "return" | "reject";
   size?: "sm" | "md" | "lg";
 }
 
@@ -24,6 +24,9 @@ export const Button: React.FC<ButtonProps> = ({
     outline: "border border-border/80 bg-transparent text-foreground hover:bg-muted/50 backdrop-blur-sm shadow-apple-sm",
     ghost: "bg-transparent text-foreground hover:bg-muted/50",
     close: "border border-blue-300 bg-blue-50/80 text-blue-800 hover:bg-blue-100 hover:text-blue-900 shadow-sm",
+    approve: "border border-emerald-600 bg-emerald-100/80 text-emerald-800 hover:bg-emerald-200 hover:text-emerald-900 shadow-sm transition-colors",
+    return: "border border-amber-500 bg-amber-100/80 text-amber-800 hover:bg-amber-200 hover:text-amber-900 shadow-sm transition-colors",
+    reject: "border border-rose-600 bg-rose-100/80 text-rose-800 hover:bg-rose-200 hover:text-rose-900 shadow-sm transition-colors",
   };
 
   const sizes = {

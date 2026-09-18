@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Building, Briefcase, FileText } from "lucide-react";
 import { Dialog, StatusBadge, Button } from "../ui";
 import { formatDate } from "../../utils/helpers";
 
@@ -46,7 +47,7 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                 <span className="text-sm font-medium text-muted-foreground ml-3">Created: {formatDate(receiptDetails.created_at || receiptDetails.submission_date || receiptDetails.date)}</span>
               </div>
               <div className="text-right">
-                <div className="text-4xl font-bold text-violet-600 tracking-tight">${Number(receiptDetails.total_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                <div className="text-4xl font-bold text-blue-600 tracking-tight">${Number(receiptDetails.total_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
                 <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Verified Total</div>
               </div>
             </div>
@@ -108,30 +109,31 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                 <p className="text-sm italic font-medium text-foreground">"{receiptDetails.justification}"</p>
               </div>
 
-              <div className="flex gap-6 p-4 bg-white border border-border rounded-2xl text-sm font-semibold text-muted-foreground shadow-sm">
-                <div className="flex items-center gap-2"><span className="text-blue-500 bg-blue-500/10 p-1.5 rounded-lg">🏢</span> Dept: {receiptDetails.department_id || "N/A"}</div>
-                <div className="flex items-center gap-2"><span className="text-blue-500 bg-blue-500/10 p-1.5 rounded-lg">📁</span> Proj: {receiptDetails.project_code || receiptDetails.project_id || "N/A"}</div>
+              <div className="flex gap-6 p-4 bg-white border border-border rounded-2xl text-sm font-semibold text-foreground shadow-sm">
+                <div className="flex items-center gap-2.5">
+                  <div className="bg-blue-100 p-1.5 rounded-lg text-blue-600">
+                    <Building className="w-4 h-4" />
+                  </div>
+                  Dept: {receiptDetails.department_id || "N/A"}
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <div className="bg-blue-100 p-1.5 rounded-lg text-blue-600">
+                    <Briefcase className="w-4 h-4" />
+                  </div>
+                  Proj: {receiptDetails.project_code || receiptDetails.project_id || "N/A"}
+                </div>
               </div>
 
               {/* ACTION BUTTONS (Placed above attached receipts) */}
               {isPendingForUser && (
                  <div className="flex items-center gap-3 pt-2 pb-2 justify-start">
-                   <Button 
-                     className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white border-2 border-green-700 shadow-sm transition-colors rounded-full font-semibold" 
-                     onClick={() => onAction("approve")}
-                   >
+                   <Button variant="approve" onClick={() => onAction("approve")}>
                      Approve
                    </Button>
-                   <Button 
-                     className="px-6 py-2 bg-yellow-600 hover:bg-yellow-700 text-white border-2 border-yellow-700 shadow-sm transition-colors rounded-full font-semibold"
-                     onClick={() => onAction("return")}
-                   >
+                   <Button variant="return" onClick={() => onAction("return")}>
                      Return for Correction
                    </Button>
-                   <Button 
-                     className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white border-2 border-red-700 shadow-sm transition-colors rounded-full font-semibold"
-                     onClick={() => onAction("reject")}
-                   >
+                   <Button variant="reject" onClick={() => onAction("reject")}>
                      Reject
                    </Button>
                  </div>

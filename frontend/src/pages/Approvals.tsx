@@ -458,7 +458,7 @@ export const Approvals: React.FC = () => {
                   {isPendingStatus && (
                     <div className="flex items-center gap-2 pt-3 border-t border-border">
                       <Button 
-                        variant="success" 
+                        variant="approve" 
                         size="sm"
                         className="flex-1 py-1.5 px-2 text-xs font-semibold shadow-apple-sm flex items-center justify-center gap-1"
                         onClick={() => { setSelectedWorkflow(wf); setActionType("approve"); }}
@@ -467,20 +467,20 @@ export const Approvals: React.FC = () => {
                         <span>Approve</span>
                       </Button>
                       <Button 
-                        variant="warning" 
+                        variant="return" 
                         size="sm"
-                        className="flex-1 py-1.5 px-2 text-xs font-semibold shadow-apple-sm border border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white transition-all flex items-center justify-center gap-1"
+                        className="flex-1 py-1.5 px-2 text-xs font-semibold shadow-apple-sm flex items-center justify-center gap-1"
                         onClick={() => { setSelectedWorkflow(wf); setActionType("return"); }}
                       >
                         <span>Return</span>
                       </Button>
                       <Button 
-                        variant="danger" 
+                        variant="reject" 
                         size="sm"
                         className="flex-1 py-1.5 px-2 text-xs font-semibold shadow-apple-sm flex items-center justify-center gap-1"
                         onClick={() => { setSelectedWorkflow(wf); setActionType("reject"); }}
                       >
-                        <XIcon className="w-3.5 h-3.5 shrink-0" />
+                        <XCircle className="w-3.5 h-3.5 shrink-0" />
                         <span>Reject</span>
                       </Button>
                     </div>
