@@ -195,13 +195,13 @@ export const StatusBadge: React.FC<{ status: string; className?: string; pulse?:
     );
   }
 
-  // Approved / Completed / Active / Paid / Verified
-  if (s === "approved" || s === "completed" || s === "active" || s === "paid" || s === "success" || s === "verified") {
+  // Approved / Completed / Active / Paid / Verified / Closed
+  if (s === "approved" || s === "completed" || s === "active" || s === "paid" || s === "success" || s === "verified" || s === "closed") {
     return (
       <span
-        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-tight whitespace-nowrap bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 shadow-apple-sm ${className}`}
+        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-tight whitespace-nowrap bg-green-100 text-green-700 border border-green-500 shadow-apple-sm ${className}`}
       >
-        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+        <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0" />
         <span>{status}</span>
       </span>
     );
@@ -250,7 +250,7 @@ export const Dialog: React.FC<DialogProps> = ({ isOpen, onClose, title, children
           <h2 className="text-lg font-bold tracking-tight text-foreground">{title}</h2>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-green-500 text-white hover:bg-green-600 transition-all active:scale-95 text-xs font-bold shadow-md"
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-all active:scale-95 text-xs font-bold"
             title="Close"
           >
             ✕

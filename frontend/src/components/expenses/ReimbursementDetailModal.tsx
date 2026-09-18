@@ -83,7 +83,7 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                             : isActive 
                               ? "bg-white text-blue-500 border-2 border-blue-500 ring-4 ring-blue-500/20 scale-110" 
                               : isCompleted 
-                                ? ["bg-blue-700", "bg-blue-600", "bg-blue-500", "bg-blue-400", "bg-blue-300", "bg-blue-200"][idx] + " text-white shadow-md shadow-blue-500/20" 
+                              ? ["bg-blue-200", "bg-blue-300", "bg-blue-400", "bg-blue-500", "bg-blue-600", "bg-blue-700"][idx] + " text-white shadow-md shadow-blue-500/20" 
                                 : "bg-white text-muted-foreground border-2 border-muted"
                         }`}>
                           {idx + 1}
@@ -225,7 +225,7 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
         <div className="relative max-w-4xl max-h-[95vh] bg-white p-2 rounded-xl shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
            <button 
              onClick={() => setPreviewReceipt(null)} 
-             className="absolute -top-4 -right-4 w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white font-bold shadow-md hover:bg-green-600 transition-colors z-10 text-xl"
+             className="absolute -top-4 -right-4 w-10 h-10 bg-white rounded-full flex items-center justify-center text-black font-bold shadow-md hover:bg-gray-100 transition-colors z-10 text-xl"
            >
              ✕
            </button>
