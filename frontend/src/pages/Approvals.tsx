@@ -466,23 +466,27 @@ export const Approvals: React.FC = () => {
                         <Check className="w-3.5 h-3.5 shrink-0" />
                         <span>{wf.status === "Payment Requested" ? "Authorize Payment" : "Approve"}</span>
                       </Button>
-                      <Button 
-                        variant="return" 
-                        size="sm"
-                        className="flex-1 py-1.5 px-2 text-xs font-semibold shadow-apple-sm flex items-center justify-center gap-1"
-                        onClick={() => { setSelectedWorkflow(wf); setActionType("return"); }}
-                      >
-                        <span>Return</span>
-                      </Button>
-                      <Button 
-                        variant="reject" 
-                        size="sm"
-                        className="flex-1 py-1.5 px-2 text-xs font-semibold shadow-apple-sm flex items-center justify-center gap-1"
-                        onClick={() => { setSelectedWorkflow(wf); setActionType("reject"); }}
-                      >
-                        <XCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span>Reject</span>
-                      </Button>
+                      {wf.status !== "Payment Requested" && (
+                        <>
+                          <Button 
+                            variant="return" 
+                            size="sm"
+                            className="flex-1 py-1.5 px-2 text-xs font-semibold shadow-apple-sm flex items-center justify-center gap-1"
+                            onClick={() => { setSelectedWorkflow(wf); setActionType("return"); }}
+                          >
+                            <span>Return</span>
+                          </Button>
+                          <Button 
+                            variant="reject" 
+                            size="sm"
+                            className="flex-1 py-1.5 px-2 text-xs font-semibold shadow-apple-sm flex items-center justify-center gap-1"
+                            onClick={() => { setSelectedWorkflow(wf); setActionType("reject"); }}
+                          >
+                            <XCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>Reject</span>
+                          </Button>
+                        </>
+                      )}
                     </div>
                   )}
                   

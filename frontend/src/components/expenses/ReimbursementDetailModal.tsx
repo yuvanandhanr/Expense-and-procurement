@@ -127,16 +127,20 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
               {/* ACTION BUTTONS (Placed above attached receipts) */}
               {isPendingForUser && (
                  <div className="flex items-center gap-3 pt-2 pb-2 justify-start">
-                   <Button variant="approve" onClick={() => onAction("approve")}>
-                     {receiptDetails.status === "Payment Requested" ? "Authorize Payment" : "Approve"}
-                   </Button>
-                   <Button variant="return" onClick={() => onAction("return")}>
-                     Return for Correction
-                   </Button>
-                   <Button variant="reject" onClick={() => onAction("reject")}>
-                     Reject
-                   </Button>
-                 </div>
+                    <Button variant="approve" onClick={() => onAction("approve")}>
+                      {receiptDetails.status === "Payment Requested" ? "Authorize Payment" : "Approve"}
+                    </Button>
+                    {receiptDetails.status !== "Payment Requested" && (
+                      <>
+                        <Button variant="return" onClick={() => onAction("return")}>
+                          Return for Correction
+                        </Button>
+                        <Button variant="reject" onClick={() => onAction("reject")}>
+                          Reject
+                        </Button>
+                      </>
+                    )}
+                  </div>
               )}
 
               {receiptDetails.receipts && receiptDetails.receipts.length > 0 && (
