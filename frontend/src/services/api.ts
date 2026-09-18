@@ -6,7 +6,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 120000, // 120s timeout
+  timeout: 300000, // 300s timeout
 });
 
 // Cache tokens locally for quick synchronous access in interceptors
