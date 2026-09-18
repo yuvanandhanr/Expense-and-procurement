@@ -331,8 +331,8 @@ export const PurchaseRequisitions: React.FC = () => {
               required
             />
           </div>
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button variant="close" size="sm" type="button"  onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+          <div className="flex justify-end space-x-2 pt-3">
+            <Button variant="close" type="button"  onClick={() => setIsCreateOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Submitting..." : "Submit Requisition"}
             </Button>
@@ -343,25 +343,23 @@ export const PurchaseRequisitions: React.FC = () => {
       {/* Review Dialog */}
       {selectedPr && (
         <Dialog isOpen={true} onClose={() => setSelectedPr(null)} title={`Review PR #${selectedPr.pr_number}`}>
-          <div className="space-y-4">
-            <div className="space-y-3 bg-muted/40 p-3 rounded-lg border border-border text-xs">
-              <div>
-                <span className="block text-muted-foreground font-semibold uppercase">What do you need? (Requisition Title)</span>
-                <span className="font-bold text-sm tracking-wider text-foreground">{selectedPr.title}</span>
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-muted/30 p-4 rounded-xl border border-border/60">
+                <span className="block text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-1.5">What do you need?</span>
+                <span className="font-bold text-base text-foreground leading-tight">{selectedPr.title}</span>
               </div>
-              
-              <div>
-                <span className="block text-muted-foreground font-semibold uppercase">Requirements / Specifications</span>
+              <div className="bg-muted/30 p-4 rounded-xl border border-border/60">
+                <span className="block text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-1.5">Requirements / Specifications</span>
                 <span className="font-medium text-sm text-foreground">
                   {selectedPr.items && selectedPr.items.length > 0 && (selectedPr.items[0] as any).specification 
                     ? (selectedPr.items[0] as any).specification 
-                    : "No specifications provided."}
+                    : "None provided."}
                 </span>
               </div>
-
-              <div>
-                <span className="block text-muted-foreground font-semibold uppercase">Why do you need it? (Business Reason)</span>
-                <span className="font-medium text-sm text-foreground">{selectedPr.justification || "No justification provided."}</span>
+              <div className="bg-muted/30 p-4 rounded-xl border border-border/60 md:col-span-2">
+                <span className="block text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-1.5">Business Justification</span>
+                <span className="font-medium text-sm text-foreground leading-relaxed">{selectedPr.justification || "None provided."}</span>
               </div>
             </div>
 
@@ -382,7 +380,7 @@ export const PurchaseRequisitions: React.FC = () => {
 
                 {/* Delivery Verification Section */}
                 {purchaseOrders.filter(po => po.pr_id === selectedPr.pr_id).map(po => (
-                  <div key={po.po_id} className="mt-4 pt-4 border-t border-border">
+                  <div key={po.po_id} className="mt-4 pt-3 mt-2 border-t border-border">
                     <h4 className="text-xs font-bold uppercase text-muted-foreground mb-3 tracking-wider">PO #{po.po_number} Deliveries</h4>
                     <div className="space-y-3">
                       {po.items?.map((item: any) => (
@@ -473,8 +471,8 @@ export const PurchaseRequisitions: React.FC = () => {
               </>
             )}
 
-            <div className="flex justify-end space-x-2 pt-4 border-t border-border">
-              <Button variant="close" size="sm" onClick={() => setSelectedPr(null)}>Close</Button>
+            <div className="flex justify-end space-x-2 pt-3 border-t border-border mt-2">
+              <Button variant="close" onClick={() => setSelectedPr(null)}>Close</Button>
               {(!["Approved", "Completed", "Cancelled", "Rejected"].includes(selectedPr.status)) && (
                 selectedPr.requestor_id === user?.user_id || selectedPr.requested_by === user?.user_id ? (
                   <Button variant="danger" disabled={isSubmitting} onClick={() => handleAction("cancel")} className="gap-1.5 font-bold">

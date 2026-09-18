@@ -311,8 +311,8 @@ export const MyAssets: React.FC = () => {
             <p className="text-xs text-muted-foreground">Provide a link to an image showing the issue.</p>
           </div>
 
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button variant="close" size="sm" type="button"  onClick={() => setIsIncidentModalOpen(false)}>Cancel</Button>
+          <div className="flex justify-end space-x-2 pt-3 mt-2">
+            <Button variant="close" type="button"  onClick={() => setIsIncidentModalOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={isSubmitting || !incidentDescription}>Submit Report</Button>
           </div>
         </form>
@@ -354,8 +354,8 @@ export const MyAssets: React.FC = () => {
             />
           </div>
 
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button variant="close" size="sm" type="button"  onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
+            <div className="flex justify-end space-x-2 pt-3 mt-2">
+              <Button variant="close" type="button"  onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting || !incidentDescription}>Resubmit Report</Button>
             </div>
           </form>
@@ -413,7 +413,7 @@ export const MyAssets: React.FC = () => {
               )}
 
               <div className="flex justify-end pt-2">
-                <Button variant="close" size="sm" onClick={() => setIsViewModalOpen(false)}>Close</Button>
+                <Button variant="close" onClick={() => setIsViewModalOpen(false)}>Close</Button>
               </div>
             </div>
           )}

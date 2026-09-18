@@ -9,41 +9,13 @@ for filename in os.listdir(frontend_pages_dir):
         with open(filepath, 'r') as f:
             content = f.read()
 
-        new_content = ""
-        last_idx = 0
+        new_content = re.sub(r'variant="close" size="sm"', 'variant="close"', content)
         
-        # Find all <Button tags
-        for match in re.finditer(r'<Button\b', content):
-            start = match.end()
-            
-            # Find the closing </Button>
-            end_match = re.search(r'</Button>', content[start:])
-            if not end_match:
-                continue
-                
-            end = start + end_match.start()
-            
-            button_inner = content[start:end]
-            # Check if it contains 'Cancel' or 'Close' (and nothing else but whitespace)
-            
-            # Extract the content between > and </Button>
-            # we need to find the first > that is outside of {} brackets, which is hard.
-            # but we can just split by > from the right side.
-            last_bracket = button_inner.rfind('>')
-            if last_bracket != -1:
-                text_content = button_inner[last_bracket+1:].strip()
-                if text_content in ['Cancel', 'Close']:
-                    attrs = button_inner[:last_bracket]
-                    attrs = re.sub(r'variant="[^"]+"', '', attrs)
-                    attrs = re.sub(r'size="[^"]+"', '', attrs)
-                    attrs = attrs.strip()
-                    
-                    new_button = f' variant="close" size="sm" {attrs}>{text_content}'
-                    
-                    new_content += content[last_idx:start] + new_button
-                    last_idx = end
-                    
-        new_content += content[last_idx:]
+        # Also let's reduce the spacing at the bottom of modals.
+        # Often it is `pt-4` on the parent div containing the buttons.
+        # `<div className="flex justify-end space-x-2 pt-4 border-t border-border">`
+        # Let's change `pt-4` to `pt-2` or `pt-3`? The user said "the spacing is also too much".
+        # Let's change `pt-4` to `pt-2` and `mt-4` to `mt-2` for the button containers.
         
         if new_content != content:
             with open(filepath, 'w') as f:

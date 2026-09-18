@@ -163,8 +163,8 @@ export const DeliveredItems: React.FC = () => {
               onChange={(e) => setProductUniqueId(e.target.value)}
             />
 
-            <div className="flex justify-end space-x-2 pt-4 border-t border-border">
-              <Button variant="close" size="sm" type="button" onClick={() => setDeliveryDialogItem(null)}>Cancel</Button>
+            <div className="flex justify-end space-x-2 pt-3 mt-2 border-t border-border">
+              <Button variant="close" type="button" onClick={() => setDeliveryDialogItem(null)}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Submitting..." : "Confirm Delivery"}
               </Button>

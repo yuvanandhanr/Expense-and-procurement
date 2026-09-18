@@ -293,8 +293,8 @@ export const Users: React.FC = () => {
               )}
             </div>
           </div>
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button variant="close" size="sm" type="button"  onClick={() => setIsModalOpen(false)}>Cancel</Button>
+          <div className="flex justify-end space-x-2 pt-3 mt-2">
+            <Button variant="close" type="button"  onClick={() => setIsModalOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Saving..." : (isEditMode ? "Save Changes" : "Create User")}
             </Button>

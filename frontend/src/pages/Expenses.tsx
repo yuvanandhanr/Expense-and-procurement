@@ -485,8 +485,8 @@ const Expenses: React.FC = () => {
               required
             ></textarea>
           </div>
-          <div className="pt-4 flex justify-end gap-2 border-t border-border">
-            <Button variant="close" size="sm" type="button"  onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+          <div className="pt-3 mt-2 flex justify-end gap-2 border-t border-border">
+            <Button variant="close" type="button"  onClick={() => setIsCreateOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={createReportMutation.isPending || !newReport.purpose.trim() || !newReport.justification.trim()}>Create Report</Button>
           </div>
         </form>
@@ -862,7 +862,7 @@ const Expenses: React.FC = () => {
           </span>
         </label>
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-border">
+        <div className="flex justify-end gap-3 pt-3 mt-2 border-t border-border">
           <Button variant="ghost" onClick={() => setIsReviewOpen(false)}>Back to Editing</Button>
           <Button
             onClick={() => submitReportMutation.mutate(report.expense_report_id)}
@@ -888,8 +888,8 @@ const Expenses: React.FC = () => {
       value={managerComments}
       onChange={e => setManagerComments(e.target.value)}
     />
-    <div className="flex justify-end gap-2 pt-4 border-t border-border">
-      <Button variant="close" size="sm" onClick={() => setManagerAction({ isOpen: false, action: null, reportId: null })}>Cancel</Button>
+    <div className="flex justify-end gap-2 pt-3 mt-2 border-t border-border">
+      <Button variant="close" onClick={() => setManagerAction({ isOpen: false, action: null, reportId: null })}>Cancel</Button>
       <Button
         disabled={!managerComments.trim() || managerActionMutation.isPending}
         onClick={() => {
@@ -972,8 +972,8 @@ const Expenses: React.FC = () => {
         required
       ></textarea>
     </div>
-    <div className="pt-4 flex justify-end gap-2 border-t border-border">
-      <Button variant="close" size="sm" type="button"  onClick={() => setIsEditDetailsOpen(false)}>Cancel</Button>
+    <div className="pt-3 mt-2 flex justify-end gap-2 border-t border-border">
+      <Button variant="close" type="button"  onClick={() => setIsEditDetailsOpen(false)}>Cancel</Button>
       <Button type="submit" disabled={updateReportMutation.isPending || !editDetails.purpose.trim() || !editDetails.justification.trim()}>Save Changes</Button>
     </div>
   </form>
