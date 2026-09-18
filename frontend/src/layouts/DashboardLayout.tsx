@@ -225,7 +225,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   // Quick navigation destinations
   const quickPages = [
     { label: "Employee Reimbursements", path: "/expenses", icon: FileText, category: "Claims" },
-    { label: "Purchase Requisitions", path: "/prs", icon: FileText, category: "Requisitions" },
+    { label: "My Requisitions", path: "/prs", icon: FileText, category: "Requisitions" },
     { label: "Pending Approvals", path: "/approvals", icon: CheckSquare, category: "Approvals" },
     { label: "Vendor Management", path: "/vendors", icon: Users, category: "Procurement" },
     { label: "Requests For Quotations", path: "/rfqs", icon: Briefcase, category: "Sourcing" },
@@ -292,7 +292,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         title: "My Requests",
         items: [
           { label: "My Reimbursements", path: "/expenses", icon: FileText, show: true },
-          { label: "Purchase Requisitions", path: "/prs", icon: FileText, show: true },
+          { label: "My Requisitions", path: "/prs", icon: FileText, show: true },
           { label: "My Assets", path: "/my-assets", icon: HardDrive, show: true },
         ]
       },

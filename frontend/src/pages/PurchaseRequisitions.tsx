@@ -79,7 +79,7 @@ export const PurchaseRequisitions: React.FC = () => {
         await api.post(`/pr/${res.data.pr_id}/submit`);
       }
 
-      toast.success("Purchase Requisition created and submitted successfully!");
+      toast.success("My Requisition created and submitted successfully!");
       setIsCreateOpen(false);
       // Reset form
       setTitle("");
@@ -104,13 +104,13 @@ export const PurchaseRequisitions: React.FC = () => {
           return;
         }
         await api.post(`/pr/${selectedPr.pr_id}/${action}`, { comments: comment });
-        toast.success(`Purchase Requisition successfully ${action === "cancel" ? "cancelled" : "rejected"}!`);
+        toast.success(`My Requisition successfully ${action === "cancel" ? "cancelled" : "rejected"}!`);
       } else {
         await api.post(`/pr/${selectedPr.pr_id}/${action}`, {
           comments: comment,
           physical_inspection_done: physicalInspectionDone
         });
-        toast.success(`Purchase Requisition successfully ${action}d!`);
+        toast.success(`My Requisition successfully ${action}d!`);
       }
       setSelectedPr(null);
       setComment("");
@@ -154,7 +154,7 @@ export const PurchaseRequisitions: React.FC = () => {
   const handleSubmit = async (prId: number) => {
     try {
       await api.post(`/pr/${prId}/submit`);
-      toast.success("Purchase Requisition submitted successfully!");
+      toast.success("My Requisition submitted successfully!");
       fetchPRs();
     } catch (err: any) {
       toast.error(getErrorMessage(err, "Failed to submit PR."));
@@ -194,7 +194,7 @@ export const PurchaseRequisitions: React.FC = () => {
       {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Purchase Requisitions</h1>
+          <h1 className="text-3xl font-bold tracking-tight">My Requisitions</h1>
           <p className="text-xs text-muted-foreground mt-1">Submit and track department purchase requests.</p>
         </div>
         <div className="flex items-center space-x-4">
@@ -303,7 +303,7 @@ export const PurchaseRequisitions: React.FC = () => {
       </Card>
 
       {/* Creation Modal */}
-      <Dialog isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Create Purchase Requisition">
+      <Dialog isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Create My Requisition">
         <form onSubmit={handleCreate} className="space-y-4">
           <Input
             id="title"
@@ -346,119 +346,133 @@ export const PurchaseRequisitions: React.FC = () => {
       {selectedPr && (
         <Dialog isOpen={true} onClose={() => setSelectedPr(null)} title={`Review PR #${selectedPr.pr_number}`}>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 bg-muted/40 p-3 rounded-lg border border-border text-xs">
+            <div className="space-y-3 bg-muted/40 p-3 rounded-lg border border-border text-xs">
               <div>
-                <span className="block text-muted-foreground font-semibold uppercase">Requisition Title</span>
-                <span className="font-bold text-sm uppercase tracking-wider text-foreground">{selectedPr.title}</span>
+                <span className="block text-muted-foreground font-semibold uppercase">What do you need? (Requisition Title)</span>
+                <span className="font-bold text-sm tracking-wider text-foreground">{selectedPr.title}</span>
               </div>
+              
               <div>
-                <span className="block text-muted-foreground font-semibold uppercase">Estimated Cost</span>
-                <span className="font-bold text-sm tracking-wider text-foreground">{selectedPr.total_estimated_amount > 0 ? `$${selectedPr.total_estimated_amount?.toLocaleString()}` : "TBD"}</span>
+                <span className="block text-muted-foreground font-semibold uppercase">Requirements / Specifications</span>
+                <span className="font-medium text-sm text-foreground">
+                  {selectedPr.items && selectedPr.items.length > 0 && (selectedPr.items[0] as any).specification 
+                    ? (selectedPr.items[0] as any).specification 
+                    : "No specifications provided."}
+                </span>
+              </div>
+
+              <div>
+                <span className="block text-muted-foreground font-semibold uppercase">Why do you need it? (Business Reason)</span>
+                <span className="font-medium text-sm text-foreground">{selectedPr.justification || "No justification provided."}</span>
               </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                {selectedPr.requestor_id === user?.user_id || selectedPr.requested_by === user?.user_id ? "Reason for Cancellation *" : "Comments / Decision Notes"}
-              </label>
-              <textarea
-                placeholder={selectedPr.requestor_id === user?.user_id || selectedPr.requested_by === user?.user_id ? "Provide a reason for canceling this request..." : "Include details explaining your decision (required if rejecting)"}
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring min-h-[80px]"
-              />
-            </div>
+            {/* Actionable Sections (Hidden in View Mode) */}
+            {(!["Approved", "Completed", "Cancelled", "Rejected"].includes(selectedPr.status)) && (
+              <>
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {selectedPr.requestor_id === user?.user_id || selectedPr.requested_by === user?.user_id ? "Reason for Cancellation *" : "Comments / Decision Notes"}
+                  </label>
+                  <textarea
+                    placeholder={selectedPr.requestor_id === user?.user_id || selectedPr.requested_by === user?.user_id ? "Provide a reason for canceling this request..." : "Include details explaining your decision (required if rejecting)"}
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring min-h-[80px]"
+                  />
+                </div>
 
-            {/* Delivery Verification Section */}
-            {purchaseOrders.filter(po => po.pr_id === selectedPr.pr_id).map(po => (
-              <div key={po.po_id} className="mt-4 pt-4 border-t border-border">
-                <h4 className="text-xs font-bold uppercase text-muted-foreground mb-3 tracking-wider">PO #{po.po_number} Deliveries</h4>
-                <div className="space-y-3">
-                  {po.items?.map((item: any) => (
-                    <div key={item.po_item_id} className="bg-background border border-border p-3 rounded-lg shadow-sm">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="font-semibold text-sm">{item.item_name}</span>
-                        <Badge variant={
-                          item.delivery_verification_status === "Matched" ? "success" :
-                            item.delivery_verification_status === "Returned / Cancelled" ? "danger" :
-                              item.delivery_verification_status === "Vendor Delivered" ? "warning" : "neutral"
-                        }>
-                          {item.delivery_verification_status || "Pending"}
-                        </Badge>
-                      </div>
+                {/* Delivery Verification Section */}
+                {purchaseOrders.filter(po => po.pr_id === selectedPr.pr_id).map(po => (
+                  <div key={po.po_id} className="mt-4 pt-4 border-t border-border">
+                    <h4 className="text-xs font-bold uppercase text-muted-foreground mb-3 tracking-wider">PO #{po.po_number} Deliveries</h4>
+                    <div className="space-y-3">
+                      {po.items?.map((item: any) => (
+                        <div key={item.po_item_id} className="bg-background border border-border p-3 rounded-lg shadow-sm">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="font-semibold text-sm">{item.item_name}</span>
+                            <Badge variant={
+                              item.delivery_verification_status === "Matched" ? "success" :
+                                item.delivery_verification_status === "Returned / Cancelled" ? "danger" :
+                                  item.delivery_verification_status === "Vendor Delivered" ? "warning" : "neutral"
+                            }>
+                              {item.delivery_verification_status || "Pending"}
+                            </Badge>
+                          </div>
 
-                      {item.delivery_verification_status === "Vendor Delivered" && (
-                        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border">
-                          <Input
-                            id={`verify-${item.po_item_id}`}
-                            type="text"
-                            placeholder="Enter received Unique ID..."
-                            value={(window as any)[`verify_${item.po_item_id}`] || ""}
-                            onChange={(e) => {
-                              (window as any)[`verify_${item.po_item_id}`] = e.target.value;
-                              // Force re-render just to update input (hacky but works for this demo scope)
-                              setComment(comment + " ");
-                              setTimeout(() => setComment(comment.trim()), 0);
-                            }}
-                          />
-                          <Button size="sm" onClick={async () => {
-                            const val = (window as any)[`verify_${item.po_item_id}`];
-                            if (!val) { toast.error("Enter the product unique ID"); return; }
-                            try {
-                              await api.post(`/purchase-orders/${po.po_id}/items/${item.po_item_id}/verify-delivery`, {
-                                receiver_product_id: val
-                              });
-                              toast.success("Verification processed!");
-                              fetchPRs();
-                              const poRes = await api.get("/purchase-orders");
-                              setPurchaseOrders(poRes.data);
-                            } catch (e: any) {
-                              toast.error(e.response?.data?.detail || "Failed to verify");
-                            }
-                          }}>Verify</Button>
+                          {item.delivery_verification_status === "Vendor Delivered" && (
+                            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border">
+                              <Input
+                                id={`verify-${item.po_item_id}`}
+                                type="text"
+                                placeholder="Enter received Unique ID..."
+                                value={(window as any)[`verify_${item.po_item_id}`] || ""}
+                                onChange={(e) => {
+                                  (window as any)[`verify_${item.po_item_id}`] = e.target.value;
+                                  setComment(comment + " ");
+                                  setTimeout(() => setComment(comment.trim()), 0);
+                                }}
+                              />
+                              <Button size="sm" onClick={async () => {
+                                const val = (window as any)[`verify_${item.po_item_id}`];
+                                if (!val) { toast.error("Enter the product unique ID"); return; }
+                                try {
+                                  await api.post(`/purchase-orders/${po.po_id}/items/${item.po_item_id}/verify-delivery`, {
+                                    receiver_product_id: val
+                                  });
+                                  toast.success("Verification processed!");
+                                  fetchPRs();
+                                  const poRes = await api.get("/purchase-orders");
+                                  setPurchaseOrders(poRes.data);
+                                } catch (e: any) {
+                                  toast.error(e.response?.data?.detail || "Failed to verify");
+                                }
+                              }}>Verify</Button>
+                            </div>
+                          )}
                         </div>
-                      )}
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-
-            {selectedPr.requestor_id !== user?.user_id && user?.roles?.some(r => r.role_name === "Manager") && selectedPr.status === "Pending Manager Approval" && (
-              <div className="flex items-center space-x-2 bg-muted/30 p-3 rounded-lg border border-border mt-4">
-                <input
-                  type="checkbox"
-                  id="physical_inspection"
-                  checked={physicalInspectionDone}
-                  onChange={(e) => setPhysicalInspectionDone(e.target.checked)}
-                  className="w-4 h-4 text-primary rounded border-border focus:ring-primary"
-                />
-                <label htmlFor="physical_inspection" className="text-sm font-semibold">
-                  Physical Inspection Completed <span className="text-red-500">*</span>
-                </label>
-              </div>
-            )}
-
-            {selectedPr.requestor_id !== user?.user_id && user?.roles?.some(r => r.role_name === "Admin") && (selectedPr.status === "Pending Admin Approval" || selectedPr.status === "Under Review") && (
-              <div className="mt-4 p-4 border border-border bg-muted/20 rounded-lg space-y-4">
-                <h4 className="font-bold text-sm">Inventory Check & Allocation</h4>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase">Allocate from Available Inventory</label>
-                  <div className="flex gap-2">
-                    <Input 
-                      id="allocate-asset-id"
-                      placeholder="Enter Asset ID..." 
-                      value={allocateAssetId}
-                      onChange={(e) => setAllocateAssetId(e.target.value)}
-                    />
-                    <Button onClick={() => handleAdminAction("allocate")} variant="primary" disabled={isSubmitting}>Allocate Asset</Button>
                   </div>
-                </div>
-                <div className="pt-2 border-t border-border">
-                  <p className="text-xs text-muted-foreground mb-2">If no suitable asset is found in inventory, initiate a new purchase.</p>
-                  <Button onClick={() => handleAdminAction("procure")} variant="outline" className="w-full" disabled={isSubmitting}>Initiate Procurement (Route to CFO)</Button>
-                </div>
-              </div>
+                ))}
+
+                {selectedPr.requestor_id !== user?.user_id && user?.roles?.some(r => r.role_name === "Manager") && selectedPr.status === "Pending Manager Approval" && (
+                  <div className="flex items-center space-x-2 bg-muted/30 p-3 rounded-lg border border-border mt-4">
+                    <input
+                      type="checkbox"
+                      id="physical_inspection"
+                      checked={physicalInspectionDone}
+                      onChange={(e) => setPhysicalInspectionDone(e.target.checked)}
+                      className="w-4 h-4 text-primary rounded border-border focus:ring-primary"
+                    />
+                    <label htmlFor="physical_inspection" className="text-sm font-semibold">
+                      Physical Inspection Completed <span className="text-red-500">*</span>
+                    </label>
+                  </div>
+                )}
+
+                {selectedPr.requestor_id !== user?.user_id && user?.roles?.some(r => r.role_name === "Admin") && (selectedPr.status === "Pending Admin Approval" || selectedPr.status === "Under Review") && (
+                  <div className="mt-4 p-4 border border-border bg-muted/20 rounded-lg space-y-4">
+                    <h4 className="font-bold text-sm">Inventory Check & Allocation</h4>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase">Allocate from Available Inventory</label>
+                      <div className="flex gap-2">
+                        <Input 
+                          id="allocate-asset-id"
+                          placeholder="Enter Asset ID..." 
+                          value={allocateAssetId}
+                          onChange={(e) => setAllocateAssetId(e.target.value)}
+                        />
+                        <Button onClick={() => handleAdminAction("allocate")} variant="primary" disabled={isSubmitting}>Allocate Asset</Button>
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t border-border">
+                      <p className="text-xs text-muted-foreground mb-2">If no suitable asset is found in inventory, initiate a new purchase.</p>
+                      <Button onClick={() => handleAdminAction("procure")} variant="outline" className="w-full" disabled={isSubmitting}>Initiate Procurement (Route to CFO)</Button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             <div className="flex justify-end space-x-2 pt-4 border-t border-border">

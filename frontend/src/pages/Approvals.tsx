@@ -376,11 +376,11 @@ export const Approvals: React.FC = () => {
           {filteredWorkflows.map(wf => {
             const entityTypeStr = String(wf.entity_type || "");
             
-            let formattedTitle = "Purchase Requisition";
+            let formattedTitle = "My Requisition";
             if (entityTypeStr === "ExpenseReport" || entityTypeStr === "Expense") formattedTitle = "Expense Reimbursement";
             else if (entityTypeStr === "AssetIncident") formattedTitle = "Asset Incident";
             else if (entityTypeStr === "Resignation") formattedTitle = "Resignation";
-            else if (entityTypeStr === "PurchaseRequisition") formattedTitle = "Purchase Requisition";
+            else if (entityTypeStr === "PurchaseRequisition") formattedTitle = "My Requisition";
             else formattedTitle = entityTypeStr.replace(/([A-Z])/g, " $1").trim();
 
             const headerTag = entityTypeStr === "ExpenseReport" ? "EXPENSE REIMBURSEMENT" : formattedTitle.toUpperCase();
