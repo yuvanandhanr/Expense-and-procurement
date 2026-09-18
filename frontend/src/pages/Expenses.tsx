@@ -606,22 +606,36 @@ const Expenses: React.FC = () => {
                     const isCompleted = i < currentIndex;
                     const isRejected = report.status.includes("Reject") || report.status.includes("Return");
                     const isActive = i === currentIndex;
+                    
+                    // Progressive blue shades for completed steps
+                    const blueShades = [
+                      "bg-blue-200 text-blue-800",
+                      "bg-blue-300 text-blue-900",
+                      "bg-blue-400 text-white",
+                      "bg-blue-500 text-white",
+                      "bg-blue-600 text-white",
+                      "bg-blue-700 text-white"
+                    ];
+                    const completedStyle = isRejected && isActive ? 'bg-red-500 text-white shadow-red-500/20' : blueShades[Math.min(i, blueShades.length - 1)];
+                    const activeStyle = 'border-2 border-blue-400 bg-background text-blue-600';
+                    const defaultStyle = 'bg-muted border border-border text-muted-foreground';
 
                     return (
-                      <div key={s} className="flex flex-col items-center gap-2.5 relative group">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold z-10 transition-all shadow-sm
-                            ${isCompleted
-                            ? (isRejected && isActive ? 'bg-red-500 text-white shadow-red-500/20' : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-purple-500/20')
-                            : (isActive ? 'border-2 border-blue-500 bg-background text-blue-500' : 'bg-muted border border-border text-muted-foreground')}`}
+                      <div key={s} className="flex flex-col items-center gap-2.5 relative group z-10 w-20">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold z-10 transition-all
+                            ${isCompleted ? completedStyle : (isActive ? activeStyle : defaultStyle)}`}
                         >
                           {i + 1}
                         </div>
-                        <span className={`text-[10px] font-bold uppercase tracking-wider text-center w-20 leading-tight
-                            ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
+                        <span className={`text-[10px] font-bold uppercase tracking-wider text-center w-full leading-tight
+                            ${isActive || isCompleted ? 'text-blue-600' : 'text-muted-foreground'}`}>
                           {s}
                         </span>
                         {i < currentIndex && (
-                          <div className="absolute top-3 left-6 w-[calc(100%+30px)] h-0.5 bg-gradient-to-r from-purple-500 to-pink-500 -z-10" />
+                          <div className="absolute top-4 left-10 w-[calc(100%+30px)] h-[2px] bg-border -z-10" />
+                        )}
+                        {i === currentIndex && i !== steps.length - 1 && (
+                          <div className="absolute top-4 left-10 w-[calc(100%+30px)] h-[2px] bg-border -z-10" />
                         )}
                       </div>
                     )
@@ -630,14 +644,28 @@ const Expenses: React.FC = () => {
               </div>
 
               {report.justification && (
-                <div className="text-sm text-foreground/90 italic border-l-2 border-purple-500/50 pl-4 py-2 bg-muted/10 rounded-r-md mx-2">
+                <div className="text-sm text-foreground/90 italic border-l-4 border-blue-500 pl-4 py-1 mx-2">
                   "{report.justification}"
                 </div>
               )}
 
-              <div className="flex flex-wrap gap-6 text-sm text-muted-foreground font-medium bg-muted/20 p-4 rounded-xl border border-border/50 mx-2">
-                {report.department_id && <span className="flex items-center gap-2"><Building className="w-4 h-4 text-purple-500/70" /> Dept: {report.department_id}</span>}
-                {report.project_code && <span className="flex items-center gap-2"><Briefcase className="w-4 h-4 text-pink-500/70" /> Proj: {report.project_code}</span>}
+              <div className="flex flex-wrap gap-6 text-sm text-foreground font-medium bg-card p-4 rounded-2xl border border-border shadow-sm mx-2 mt-4">
+                {report.department_id && (
+                  <span className="flex items-center gap-2.5">
+                    <div className="bg-blue-100 p-1.5 rounded-lg text-blue-600">
+                      <Building className="w-4 h-4" />
+                    </div>
+                    Dept: {report.department_id}
+                  </span>
+                )}
+                {report.project_code && (
+                  <span className="flex items-center gap-2.5">
+                    <div className="bg-blue-100 p-1.5 rounded-lg text-blue-600">
+                      <Briefcase className="w-4 h-4" />
+                    </div>
+                    Proj: {report.project_code}
+                  </span>
+                )}
               </div>
 
               {report.duplicate_flag && (
@@ -656,27 +684,27 @@ const Expenses: React.FC = () => {
               {/* Unified Action Area */}
               {(report.status === "Draft" || (report.status === "Returned for Correction" && isOwner(report))) && (
                 <div className="flex flex-col gap-6 pt-2">
-                  <div className="p-6 bg-transparent rounded-xl border border-[#3E3E4A] border-dashed">
+                  <div className="p-6 bg-card rounded-2xl border border-dashed border-border/80 shadow-sm mx-2">
                     <div className="flex items-start gap-3 mb-4">
-                      <Upload className="w-5 h-5 text-[#A78BFA]" />
+                      <Upload className="w-5 h-5 text-blue-500 mt-0.5" />
                       <div>
                         <h4 className="text-sm font-semibold text-foreground">Upload Receipts</h4>
                         <p className="text-xs text-muted-foreground mt-1">Upload multiple receipts to build your report.</p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-0 w-full mb-4">
-                      <label className="cursor-pointer bg-[#2A2A35] hover:bg-[#333338] border border-[#3E3E4A] border-r-0 rounded-l-md px-4 py-2.5 text-sm font-medium text-[#A78BFA] transition-colors">
+                    <div className="flex items-center w-full mb-4 shadow-sm rounded-lg overflow-hidden border border-border/60">
+                      <label className="cursor-pointer bg-muted hover:bg-muted/80 border-r border-border/60 px-5 py-2.5 text-sm font-semibold text-foreground transition-colors h-full flex items-center shrink-0">
                         Choose File
                         <input id="receipt-upload" type="file" multiple accept="image/*,.pdf" className="hidden" onChange={(e) => handleFileUpload(e, report.expense_report_id)} disabled={uploading} />
                       </label>
-                      <div className="flex-1 bg-[#23232C] border border-[#3E3E4A] rounded-r-md px-4 py-2.5 text-sm text-muted-foreground flex items-center">
+                      <div className="flex-1 bg-background px-4 py-2.5 text-sm text-muted-foreground flex items-center h-full">
                         {uploading ? "Extracting OCR..." : "No file chosen"}
-                        {uploading && <RefreshCw className="w-4 h-4 text-[#A78BFA] animate-spin ml-auto" />}
+                        {uploading && <RefreshCw className="w-4 h-4 text-blue-500 animate-spin ml-auto" />}
                       </div>
                     </div>
 
-                    <p className="text-xs text-muted-foreground">Accepted formats: JPG, PNG, PDF (Max size: 10MB each)</p>
+                    <p className="text-[11px] text-muted-foreground font-medium">Accepted formats: JPG, PNG, PDF (Max size: 10MB each)</p>
                   </div>
 
                   <div className="flex justify-end gap-4 w-full">
