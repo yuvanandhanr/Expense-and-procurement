@@ -199,7 +199,7 @@ const Expenses: React.FC = () => {
     }
   });
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  const handleCreateSubmit = (e: React.FormEvent, isDraft: boolean = false) => {
     e.preventDefault();
     if (!newReport.purpose.trim() || !isValidText(newReport.purpose)) {
       toast.error("Business purpose is required and must contain letters or numbers.");
@@ -218,7 +218,25 @@ const Expenses: React.FC = () => {
     if (newReport.cost_center_id) payload.cost_center_id = parseInt(newReport.cost_center_id);
     if (newReport.project_code) payload.project_code = newReport.project_code;
 
-    createReportMutation.mutate(payload);
+    const processCreate = async () => {
+      try {
+        const res = await api.post("/expenses", payload);
+        const reportId = res.data.expense_report_id;
+        if (isDraft) {
+          toast.success("Reimbursement saved as draft!");
+          setSelectedReportId(null);
+        } else {
+          toast.success("Reimbursement created! Please add receipts to submit.");
+          setSelectedReportId(reportId);
+        }
+        setIsCreateOpen(false);
+        setNewReport({ purpose: "", submission_date: new Date().toISOString().slice(0, 10), department_id: "", cost_center_id: "", project_code: "", currency: "USD", justification: "" });
+        queryClient.invalidateQueries({ queryKey: ["expenses"] });
+      } catch (err: any) {
+        toast.error(err.response?.data?.detail || "Failed to process expense report");
+      }
+    };
+    processCreate();
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, reportId: number) => {
@@ -424,7 +442,7 @@ const Expenses: React.FC = () => {
 
       {/* Create Reimbursement Modal */}
       <Dialog isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="New Expense Reimbursement">
-        <form onSubmit={handleCreateSubmit} className="space-y-4">
+        <form onSubmit={(e) => handleCreateSubmit(e, false)} className="space-y-4">
           <Input
             label="Business Purpose *"
             placeholder="e.g. Q3 Sales Offsite in NYC"
@@ -485,9 +503,10 @@ const Expenses: React.FC = () => {
               required
             ></textarea>
           </div>
-          <div className="pt-3 mt-2 flex justify-end gap-2 border-t border-border">
+          <div className="flex justify-end space-x-2 pt-3 border-t border-border mt-2">
             <Button variant="close" type="button"  onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={createReportMutation.isPending || !newReport.purpose.trim() || !newReport.justification.trim()}>Create Report</Button>
+            <Button type="button" variant="secondary" onClick={(e) => handleCreateSubmit(e, true)} disabled={!newReport.purpose.trim() || !newReport.justification.trim()}>Save as Draft</Button>
+            <Button type="submit" disabled={!newReport.purpose.trim() || !newReport.justification.trim()}>Save & Add Receipts</Button>
           </div>
         </form>
       </Dialog>
