@@ -527,7 +527,8 @@ async def approve_expense(
         "Pending Finance Approval",
         "Pending Finance Verification",
         "Pending Approval",
-        "Corrected Claim"
+        "Corrected Claim",
+        "Pending CFO Approval"
     ]
     if report.status not in valid_statuses:
         raise HTTPException(status_code=400, detail="Report is not pending approval")
@@ -587,7 +588,7 @@ async def approve_expense(
         
     roles = _roles(current_user)
     if report.status in ["Pending Manager Approval", "Corrected Claim", "Pending Approval"]:
-        report.status = "Pending Finance Approval"
+        report.status = "Pending Finance Manager Approval"
         
         # Find a Finance Manager who is not the submitter
         fm_query = select(User).join(User.roles).where(
