@@ -104,10 +104,10 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                           isError 
                             ? "bg-red-500 text-white ring-4 ring-red-500/20" 
                             : isActive 
-                              ? "bg-white text-blue-500 border-2 border-blue-500 ring-4 ring-blue-500/20 scale-110" 
+                              ? "bg-card text-blue-500 border-2 border-blue-500 ring-4 ring-blue-500/20 scale-110" 
                               : isCompleted 
                               ? ["bg-blue-200", "bg-blue-300", "bg-blue-400", "bg-blue-500", "bg-blue-600", "bg-blue-700"][idx] + " text-white shadow-md shadow-blue-500/20" 
-                                : "bg-white text-muted-foreground border-2 border-muted"
+                                : "bg-card text-muted-foreground border-2 border-muted"
                         }`}>
                           {idx + 1}
                         </div>
@@ -132,7 +132,7 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                 <p className="text-sm italic font-medium text-foreground">"{receiptDetails.justification}"</p>
               </div>
 
-              <div className="flex gap-6 p-4 bg-white border border-border rounded-2xl text-sm font-semibold text-foreground shadow-sm">
+              <div className="flex gap-6 p-4 bg-card border border-border rounded-2xl text-sm font-semibold text-foreground shadow-sm">
                 <div className="flex items-center gap-2.5">
                   <div className="bg-blue-100 p-1.5 rounded-lg text-blue-600">
                     <Building className="w-4 h-4" />
@@ -194,8 +194,8 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                     }
                     
                     return (
-                      <div key={idx} className="flex gap-6 p-5 bg-white border border-border rounded-2xl items-start hover:shadow-md transition-shadow shadow-sm">
-                        <div className="w-32 h-32 bg-white rounded-xl flex items-center justify-center shrink-0 border border-border/80 overflow-hidden p-1 shadow-sm">
+                      <div key={idx} className="flex gap-6 p-5 bg-card border border-border rounded-2xl items-start hover:shadow-md transition-shadow shadow-sm">
+                        <div className="w-32 h-32 bg-card rounded-xl flex items-center justify-center shrink-0 border border-border/80 overflow-hidden p-1 shadow-sm">
                           {finalUrl ? (
                              <button 
                                onClick={() => setPreviewReceipt(finalUrl)} 
@@ -255,14 +255,14 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
         className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" 
         onClick={() => setPreviewReceipt(null)}
       >
-        <div className="relative max-w-4xl max-h-[95vh] bg-white p-2 rounded-xl shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="relative max-w-4xl max-h-[95vh] bg-card p-2 rounded-xl shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
            <button 
              onClick={() => setPreviewReceipt(null)} 
-             className="absolute -top-4 -right-4 w-10 h-10 bg-white rounded-full flex items-center justify-center text-black font-bold shadow-md hover:bg-gray-100 transition-colors z-10 text-xl"
+             className="absolute -top-4 -right-4 w-10 h-10 bg-card rounded-full flex items-center justify-center text-foreground font-bold shadow-md hover:bg-muted transition-colors z-10 text-xl"
            >
              ✕
            </button>
-           <div className="flex-1 overflow-auto rounded-lg bg-gray-50 flex items-center justify-center p-4">
+           <div className="flex-1 overflow-auto rounded-lg bg-muted/10 flex items-center justify-center p-4">
              {previewReceipt.toLowerCase().endsWith('.pdf') ? (
                <iframe src={previewReceipt} className="w-full h-[85vh] rounded-lg border-none" title="PDF Preview" />
              ) : (
