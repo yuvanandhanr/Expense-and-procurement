@@ -316,7 +316,7 @@ export const Approvals: React.FC = () => {
           </CardContent>
         </Card>
       ) : activeTab === "Reimbursements" ? (
-        <div className="bg-white rounded-xl shadow-sm border border-border overflow-hidden">
+        <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-border/80 text-xs text-muted-foreground uppercase tracking-wider bg-muted/20">
