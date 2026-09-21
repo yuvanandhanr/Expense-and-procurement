@@ -308,43 +308,150 @@ class ApprovalService:
                 elif active_step.approver_id is None and active_step.approver_role_id in user_role_ids:
                     can_approve = True
 
-            if can_approve:
-                wf_hist = history_by_wf.get(workflow.workflow_id, [])
-                past_approvers = []
+            wf_hist = history_by_wf.get(workflow.workflow_id, [])
+
+
+            user_was_past_approver = any(h.performed_by == user.user_id for h in wf_hist)
+
+
+            is_manager_of_requestor = requestor and requestor.manager_id == user.user_id
+
+
+            
+
+
+            should_include = can_approve or user_was_past_approver or is_manager_of_requestor
+
+
+            
+
+
+            # Check strict visibility rules for Admin/CEO/CFO claims
+
+
+            requestor_roles = [r.role_name for r in getattr(requestor, "roles", [])] if requestor else []
+
+
+            if any(r in ["Admin", "CEO", "CFO", "SuperAdmin"] for r in requestor_roles):
+
+
+                if not can_approve and not user_was_past_approver:
+
+
+                    should_include = False
+
+
+            
+
+
+            if should_include:
+
+
+                past_approvers_list = []
+
+
                 for h in wf_hist:
+
+
                     if h.action == "Approve" and h.performed_by in users_by_id:
+
+
                         u = users_by_id[h.performed_by]
+
+
                         step = next((s for s in wf_steps if s.step_id == h.step_id), None)
+
+
                         role_name = roles_by_id.get(step.approver_role_id, "Approver") if step else "Approver"
-                        past_approvers.append(f"{role_name} ({u.first_name} {u.last_name})")
-                        
+
+
+                        past_approvers_list.append(f"{role_name} ({u.first_name} {u.last_name})")
+
+
+            
+
+
                 pending_approvers = []
+
+
                 for s in pending_steps:
+
+
                     role_name = roles_by_id.get(s.approver_role_id, "Approver")
+
+
                     pending_approvers.append(role_name)
-                        
+
+
+            
+
+
                 current_step_sequence = active_step.step_number if active_step else (max(s.step_number for s in wf_steps) if wf_steps else 0)
+
+
                 steps_to_return = [active_step] if active_step else wf_steps
 
+
+            
+
+
                 pending_workflows.append({
+
+
                     "workflow_id": workflow.workflow_id,
+
+
                     "entity_type": "PurchaseRequisition",
+
+
                     "entity_id": pr.pr_id,
+
+
                     "current_step_sequence": current_step_sequence,
+
+
                     "status": workflow.status,
+
+
                     "created_at": workflow.created_at,
+
+
                     "updated_at": workflow.updated_at,
+
+
                     "requestor_id": pr.requestor_id,
-                    "requestor_name": f"{requestor.first_name} {requestor.last_name}",
-                    "requestor_designation": requestor.designation if hasattr(requestor, 'designation') and requestor.designation else "",
+
+
+                    "requestor_name": f"{requestor.first_name} {requestor.last_name}" if requestor else "Employee",
+
+
+                    "requestor_designation": requestor.designation if requestor and hasattr(requestor, 'designation') and requestor.designation else "",
+
+
                     "title": pr.title,
+
+
                     "justification": pr.justification,
+
+
                     "total_amount": pr.total_estimated_amount,
+
+
                     "amount": pr.total_estimated_amount,
-                    "past_approvers": past_approvers,
+
+
+                    "past_approvers": past_approvers_list,
+
+
                     "pending_approvers": pending_approvers,
+
+
                     "steps": steps_to_return,
+
+
                     "can_approve": can_approve
+
+
                 })
 
         return pending_workflows

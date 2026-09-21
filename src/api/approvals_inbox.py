@@ -41,19 +41,25 @@ async def get_pending_approvals(
     try:
         from src.models.assets import AssetIncident, Asset
         from sqlalchemy import or_
-        
         from sqlalchemy.orm import selectinload
+        
         stmt = (
             select(AssetIncident, Asset, UserModel)
             .options(selectinload(UserModel.roles))
             .join(Asset, AssetIncident.asset_id == Asset.asset_id)
             .join(UserModel, AssetIncident.reporter_id == UserModel.user_id)
-            .where(AssetIncident.status != "Draft")
+            .where(
+                AssetIncident.reporter_id != current_user.user_id,
+                AssetIncident.status != "Draft"
+            )
         )
         
         conditions = []
         if has_manager:
-            conditions.append((AssetIncident.status == "Reported") & (UserModel.manager_id == current_user.user_id))
+            conditions.append(UserModel.manager_id == current_user.user_id)
+            
+        if has_admin or has_it:
+            conditions.append(AssetIncident.status.in_(["Pending Fulfillment", "Closed", "In Progress", "Resolved"]))
             
         if conditions:
             stmt = stmt.where(or_(*conditions))
@@ -98,7 +104,7 @@ async def get_pending_approvals(
             select(ExpenseReport, UserModel)
             .options(selectinload(UserModel.roles))
             .join(UserModel, ExpenseReport.employee_id == UserModel.user_id)
-            .outerjoin(ExpenseApproval, (ExpenseApproval.expense_report_id == ExpenseReport.expense_report_id) & (ExpenseApproval.status == "Pending"))
+            .outerjoin(ExpenseApproval, (ExpenseApproval.expense_report_id == ExpenseReport.expense_report_id))
             .where(
                 ExpenseReport.employee_id != current_user.user_id,
                 ExpenseReport.status != "Draft"
@@ -107,23 +113,19 @@ async def get_pending_approvals(
         
         conditions = [ExpenseApproval.approver_id == current_user.user_id]
         
-        # Fallback for old claims without ExpenseApproval rows
         if has_manager:
-            conditions.append(
-                (ExpenseReport.status == "Pending Manager Approval") & 
-                (UserModel.manager_id == current_user.user_id)
-            )
+            # Manager sees all claims from their direct reports
+            conditions.append(UserModel.manager_id == current_user.user_id)
             
-        # Finance Managers can see Payment Requested items, EXCEPT those from Admin/CEO/CFO
         if has_finance_mgr:
+            # Finance Manager sees claims they are involved in, plus legacy claims that reached them
             conditions.append(
-                (ExpenseReport.status == "Payment Requested") & 
+                ExpenseReport.status.in_(["Payment Requested", "Approved for Payment", "Finance Rejected", "Closed"]) & 
                 (~UserModel.roles.any(Role.role_name.in_(["Admin", "CEO", "CFO", "SuperAdmin"])))
             )
             
-        # Admin and CFO can see all Payment Requested items
         if has_admin or has_cfo:
-            conditions.append(ExpenseReport.status == "Payment Requested")
+            conditions.append(ExpenseReport.status.in_(["Payment Requested", "Approved for Payment", "Finance Rejected", "Closed", "Pending Admin Approval", "Pending CFO Approval"]))
             
         stmt = stmt.where(or_(*conditions))
         
