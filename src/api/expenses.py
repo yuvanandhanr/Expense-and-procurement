@@ -66,21 +66,30 @@ def _can_access_report(report: ExpenseReport, user: User) -> bool:
     if any(app.approver_id == user.user_id for app in report.approvals):
         return True
 
+    user_roles = [r.role_name for r in getattr(user, 'roles', [])]
+    is_admin_or_exec = any(r in user_roles for r in ["Admin", "SuperAdmin", "CEO", "CFO"])
+    
+    # Admin, CFO, CEO can see all non-draft claims globally
+    if is_admin_or_exec:
+        return True
+        
+    has_finance_mgr = "Finance Manager" in user_roles or "Finance" in user_roles
+    creator_roles = [r.role_name for r in getattr(report.employee, 'roles', [])]
+    
+    # Finance Managers can see claims pending manager approval or their stages, except from Admin/Execs
+    if has_finance_mgr:
+        if not any(r in creator_roles for r in ["Admin", "CEO", "CFO", "SuperAdmin"]):
+            if report.status in ["Pending Manager Approval", "Pending Finance Manager Approval", "Payment Requested", "Approved for Payment", "Finance Rejected", "Closed"]:
+                return True
+
     # If user is the manager of the creator
     if getattr(report.employee, "manager_id", None) == user.user_id:
-        user_roles = [r.role_name for r in user.roles] if hasattr(user, 'roles') else []
-        is_admin = any(r in user_roles for r in ["Admin", "SuperAdmin", "CEO", "CFO"])
-        
-        creator_roles = [r.role_name for r in report.employee.roles] if hasattr(report.employee, 'roles') else []
-        
-        if not is_admin:
+        if not is_admin_or_exec:
             if any(r in creator_roles for r in ["Admin", "CFO", "CEO", "Finance Manager"]):
                 return False
         return True
 
     return False
-
-
 def _can_act_on_pending_report(report: ExpenseReport, user: User, explicit_approval: object | None) -> bool:
     """Whether a user may approve / reject / return a report awaiting review.
 
