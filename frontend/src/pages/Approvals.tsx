@@ -80,7 +80,7 @@ export const Approvals: React.FC = () => {
       let payload: any = { comments: comment };
       
       if (selectedWorkflow.entity_type === "ExpenseReport" || selectedWorkflow.entity_type === "Expense") {
-        if (selectedWorkflow.status === "Payment Requested" && actionType === "approve") {
+        if ((selectedWorkflow.status === "Payment Requested" || selectedWorkflow.status === "Approved for Payment") && actionType === "approve") {
           endpoint = `/expenses/${selectedWorkflow.entity_id}/pay`;
         } else {
           endpoint = `/expenses/${selectedWorkflow.entity_id}/${actionType}`;
@@ -151,7 +151,7 @@ export const Approvals: React.FC = () => {
   // Helper status checkers
   const isPendingForUser = (wf: any) => {
     const s = String(wf?.status || "");
-    const isPaymentRequested = s === "Payment Requested";
+    const isPaymentRequested = s === "Payment Requested" || s === "Approved for Payment";
     if (!s.toLowerCase().includes("pending") && !isPaymentRequested) return false;
     
     const roles = user?.roles?.map(r => r.role_name) || [];

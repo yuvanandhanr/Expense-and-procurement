@@ -798,7 +798,7 @@ async def pay_expense(
     from sqlalchemy import select
     from src.models.expense import ExpenseApproval
     
-    if report.status != "Payment Requested":
+    if report.status not in ["Payment Requested", "Approved for Payment"]:
         raise HTTPException(status_code=400, detail="Report is not requesting payment. It must be approved by the Finance Manager first.")
         
     if report.employee_id == current_user.user_id:
