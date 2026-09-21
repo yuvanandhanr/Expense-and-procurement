@@ -107,6 +107,13 @@ async def get_pending_approvals(
         
         conditions = [ExpenseApproval.approver_id == current_user.user_id]
         
+        # Fallback for old claims without ExpenseApproval rows
+        if has_manager:
+            conditions.append(
+                (ExpenseReport.status == "Pending Manager Approval") & 
+                (UserModel.manager_id == current_user.user_id)
+            )
+            
         # Finance Managers can see Payment Requested items, EXCEPT those from Admin/CEO/CFO
         if has_finance_mgr:
             conditions.append(
