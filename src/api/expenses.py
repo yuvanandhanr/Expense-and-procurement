@@ -351,7 +351,7 @@ async def upload_receipts(
             category=ocr_result.get("category"),
             ocr_amount=ocr_amount,
             verified_amount=verified_amount,
-            image_path=f"/uploads/receipts/{unique_name}",
+            image_path=f"/uploads/{unique_name}",
             file_name=file.filename,
             content_hash=content_hash,
             ocr_confidence=confidence,
