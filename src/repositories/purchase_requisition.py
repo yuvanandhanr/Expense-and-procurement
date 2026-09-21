@@ -75,21 +75,6 @@ class PRRepository(BaseRepository[PurchaseRequisition]):
         return list(result.scalars().all())
 
 
-class PRItemRepository(BaseRepository[PRItem]):
-    """
-    Repository for PRItem CRUD operations.
-    """
-    def __init__(self, session: AsyncSession) -> None:
-        super().__init__(PRItem, session)
-
-    async def get_by_id(self, entity_id: int) -> Optional[PRItem]:
-        return await self.session.get(self.model, entity_id)
-
-    async def list_by_pr_id(self, pr_id: int) -> List[PRItem]:
-        query = select(self.model).where(self.model.pr_id == pr_id)
-        result = await self.session.execute(query)
-        return list(result.scalars().all())
-
     async def list_accessible_prs(self, user) -> List[PurchaseRequisition]:
         from src.models.approval import ApprovalWorkflow, ApprovalStep, ApprovalHistory
         from src.models.auth import User as UserModel, Role
@@ -136,3 +121,18 @@ class PRItemRepository(BaseRepository[PRItem]):
                 seen.add(pr.pr_id)
                 prs.append(pr)
         return prs
+class PRItemRepository(BaseRepository[PRItem]):
+    """
+    Repository for PRItem CRUD operations.
+    """
+    def __init__(self, session: AsyncSession) -> None:
+        super().__init__(PRItem, session)
+
+    async def get_by_id(self, entity_id: int) -> Optional[PRItem]:
+        return await self.session.get(self.model, entity_id)
+
+    async def list_by_pr_id(self, pr_id: int) -> List[PRItem]:
+        query = select(self.model).where(self.model.pr_id == pr_id)
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
