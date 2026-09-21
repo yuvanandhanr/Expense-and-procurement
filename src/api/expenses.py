@@ -61,12 +61,20 @@ def _can_access_report(report: ExpenseReport, user: User) -> bool:
     if report.employee_id == user.user_id:
         return True
 
-    # If user is the manager of the creator
-    if getattr(report.employee, "manager_id", None) == user.user_id:
-        return True
-
     # If user is in the approval chain for this report
     if any(app.approver_id == user.user_id for app in report.approvals):
+        return True
+
+    # If user is the manager of the creator
+    if getattr(report.employee, "manager_id", None) == user.user_id:
+        user_roles = [r.role_name for r in user.roles] if hasattr(user, 'roles') else []
+        is_admin = any(r in user_roles for r in ["Admin", "SuperAdmin", "CEO", "CFO"])
+        
+        creator_roles = [r.role_name for r in report.employee.roles] if hasattr(report.employee, 'roles') else []
+        
+        if not is_admin:
+            if any(r in creator_roles for r in ["Admin", "CFO", "CEO", "Finance Manager"]):
+                return False
         return True
 
     return False
@@ -143,17 +151,19 @@ async def list_expenses(
     )
 
     user_roles = [r.role_name for r in current_user.roles]
-    is_pure_manager = "Manager" in user_roles and not any(r in user_roles for r in ["Admin", "SuperAdmin", "CEO", "CFO"])
-
-    manager_cond = (UserModel.manager_id == current_user.user_id) & (ExpenseReport.status != 'Draft')
-    if is_pure_manager:
-        manager_cond = manager_cond & (~UserModel.roles.any(Role.role_name.in_(["Admin", "CFO", "CEO", "Finance Manager"])))
+    is_admin = any(r in user_roles for r in ["Admin", "SuperAdmin", "CEO", "CFO"])
+    is_manager = "Manager" in user_roles
 
     conditions = [
         ExpenseReport.employee_id == current_user.user_id,
-        manager_cond,
         (ExpenseApproval.approver_id == current_user.user_id) & (ExpenseReport.status != 'Draft')
     ]
+
+    if is_manager:
+        manager_cond = (UserModel.manager_id == current_user.user_id) & (ExpenseReport.status != 'Draft')
+        if not is_admin:
+            manager_cond = manager_cond & (~UserModel.roles.any(Role.role_name.in_(["Admin", "CFO", "CEO", "Finance Manager"])))
+        conditions.append(manager_cond)
 
     stmt = stmt.where(or_(*conditions)).order_by(ExpenseReport.created_at.desc())
     result = await db.execute(stmt)
