@@ -57,9 +57,29 @@ async def list_incidents(
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
-    # Only fetch incidents reported by the authenticated user in My Requests
-    stmt = select(AssetIncident).where(AssetIncident.reporter_id == current_user.user_id)
-
+    from sqlalchemy import select, or_
+    from src.models.auth import User as UserModel, Role
+    
+    stmt = select(AssetIncident).outerjoin(UserModel, AssetIncident.reporter_id == UserModel.user_id)
+    
+    conditions = [AssetIncident.reporter_id == current_user.user_id]
+    
+    user_roles = [r.role_name for r in current_user.roles]
+    if "Manager" in user_roles:
+        manager_cond1 = (UserModel.manager_id == current_user.user_id) & (AssetIncident.status != "Draft")
+        manager_cond2 = (AssetIncident.status == "Reported") & (UserModel.manager_id == current_user.user_id)
+        
+        if not any(r in user_roles for r in ["Admin", "SuperAdmin", "CEO", "CFO"]):
+            manager_cond1 = manager_cond1 & (~UserModel.roles.any(Role.role_name.in_(["Admin", "CFO", "CEO", "Finance Manager"])))
+            manager_cond2 = manager_cond2 & (~UserModel.roles.any(Role.role_name.in_(["Admin", "CFO", "CEO", "Finance Manager"])))
+            
+        conditions.append(manager_cond1)
+        conditions.append(manager_cond2)
+        
+    if "Admin" in user_roles or "IT" in user_roles:
+        conditions.append(AssetIncident.status == "Pending Fulfillment")
+        
+    stmt = stmt.where(or_(*conditions)).order_by(AssetIncident.created_at.desc())
     result = await session.execute(stmt)
     return result.scalars().all()
 

@@ -301,26 +301,12 @@ class ApprovalService:
 
             can_approve = False
             if active_step:
-                if is_admin:
-                    can_approve = True
-                elif active_step.approver_id == user.user_id:
+                if active_step.approver_id == user.user_id:
                     can_approve = True
                 elif active_step.approver_id is None and active_step.approver_role_id in user_role_ids:
                     can_approve = True
 
-            can_view = False
-            if is_admin or is_ceo_or_cfo:
-                can_view = True
-            elif can_approve:
-                can_view = True
-            elif pr.requestor_id == user.user_id:
-                can_view = True
-            else:
-                wf_hist = history_by_wf.get(workflow.workflow_id, [])
-                if any(h.performed_by == user.user_id for h in wf_hist):
-                    can_view = True
-
-            if can_view:
+            if can_approve:
                 wf_hist = history_by_wf.get(workflow.workflow_id, [])
                 past_approvers = []
                 for h in wf_hist:

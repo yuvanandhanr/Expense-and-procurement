@@ -57,11 +57,18 @@ def _log_action(user: User, action: str, record_id: int | str, *, level: int = l
 def _can_access_report(report: ExpenseReport, user: User) -> bool:
     if report.status == "Draft":
         return report.employee_id == user.user_id
-    roles = _roles(user)
-    if bool(roles & {"Admin", "Finance", "Finance Manager", "CFO", "CEO", "Manager"}):
-        return True
+
     if report.employee_id == user.user_id:
         return True
+
+    # If user is the manager of the creator
+    if getattr(report.employee, "manager_id", None) == user.user_id:
+        return True
+
+    # If user is in the approval chain for this report
+    if any(app.approver_id == user.user_id for app in report.approvals):
+        return True
+
     return False
 
 
@@ -122,10 +129,44 @@ async def list_expenses(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
-    repo = ExpenseRepository(db)
-    reports = await repo.get_all_reports(employee_id=current_user.user_id)
+    from sqlalchemy import select, or_
+    from sqlalchemy.orm import selectinload
+    from src.models.expense import ExpenseReport, ExpenseApproval
+    from src.models.auth import User as UserModel, Role
+
+    stmt = select(ExpenseReport).options(
+        selectinload(ExpenseReport.receipts),
+        selectinload(ExpenseReport.approvals),
+        selectinload(ExpenseReport.employee).selectinload(UserModel.roles)
+    ).join(UserModel, ExpenseReport.employee_id == UserModel.user_id).outerjoin(
+        ExpenseApproval, ExpenseApproval.expense_report_id == ExpenseReport.expense_report_id
+    )
+
+    user_roles = [r.role_name for r in current_user.roles]
+    is_pure_manager = "Manager" in user_roles and not any(r in user_roles for r in ["Admin", "SuperAdmin", "CEO", "CFO"])
+
+    manager_cond = (UserModel.manager_id == current_user.user_id) & (ExpenseReport.status != 'Draft')
+    if is_pure_manager:
+        manager_cond = manager_cond & (~UserModel.roles.any(Role.role_name.in_(["Admin", "CFO", "CEO", "Finance Manager"])))
+
+    conditions = [
+        ExpenseReport.employee_id == current_user.user_id,
+        manager_cond,
+        (ExpenseApproval.approver_id == current_user.user_id) & (ExpenseReport.status != 'Draft')
+    ]
+
+    stmt = stmt.where(or_(*conditions)).order_by(ExpenseReport.created_at.desc())
+    result = await db.execute(stmt)
+    
+    # Deduplicate in case of multiple approvals
+    seen = set()
+    reports = []
+    for r in result.scalars().all():
+        if r.expense_report_id not in seen:
+            seen.add(r.expense_report_id)
+            reports.append(r)
         
-    accessible_reports = [_present_report(report) for report in reports if _can_access_report(report, current_user)]
+    accessible_reports = [_present_report(report) for report in reports]
     
     # Priority sort: Items requiring approval come first, sorted by creation time (newest first)
     def _sort_key(report: ExpenseReport):

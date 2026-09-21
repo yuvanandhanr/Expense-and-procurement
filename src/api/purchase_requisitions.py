@@ -10,7 +10,7 @@ from src.services.pr_service import PRService
 router = APIRouter(prefix="/pr", tags=["Purchase Requisitions"])
 
 
-def check_pr_access(pr, current_user: User) -> None:
+async def check_pr_access(pr, current_user: User, db: AsyncSession) -> None:
     """
     Validates user authorization access to a Purchase Requisition.
     - Admin: Full Access.
@@ -25,12 +25,15 @@ def check_pr_access(pr, current_user: User) -> None:
             detail="Only the owner can access their drafts."
         )
 
-    # Check full access roles
-    user_roles = [role.role_name for role in current_user.roles]
-    if any(role in user_roles for role in ["Admin", "CFO", "Finance Manager", "Finance", "Manager", "CEO"]):
+    if pr.requestor_id == current_user.user_id:
         return
+        
+    user_roles = [role.role_name for role in current_user.roles]
+    
+    if "Manager" in user_roles:
+        if getattr(pr.requestor, "manager_id", None) == current_user.user_id:
+            return
 
-    # Check Procurement role
     if "Procurement" in user_roles:
         if pr.status in ("Approved", "Assigned to Procurement", "Procurement In Progress", "Completed"):
             return
@@ -39,17 +42,35 @@ def check_pr_access(pr, current_user: User) -> None:
             detail="Procurement can only access fully approved requisitions."
         )
 
-    # Check Manager role
-    if "Manager" in user_roles and current_user.department_id:
-        if pr.department_id == current_user.department_id:
-            return
-
-    # Fallback to Requestor check
-    if pr.requestor_id != current_user.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are restricted to accessing your own requisitions only"
+    from src.models.approval import ApprovalWorkflow, ApprovalStep, ApprovalHistory
+    from sqlalchemy import select
+    
+    wf_query = select(ApprovalWorkflow.workflow_id).where(ApprovalWorkflow.pr_id == pr.pr_id)
+    wf_res = await db.execute(wf_query)
+    wf_id = wf_res.scalar_one_or_none()
+    
+    if wf_id:
+        step_query = select(ApprovalStep).where(
+            ApprovalStep.workflow_id == wf_id,
+            (ApprovalStep.approver_id == current_user.user_id) | 
+            (ApprovalStep.approver_id.is_(None) & ApprovalStep.approver_role_id.in_([r.role_id for r in current_user.roles]))
         )
+        step_res = await db.execute(step_query)
+        if step_res.scalars().first():
+            return
+            
+        hist_query = select(ApprovalHistory).join(ApprovalStep, ApprovalHistory.step_id == ApprovalStep.step_id).where(
+            ApprovalStep.workflow_id == wf_id,
+            ApprovalHistory.performed_by == current_user.user_id
+        )
+        hist_res = await db.execute(hist_query)
+        if hist_res.scalars().first():
+            return
+            
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You are not authorized to view this requisition."
+    )
 
 
 @router.post("", response_model=PRSchema, status_code=status.HTTP_201_CREATED)
@@ -68,7 +89,7 @@ async def list_prs(
     current_user: User = Depends(get_current_user)
 ):
     service = PRService(db)
-    prs = await service.pr_repo.list_by_requestor(current_user.user_id)
+    prs = await service.pr_repo.list_accessible_prs(current_user)
         
     return [pr for pr in prs if not (pr.status == "Draft" and pr.requestor_id != current_user.user_id)]
 
@@ -84,7 +105,7 @@ async def get_pr(
     if not pr:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Purchase Requisition not found")
 
-    check_pr_access(pr, current_user)
+    await check_pr_access(pr, current_user, db)
     return pr
 
 
@@ -100,7 +121,7 @@ async def update_pr(
     if not pr:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Purchase Requisition not found")
 
-    check_pr_access(pr, current_user)
+    await check_pr_access(pr, current_user, db)
     return await service.update_pr(id, data, current_user.user_id)
 
 
@@ -115,7 +136,7 @@ async def delete_pr(
     if not pr:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Purchase Requisition not found")
 
-    check_pr_access(pr, current_user)
+    await check_pr_access(pr, current_user, db)
     if pr.status not in ("Draft", "Returned for Modification"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -135,7 +156,7 @@ async def submit_pr(
     if not pr:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
 
-    check_pr_access(pr, current_user)
+    await check_pr_access(pr, current_user, db)
     return await service.submit_pr(id, current_user.user_id)
 
 
@@ -150,7 +171,7 @@ async def cancel_pr(
     if not pr:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
 
-    check_pr_access(pr, current_user)
+    await check_pr_access(pr, current_user, db)
     return await service.cancel_pr(id, current_user.user_id)
 
 
@@ -165,7 +186,7 @@ async def clone_pr(
     if not pr:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
 
-    check_pr_access(pr, current_user)
+    await check_pr_access(pr, current_user, db)
     return await service.clone_pr(id, current_user.user_id)
 
 
@@ -181,7 +202,7 @@ async def allocate_inventory(
     if not pr:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
         
-    check_pr_access(pr, current_user)
+    await check_pr_access(pr, current_user, db)
     return await service.allocate_inventory(id, data.asset_id, current_user.user_id)
 
 
@@ -196,5 +217,5 @@ async def initiate_procurement(
     if not pr:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
         
-    check_pr_access(pr, current_user)
+    await check_pr_access(pr, current_user, db)
     return await service.initiate_procurement(id, current_user.user_id)
