@@ -229,7 +229,6 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
-app.mount("/uploads/receipts", StaticFiles(directory=UPLOAD_DIR), name="uploads_receipts_fallback")
 
 
 @app.get("/health", tags=["system"])

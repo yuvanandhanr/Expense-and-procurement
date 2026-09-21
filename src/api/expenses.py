@@ -251,11 +251,12 @@ async def upload_receipts(
         content = await file.read()
         content_hash = hashlib.sha256(content).hexdigest()
         # Check globally for duplicates
+        from sqlalchemy import select
         query_dup = select(Receipt).where(Receipt.content_hash == content_hash)
         result_dup = await db.execute(query_dup)
         if content_hash in batch_hashes or result_dup.scalars().first():
             _log_action(current_user, "receipt_duplicate_detected", report_id, level=logging.WARNING)
-            raise HTTPException(status_code=409, detail="Duplicate receipt detected in this reimbursement report.")
+            raise HTTPException(status_code=409, detail="This exact receipt has already been uploaded previously. Duplicate receipts are not allowed.")
         batch_hashes.add(content_hash)
         uploads.append((file, content, content_hash))
 
@@ -351,7 +352,7 @@ async def upload_receipts(
             category=ocr_result.get("category"),
             ocr_amount=ocr_amount,
             verified_amount=verified_amount,
-            image_path=f"/uploads/{unique_name}",
+            image_path=f"/uploads/receipts/{unique_name}",
             file_name=file.filename,
             content_hash=content_hash,
             ocr_confidence=confidence,
@@ -377,7 +378,7 @@ async def upload_receipts(
       for path in written_paths:
           _remove_uploaded_file(path)
       _log_action(current_user, "receipt_duplicate_detected", report_id, level=logging.WARNING)
-      raise HTTPException(status_code=409, detail="Duplicate receipt detected in this reimbursement report.")
+      raise HTTPException(status_code=409, detail="This exact receipt has already been uploaded previously. Duplicate receipts are not allowed.")
     except Exception:
       await db.rollback()
       for path in written_paths:
