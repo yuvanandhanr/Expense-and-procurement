@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -240,7 +241,10 @@ async def upload_receipts(
     for file in files:
         content = await file.read()
         content_hash = hashlib.sha256(content).hexdigest()
-        if content_hash in batch_hashes or await repo.get_receipt_by_content_hash(report_id, content_hash):
+        # Check globally for duplicates
+        query_dup = select(Receipt).where(Receipt.content_hash == content_hash)
+        result_dup = await db.execute(query_dup)
+        if content_hash in batch_hashes or result_dup.scalars().first():
             _log_action(current_user, "receipt_duplicate_detected", report_id, level=logging.WARNING)
             raise HTTPException(status_code=409, detail="Duplicate receipt detected in this reimbursement report.")
         batch_hashes.add(content_hash)
@@ -262,7 +266,7 @@ async def upload_receipts(
         written_paths.append(filepath)
             
         # Run OCR
-        ocr_result = OCRService.process_receipt_image(content)
+        ocr_result = await asyncio.to_thread(OCRService.process_receipt_image, content)
         
         # Determine verified amount (fallback to 0 if low confidence)
         confidence = ocr_result.get("confidence", Decimal("0.00"))

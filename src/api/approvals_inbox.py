@@ -35,6 +35,7 @@ async def get_pending_approvals(
     has_admin = "Admin" in user_roles
     has_cfo = "CFO" in user_roles
     has_finance_mgr = "Finance Manager" in user_roles or "Finance" in user_roles
+    has_ceo = "CEO" in user_roles
     has_it = "IT" in user_roles
 
     # Fetch pending Asset Incidents where user is explicitly the approver
@@ -102,7 +103,7 @@ async def get_pending_approvals(
         from src.models.auth import Role
         stmt = (
             select(ExpenseReport, UserModel)
-            .options(selectinload(UserModel.roles))
+            .options(selectinload(UserModel.roles), selectinload(ExpenseReport.receipts))
             .join(UserModel, ExpenseReport.employee_id == UserModel.user_id)
             .outerjoin(ExpenseApproval, (ExpenseApproval.expense_report_id == ExpenseReport.expense_report_id))
             .where(
@@ -118,14 +119,15 @@ async def get_pending_approvals(
             conditions.append(UserModel.manager_id == current_user.user_id)
             
         if has_finance_mgr:
-            # Finance Manager sees claims they are involved in, plus legacy claims that reached them
+            # Finance Manager sees claims they are involved in, plus legacy claims that reached them, plus claims currently pending manager approval
             conditions.append(
-                ExpenseReport.status.in_(["Payment Requested", "Approved for Payment", "Finance Rejected", "Closed"]) & 
+                ExpenseReport.status.in_(["Pending Manager Approval", "Pending Finance Manager Approval", "Payment Requested", "Approved for Payment", "Finance Rejected", "Closed"]) & 
                 (~UserModel.roles.any(Role.role_name.in_(["Admin", "CEO", "CFO", "SuperAdmin"])))
             )
             
-        if has_admin or has_cfo:
-            conditions.append(ExpenseReport.status.in_(["Payment Requested", "Approved for Payment", "Finance Rejected", "Closed", "Pending Admin Approval", "Pending CFO Approval"]))
+        if has_admin or has_cfo or has_ceo:
+            # They can see ALL claims
+            conditions.append(ExpenseReport.status != "Draft")
             
         stmt = stmt.where(or_(*conditions))
         

@@ -183,7 +183,10 @@ export const Approvals: React.FC = () => {
 
   const isApprovedWf = (wf: any) => {
     const s = String(wf?.status || "").toLowerCase();
-    return s.includes("approved") || s === "pass" || s === "completed" || s === "fulfilled";
+    // Exclude "approved for payment" from being marked as strictly Approved.
+    // Closed claims count as Approved.
+    if (s === "approved for payment") return false;
+    return s.includes("approved") || s === "closed" || s === "pass" || s === "completed" || s === "fulfilled";
   };
 
   const isRejectedWf = (wf: any) => {
