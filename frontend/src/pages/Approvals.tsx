@@ -241,16 +241,23 @@ export const Approvals: React.FC = () => {
       return true; // "All"
     })
     .sort((a: any, b: any) => {
-      const sA = String(a?.status || "").toLowerCase();
-      const sB = String(b?.status || "").toLowerCase();
-      const isPendingA = sA.includes("pending") || sA.includes("review");
-      const isPendingB = sB.includes("pending") || sB.includes("review");
+      const isPendingA = isPendingForUser(a);
+      const isPendingB = isPendingForUser(b);
       
-      // Priority: pending approval workflows come first
+      // Priority 1: pending approval workflows (for the current user) come first
       if (isPendingA && !isPendingB) return -1;
       if (!isPendingA && isPendingB) return 1;
       
-      // Sort according to time of creation (newest first)
+      // Priority 2: keep in-progress above approved/closed/rejected
+      const sA = String(a?.status || "").toLowerCase();
+      const sB = String(b?.status || "").toLowerCase();
+      const isClosedA = sA.includes("closed") || sA === "approved" || sA.includes("reject") || sA.includes("paid");
+      const isClosedB = sB.includes("closed") || sB === "approved" || sB.includes("reject") || sB.includes("paid");
+      
+      if (!isClosedA && isClosedB) return -1;
+      if (isClosedA && !isClosedB) return 1;
+
+      // Priority 3: Sort according to time of creation (newest first)
       const timeA = new Date(a?.created_at || a?.submission_date || a?.date || 0).getTime();
       const timeB = new Date(b?.created_at || b?.submission_date || b?.date || 0).getTime();
       return timeB - timeA;
