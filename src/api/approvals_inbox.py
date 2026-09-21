@@ -121,7 +121,7 @@ async def get_pending_approvals(
         if has_finance_mgr:
             # Finance Manager sees claims they are involved in, plus legacy claims that reached them, plus claims currently pending manager approval
             conditions.append(
-                ExpenseReport.status.in_(["Pending Manager Approval", "Pending Finance Manager Approval", "Payment Requested", "Approved for Payment", "Finance Rejected", "Closed"]) & 
+                ExpenseReport.status.in_(["Pending Manager Approval", "Pending Finance Manager Approval", "Payment Requested", "Approved for Payment", "Finance Rejected", "Approved"]) & 
                 (~UserModel.roles.any(Role.role_name.in_(["Admin", "CEO", "CFO", "SuperAdmin"])))
             )
             

@@ -79,7 +79,7 @@ def _can_access_report(report: ExpenseReport, user: User) -> bool:
     # Finance Managers can see claims pending manager approval or their stages, except from Admin/Execs
     if has_finance_mgr:
         if not any(r in creator_roles for r in ["Admin", "CEO", "CFO", "SuperAdmin"]):
-            if report.status in ["Pending Manager Approval", "Pending Finance Manager Approval", "Payment Requested", "Approved for Payment", "Finance Rejected", "Closed"]:
+            if report.status in ["Pending Manager Approval", "Pending Finance Manager Approval", "Payment Requested", "Approved for Payment", "Finance Rejected", "Approved"]:
                 return True
 
     # If user is the manager of the creator
@@ -818,7 +818,7 @@ async def pay_expense(
         _log_action(current_user, "expense_payment_denied", report_id, level=logging.WARNING)
         raise HTTPException(status_code=403, detail="Not authorized to authorize payment")
         
-    report.status = "Closed"
+    report.status = "Approved"
     report.payment_status = "Paid"
     report.payment_reference = f"PAY-EXP-{report_id}-{uuid.uuid4().hex[:6]}"
     await repo.update_report(report)

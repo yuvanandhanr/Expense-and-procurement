@@ -444,7 +444,7 @@ class DashboardService:
     async def _get_employee_recent_expenses(self, user_id: int) -> List[Dict[str, Any]]:
         query = select(ExpenseReport).where(
             ExpenseReport.employee_id == user_id,
-            ExpenseReport.status.in_(["Finance Verified", "Payment Requested", "Closed"])
+            ExpenseReport.status.in_(["Approved", "Finance Verified", "Payment Requested"])
         ).order_by(desc(ExpenseReport.created_at)).limit(5)
         result = await self.db.execute(query)
         expenses = result.scalars().all()

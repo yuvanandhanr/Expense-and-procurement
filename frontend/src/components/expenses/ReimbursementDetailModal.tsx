@@ -61,12 +61,12 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                   
                   const isRole = (role: string) => desig.includes(role) || roles.some((r: string) => r.includes(role));
                   
-                  let steps = ["Draft", "Submitted", "Manager", "Finance", "Payment", "Closed"];
+                  let steps = ["Draft", "Submitted", "Manager", "Finance", "Payment", "Approved"];
                   
                   if (isRole("ceo") || isRole("admin") || isRole("cfo") || isRole("finance manager")) {
-                    steps = ["Draft", "Submitted", "CFO", "Payment", "Closed"];
+                    steps = ["Draft", "Submitted", "CFO", "Payment", "Approved"];
                   } else if (isRole("manager")) {
-                    steps = ["Draft", "Submitted", "Finance", "Payment", "Closed"];
+                    steps = ["Draft", "Submitted", "Finance", "Payment", "Approved"];
                   }
                   
                   return steps.map((step, idx, arr) => {
@@ -82,7 +82,7 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                   }
                   else if (s.includes("cfo approval")) currentStepIdx = steps.indexOf("CFO");
                   else if (s.includes("payment")) currentStepIdx = steps.indexOf("Payment");
-                  else if (s.includes("closed") || s.includes("paid") || s.includes("approved")) currentStepIdx = steps.indexOf("Closed");
+                  else if (s.includes("closed") || s.includes("paid") || s.includes("approved")) currentStepIdx = steps.indexOf("Approved");
                   
                   if (currentStepIdx === -1) {
                     if (isRejectedOrReturned) currentStepIdx = 1;

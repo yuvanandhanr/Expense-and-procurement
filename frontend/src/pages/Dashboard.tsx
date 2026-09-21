@@ -349,10 +349,10 @@ export const Dashboard: React.FC = () => {
                     <div key={idx} className="flex items-center justify-between p-3.5 rounded-xl border border-border/60 bg-card/60 backdrop-blur-sm hover:border-primary/40 transition-all duration-200 shadow-apple-sm">
                       <div className="flex items-center space-x-3.5">
                         <div className={`p-2 rounded-xl ${
-                          ["Finance Verified", "Payment Requested", "Closed"].includes(exp.status) ? 'bg-emerald-500/15 text-emerald-500' : 
+                          ["Approved", "Finance Verified", "Payment Requested"].includes(exp.status) ? 'bg-emerald-500/15 text-emerald-500' : 
                           exp.status === 'Rejected' ? 'bg-rose-500/15 text-rose-500' : 'bg-amber-500/15 text-amber-500'
                         }`}>
-                          {["Finance Verified", "Payment Requested", "Closed"].includes(exp.status) ? <CheckCircle className="w-4 h-4" /> : 
+                          {["Approved", "Finance Verified", "Payment Requested"].includes(exp.status) ? <CheckCircle className="w-4 h-4" /> : 
                            exp.status === 'Rejected' ? <AlertCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
                         </div>
                         <div>
