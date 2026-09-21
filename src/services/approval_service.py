@@ -245,8 +245,10 @@ class ApprovalService:
                 if eid not in user_role_ids:
                     user_role_ids.append(eid)
 
+        from sqlalchemy.orm import selectinload
         query = (
             select(ApprovalWorkflow, PurchaseRequisition, UserModel)
+            .options(selectinload(UserModel.roles))
             .join(PurchaseRequisition, ApprovalWorkflow.pr_id == PurchaseRequisition.pr_id)
             .join(UserModel, PurchaseRequisition.requestor_id == UserModel.user_id)
             .where(

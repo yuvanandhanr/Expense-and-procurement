@@ -159,7 +159,10 @@ class DashboardService:
         from src.models.auth import User
         count = 0
         if manager_id:
-            user = await self.db.get(User, manager_id)
+            from sqlalchemy import select
+            from sqlalchemy.orm import selectinload
+            result = await self.db.execute(select(User).options(selectinload(User.roles)).where(User.user_id == manager_id))
+            user = result.scalar_one_or_none()
             if user:
                 user_roles = [r.role_id for r in user.roles]
                 
