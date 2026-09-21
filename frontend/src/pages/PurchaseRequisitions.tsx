@@ -166,11 +166,7 @@ export const PurchaseRequisitions: React.FC = () => {
   };
 
   const getStatusBadge = (status: string) => {
-    const s = status.toLowerCase();
-    if (s === "approved" || s === "completed") return <Badge variant="success">{status}</Badge>;
-    if (s === "pending" || s === "under review" || s === "submitted" || s.includes("pending")) return <Badge variant="warning">{status}</Badge>;
-    if (s === "rejected" || s === "cancelled") return <Badge variant="error">{status}</Badge>;
-    return <Badge variant="neutral">{status}</Badge>;
+    return <StatusBadge status={status} />;
   };
 
   const subTabCounts: Record<string, number> = {
