@@ -285,7 +285,7 @@ const Expenses: React.FC = () => {
   // Summary Metrics
   const summary = expenses.reduce((acc, r) => {
     acc[r.status] = (acc[r.status] || 0) + 1;
-    if (r.status === "Approved" || r.status === "Closed" || r.status === "Payment Requested" || r.status === "Finance Verified") {
+    if (r.status === "Closed" || r.status === "Payment Requested" || r.status === "Finance Verified") {
       acc.totalReimbursed += Number(r.total_amount || 0);
     }
     return acc;
@@ -304,7 +304,7 @@ const Expenses: React.FC = () => {
     All: expenses.length,
     Draft: expenses.filter((r: any) => r.status === "Draft").length,
     Submitted: expenses.filter((r: any) => r.status.includes("Pending") || r.status === "Corrected Claim" || r.status === "Payment Requested" || r.status === "Finance Verified").length,
-    Approved: expenses.filter((r: any) => r.status === "Approved" || r.status === "Closed").length,
+    Closed: expenses.filter((r: any) => r.status === "Closed").length,
     Rejected: expenses.filter((r: any) => r.status === "Rejected" || r.status === "Returned for Correction").length,
   };
 
@@ -312,7 +312,7 @@ const Expenses: React.FC = () => {
     if (statusFilter === "All") return true;
     if (statusFilter === "Draft") return r.status === "Draft";
     if (statusFilter === "Submitted") return r.status.includes("Pending") || r.status === "Corrected Claim" || r.status === "Payment Requested" || r.status === "Finance Verified";
-    if (statusFilter === "Approved") return r.status === "Approved" || r.status === "Closed";
+    if (statusFilter === "Closed") return r.status === "Closed";
     if (statusFilter === "Rejected") return r.status === "Rejected" || r.status === "Returned for Correction";
     return r.status === statusFilter;
   });
@@ -336,7 +336,7 @@ const Expenses: React.FC = () => {
 
       {/* Filters & Controls */}
       <div className="flex items-center space-x-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50">
-        {["All", "Draft", "Submitted", "Approved", "Rejected"].map((status) => (
+        {["All", "Draft", "Submitted", "Closed", "Rejected"].map((status) => (
           <button
             key={status}
             onClick={() => setStatusFilter(status)}
@@ -420,12 +420,12 @@ const Expenses: React.FC = () => {
                         )}
                         <Button 
                           size="sm" 
-                          variant={["Approved", "Closed", "Rejected", "Returned for Correction"].includes(report.status) ? "view" : "primary"}
+                          variant={["Closed", "Rejected", "Returned for Correction"].includes(report.status) ? "view" : "primary"}
                           onClick={() => setSelectedReportId(report.expense_report_id)}
                           className="gap-1.5"
                         >
                           {(() => {
-                            if (["Approved", "Closed", "Rejected", "Returned for Correction"].includes(report.status)) return <><Eye className="w-3.5 h-3.5" /> View</>;
+                            if (["Closed", "Rejected", "Returned for Correction"].includes(report.status)) return <><Eye className="w-3.5 h-3.5" /> View</>;
                             if (report.status === "Draft") return "Edit Draft";
                             return "View Details";
                           })()}
@@ -532,7 +532,7 @@ const Expenses: React.FC = () => {
 
         const isRejected = report.status === "Rejected";
         const isReturned = report.status === "Returned for Correction";
-        const isApproved = report.status === "Approved" || report.status === "Closed";
+        const isApproved = report.status === "Closed";
 
         const isPendingManager = report.status === "Pending Manager Approval" || report.status === "Pending Approval" || report.status === "Corrected Claim";
         const isPendingFinance = report.status === "Pending Finance Manager Approval" || report.status === "Pending Finance Approval" || report.status === "Pending Finance Verification";
@@ -558,7 +558,7 @@ const Expenses: React.FC = () => {
                 <div className="flex items-center gap-4">
                   <Badge 
                     variant={
-                      report.status === 'Approved' || report.status === 'Closed' ? 'success' :
+                      report.status === 'Closed' ? 'success' :
                         (report.status.includes('Rejected') || report.status.includes('Returned')) ? 'error' :
                           (report.status.includes('Pending') || report.status.includes('Review')) ? 'info' :
                             'neutral'
