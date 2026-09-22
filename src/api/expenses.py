@@ -814,7 +814,7 @@ async def pay_expense(
     if pending_approvals_result.scalars().first():
         raise HTTPException(status_code=400, detail="Cannot authorize payment while there are pending approvals.")
         
-    if not _roles(current_user) & {"Finance Manager", "Finance", "CFO", "Admin", "CEO"}:
+    if not _roles(current_user) & {"Finance Manager", "CFO"}:
         _log_action(current_user, "expense_payment_denied", report_id, level=logging.WARNING)
         raise HTTPException(status_code=403, detail="Not authorized to authorize payment")
         
