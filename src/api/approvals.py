@@ -158,7 +158,7 @@ async def get_pr_history(
     pr = await service.pr_repo.get_by_id(id)
     if not pr:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
-    check_pr_access(pr, current_user)
+    await check_pr_access(pr, current_user, db)
     
     return await service.workflow_history_repo.list_by_pr_id(id)
 
@@ -175,7 +175,7 @@ async def get_pr_approvals(
     pr = await service.pr_repo.get_by_id(id)
     if not pr:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
-    check_pr_access(pr, current_user)
+    await check_pr_access(pr, current_user, db)
 
     workflow = await service.workflow_repo.get_by_pr_id(id)
     if not workflow:

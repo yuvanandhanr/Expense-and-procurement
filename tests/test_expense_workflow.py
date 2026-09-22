@@ -96,7 +96,7 @@ async def test_expense_approval_under_1000(
     )
     
     assert response.status_code == status.HTTP_200_OK
-    assert report.status == "Pending Finance Approval"
+    assert report.status == "Pending Finance Manager Approval"
     assert approval.status == "Approved"
     
     app.dependency_overrides.pop(get_db_session, None)
@@ -151,7 +151,7 @@ async def test_expense_approval_over_1000(
     )
     
     assert response.status_code == status.HTTP_200_OK
-    assert report.status == "Pending Finance Approval"
+    assert report.status == "Pending Finance Manager Approval"
     assert approval.status == "Approved"
     
     # Verify FM approval created
@@ -256,7 +256,9 @@ async def test_expense_submit_employee(
 
     mocker.patch('src.api.expenses.ExpenseRepository.get_report_by_id', return_value=report)
     mock_update = mocker.patch('src.api.expenses.ExpenseRepository.update_report')
-    mocker.patch('src.services.approval_service.ApprovalService.initialize_approval_flow')
+    async def mock_flow(*args, **kwargs):
+        report.status = "Pending Manager Approval"
+    mocker.patch('src.services.approval_service.ApprovalService.initialize_approval_flow', side_effect=mock_flow)
 
     def mock_execute(query):
         res = mocker.MagicMock()

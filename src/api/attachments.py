@@ -28,7 +28,7 @@ async def upload_attachment(
     pr = await pr_repo.get_by_id(id)
     if not pr:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
-    check_pr_access(pr, current_user)
+    await check_pr_access(pr, current_user, db)
 
     # Enforce file format constraints (PDF, DOCX, PNG, JPEG)
     ext = data.file_type.lower()
@@ -38,11 +38,18 @@ async def upload_attachment(
             detail="Unsupported file type. Allowed formats: PDF, DOCX, PNG, JPEG"
         )
 
+    # Enforce max file size (10MB)
+    if data.file_size > 10 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File size exceeds the maximum limit of 10MB"
+        )
+
     attachment = PRAttachment(
         pr_id=id,
         file_name=data.file_name,
         file_path=data.file_path,
-        file_type=data.file_type,
+        file_type=ext,
         file_size=data.file_size,
         uploaded_by=current_user.user_id,
         created_at=datetime.utcnow()
@@ -64,6 +71,6 @@ async def list_attachments(
     pr = await pr_repo.get_by_id(id)
     if not pr:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
-    check_pr_access(pr, current_user)
+    await check_pr_access(pr, current_user, db)
 
     return await repo.list_by_pr_id(id)

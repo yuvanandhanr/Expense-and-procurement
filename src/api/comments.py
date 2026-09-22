@@ -28,7 +28,7 @@ async def create_comment(
     pr = await pr_repo.get_by_id(id)
     if not pr:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
-    check_pr_access(pr, current_user)
+    await check_pr_access(pr, current_user, db)
 
     comment = ApprovalComment(
         pr_id=id,
@@ -55,7 +55,7 @@ async def list_comments(
     pr = await pr_repo.get_by_id(id)
     if not pr:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
-    check_pr_access(pr, current_user)
+    await check_pr_access(pr, current_user, db)
 
     # Admins/Managers/Finance can see internal notes; Employees see public only
     user_roles = [role.role_name for role in current_user.roles]

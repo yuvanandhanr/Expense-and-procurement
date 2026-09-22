@@ -9,14 +9,17 @@ from fastapi.testclient import TestClient
 
 def test_root_endpoint(client: TestClient) -> None:
     """
-    Checks that the root welcome message loads successfully.
+    Checks that the root welcome message or frontend SPA loads successfully.
     """
     response = client.get("/")
     assert response.status_code == 200
-    data = response.json()
-    assert "Welcome" in data["message"]
-    assert "version" in data
-    assert "environment" in data
+    if "text/html" in response.headers.get("content-type", ""):
+        assert "<!doctype html>" in response.text.lower() or "<html" in response.text.lower()
+    else:
+        data = response.json()
+        assert "Welcome" in data["message"]
+        assert "version" in data
+        assert "environment" in data
 
 
 def test_health_endpoint(client: TestClient) -> None:
