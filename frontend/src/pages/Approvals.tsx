@@ -157,7 +157,10 @@ export const Approvals: React.FC = () => {
     const roles = user?.roles?.map(r => r.role_name) || [];
     if (s === "Pending Manager Approval") return roles.includes("Manager");
     if (s === "Pending Finance Approval" || s === "Pending Finance Manager Approval") return roles.includes("Finance") || roles.includes("Finance Manager");
-    if (isPaymentRequested) return roles.includes("Finance Manager") || roles.includes("CFO");
+    if (isPaymentRequested) {
+      if (roles.includes("Admin") || roles.includes("CEO") || roles.includes("Manager") || roles.includes("Employee")) return false;
+      return roles.includes("Finance Manager") || roles.includes("CFO");
+    }
     if (s === "Pending CFO Approval") return roles.includes("CFO");
     if (s === "Pending Admin Approval") return roles.includes("Admin");
     return false;
