@@ -320,7 +320,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
           { label: "RFQs & Invitations", path: "/rfqs", icon: Briefcase, show: isProcurement || isFinance || isCFO || isAdmin },
           { label: "Quotations Inbox", path: "/quotations", icon: Layers, show: isProcurement || isFinance || isCFO || isAdmin },
           { label: "Purchase Orders", path: "/pos", icon: Package, show: isProcurement || isFinance || isCFO || isAdmin },
-          { label: "Assets Registry", path: "/assets", icon: HardDrive, show: isProcurement || isFinance || isCFO || isAdmin },
+          { label: "Assets Registry", path: "/assets", icon: HardDrive, show: hasRole("Finance Manager") || isCFO || isAdmin },
         ]
       },
       {
