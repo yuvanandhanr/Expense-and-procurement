@@ -5,7 +5,7 @@ import { Button, Card, CardHeader, CardTitle, CardContent, StatusBadge, Skeleton
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
 import { formatDate, getErrorMessage, isValidText } from "../utils/helpers";
-import { Check, X as XIcon, Eye } from "lucide-react";
+import { Check, X as XIcon, Eye, XCircle } from "lucide-react";
 import { ReimbursementDetailModal } from "../components/expenses/ReimbursementDetailModal";
 
 type TabType = "Reimbursements" | "Requisitions" | "Asset Incidents" | "Resignations";
@@ -157,7 +157,7 @@ export const Approvals: React.FC = () => {
     const roles = user?.roles?.map(r => r.role_name) || [];
     if (s === "Pending Manager Approval") return roles.includes("Manager");
     if (s === "Pending Finance Approval" || s === "Pending Finance Manager Approval") return roles.includes("Finance") || roles.includes("Finance Manager");
-    if (isPaymentRequested) return roles.includes("Finance Manager") || roles.includes("Finance") || roles.includes("CFO") || roles.includes("CEO") || roles.includes("Admin");
+    if (isPaymentRequested) return roles.includes("Finance Manager") || roles.includes("CFO");
     if (s === "Pending CFO Approval") return roles.includes("CFO");
     if (s === "Pending Admin Approval") return roles.includes("Admin");
     return false;
