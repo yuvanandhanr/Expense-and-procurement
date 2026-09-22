@@ -765,9 +765,9 @@ const Expenses: React.FC = () => {
                       <div
                         className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/60 rounded-xl border border-border flex items-center justify-center overflow-hidden shrink-0 group relative shadow-inner cursor-pointer"
                         onClick={() => {
-                            const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/api\/v1\/?$/, '') || '';
-                            const path = receipt.image_path.startsWith('/') ? receipt.image_path : `/${receipt.image_path}`;
-                            const fullUrl = receipt.image_path.startsWith('http') ? receipt.image_path : `${baseUrl}${path}`;
+                            const basePath = import.meta.env.VITE_API_URL || '/api/v1';
+                            const cleanPath = receipt.image_path.startsWith('/uploads') ? receipt.image_path.replace('/uploads', '') : (receipt.image_path.startsWith('/') ? receipt.image_path : `/${receipt.image_path}`);
+                            const fullUrl = receipt.image_path.startsWith('http') ? receipt.image_path : `${basePath}/uploads${cleanPath}`;
                             setPreviewReceiptUrl(fullUrl);
                         }}
                       >
@@ -778,8 +778,7 @@ const Expenses: React.FC = () => {
                                 <FileText className="w-8 h-8" />
                                 <span className="text-[9px] font-bold">PDF</span>
                               </div>
-                            ) : (
-                              <img src={receipt.image_path.startsWith('http') ? receipt.image_path : `${import.meta.env.VITE_API_URL?.replace(/\/api\/v1\/?$/, '') || ''}${receipt.image_path.startsWith('/') ? '' : '/'}${receipt.image_path}`} alt="Receipt" className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity" />
+                              <img src={receipt.image_path.startsWith('http') ? receipt.image_path : `${import.meta.env.VITE_API_URL || '/api/v1'}/uploads${receipt.image_path.startsWith('/uploads') ? receipt.image_path.replace('/uploads', '') : (receipt.image_path.startsWith('/') ? receipt.image_path : `/${receipt.image_path}`)}`} alt="Receipt" className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity" />
                             )}
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                               <Eye className="w-5 h-5 text-white" />

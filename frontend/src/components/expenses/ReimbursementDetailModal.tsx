@@ -187,9 +187,9 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                        if (rawUrl.startsWith('http') || rawUrl.startsWith('data:')) {
                           finalUrl = rawUrl;
                        } else {
-                          const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/api\/v1\/?$/, '') || '';
-                          const path = rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`;
-                          finalUrl = `${baseUrl}${path}`;
+                          const basePath = import.meta.env.VITE_API_URL || '/api/v1';
+                          const cleanPath = rawUrl.startsWith('/uploads') ? rawUrl.replace('/uploads', '') : (rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`);
+                          finalUrl = `${basePath}/uploads${cleanPath}`;
                        }
                     }
                     
