@@ -153,7 +153,7 @@ export const PurchaseOrders: React.FC = () => {
             <div className="bg-muted/40 p-3 rounded-lg border border-border text-xs mb-4">
               <span className="block font-semibold text-muted-foreground uppercase mb-1">Item to Verify</span>
               <span className="font-bold text-sm text-foreground/90">{verifyDialogItem.item_name}</span>
-              <p className="mt-2 text-muted-foreground">Please enter the Unique Product ID (Serial Number / Asset Tag) found on the physical item. If it matches the vendor's record, it will be automatically added to your Asset Registry.</p>
+              <p className="mt-2 text-muted-foreground">Please enter the Unique Product ID (Serial Number / Asset Tag) found on the physical item. If it matches the vendor's record, it will be automatically added to your ASSET INVENTORY.</p>
             </div>
 
             <Input

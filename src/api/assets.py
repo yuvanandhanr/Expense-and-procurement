@@ -62,6 +62,18 @@ async def get_my_assets(
         })
         
     return mapped_assets
+from src.models.assets import AssetCategory
+
+@router.get("/categories")
+async def get_asset_categories(
+    session: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    stmt = select(AssetCategory)
+    result = await session.execute(stmt)
+    categories = result.scalars().all()
+    return [{"id": c.category_id, "name": c.category_name, "description": c.description} for c in categories]
+
 
 @router.get("")
 async def get_assets(
