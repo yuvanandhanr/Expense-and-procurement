@@ -135,6 +135,20 @@ export const Assets: React.FC = () => {
   };
 
 
+
+  const isAssignedAsset = (a: Asset) => (a.assigned_to_name && a.assigned_to_name !== "Unassigned") || a.status === "Assigned" || a.status === "Transferred";
+  const isOutOfServiceAsset = (a: Asset) => ["Out of Service", "Retired", "Damaged", "Disposed", "Lost", "Under Maintenance", "Reported"].includes(a.status);
+  const isUnassignedAsset = (a: Asset) => !isAssignedAsset(a) && !isOutOfServiceAsset(a);
+
+  // We only count based on the current category filter so the counts are accurate for the current view
+  const categoryFilteredAssets = assets.filter(a => activeCategory === "All Categories" || a.category === activeCategory);
+  const counts = {
+    "All Assets": categoryFilteredAssets.length,
+    "Assigned": categoryFilteredAssets.filter(isAssignedAsset).length,
+    "Unassigned": categoryFilteredAssets.filter(isUnassignedAsset).length,
+    "Out of Service": categoryFilteredAssets.filter(isOutOfServiceAsset).length,
+  };
+
   const filteredAssigneeUsers = users
     .filter(u => !u.roles?.some(r => r.role_name.toLowerCase().includes("vendor")))
     .filter(u => {
@@ -154,7 +168,11 @@ export const Assets: React.FC = () => {
       matchesCategory = a.category === activeCategory;
     }
 
-    const matchesStatus = statusFilter === "All" || a.status === statusFilter;
+    let matchesStatus = true;
+    if (statusFilter === "Assigned") matchesStatus = isAssignedAsset(a);
+    else if (statusFilter === "Unassigned") matchesStatus = isUnassignedAsset(a);
+    else if (statusFilter === "Out of Service") matchesStatus = isOutOfServiceAsset(a);
+    
     return matchesSearch && matchesCategory && matchesStatus;
   });
 
@@ -174,37 +192,62 @@ export const Assets: React.FC = () => {
         )}
       </div>
 
-      <div className="flex flex-col md:flex-row gap-6">
-        {/* Sidebar Category Filter */}
-        <div className="w-full md:w-64 flex-shrink-0">
-          <Card>
-            <CardContent className="p-4 space-y-1">
-              <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3 px-2">Categories</h3>
-              <button
-                onClick={() => setActiveCategory("All Categories")}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  activeCategory === "All Categories" ? "bg-primary/10 text-primary" : "hover:bg-accent text-foreground"
-                }`}
-              >
-                All Categories
-              </button>
-              {categories.map(c => (
-                <button
-                  key={c.id}
-                  onClick={() => setActiveCategory(c.name)}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    activeCategory === c.name ? "bg-primary/10 text-primary" : "hover:bg-accent text-foreground"
-                  }`}
-                >
-                  {c.name}
-                </button>
-              ))}
-            </CardContent>
-          </Card>
+      
+      {/* Filters (Categories & Status) */}
+      <div className="space-y-4">
+        {/* Category Filters */}
+        <div className="flex flex-wrap items-center gap-2 bg-muted/40 p-1.5 rounded-xl w-full border border-border/50">
+          <button
+            onClick={() => setActiveCategory("All Categories")}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
+              activeCategory === "All Categories"
+                ? "bg-primary text-primary-foreground shadow-sm font-bold"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+            }`}
+          >
+            All
+          </button>
+          {categories.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setActiveCategory(c.name)}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
+                activeCategory === c.name
+                  ? "bg-primary text-primary-foreground shadow-sm font-bold"
+                  : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              }`}
+            >
+              {c.name}
+            </button>
+          ))}
         </div>
 
-        {/* Main Content */}
-        <div className="flex-1 space-y-4">
+        {/* Status Filters */}
+        <div className="flex flex-wrap items-center gap-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50">
+          {(["All Assets", "Assigned", "Unassigned", "Out of Service"] as const).map((status) => (
+            <button
+              key={status}
+              onClick={() => setStatusFilter(status === "All Assets" ? "All" : status)}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
+                (statusFilter === "All" && status === "All Assets") || statusFilter === status
+                  ? "bg-primary text-primary-foreground shadow-sm font-bold"
+                  : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              }`}
+            >
+              <span>{status}</span>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+                (statusFilter === "All" && status === "All Assets") || statusFilter === status
+                  ? "bg-primary-foreground/20 text-primary-foreground font-bold"
+                  : "bg-muted text-muted-foreground"
+              }`}>
+                {counts[status]}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex-1 space-y-4">
           <Card>
             <CardContent className="p-0">
               {/* Filters Bar */}
@@ -219,20 +262,7 @@ export const Assets: React.FC = () => {
                     className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-border bg-background focus:ring-2 focus:ring-violet outline-none"
                   />
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Filter className="w-4 h-4 text-muted-foreground" />
-                  <select 
-                    value={statusFilter}
-                    onChange={e => setStatusFilter(e.target.value)}
-                    className="px-3 py-2 text-sm rounded-lg border border-border bg-background outline-none focus:ring-2 focus:ring-violet"
-                  >
-                    <option value="All">All Statuses</option>
-                    <option value="Unassigned">Unassigned</option>
-                    <option value="Assigned">Assigned</option>
-                    <option value="Retired">Retired</option>
-                    <option value="Out of Service">Out of Service</option>
-                  </select>
-                </div>
+
               </div>
 
               {loading ? (
@@ -309,8 +339,6 @@ export const Assets: React.FC = () => {
             </CardContent>
           </Card>
         </div>
-      </div>
-
       {/* Add / Edit Asset Modal */}
       <Dialog open={isAssetModalOpen} onClose={() => setIsAssetModalOpen(false)} title={editingAssetId ? "Edit Asset" : "Add Asset"} description="Fill in the asset details below.">
         <div className="space-y-4">
