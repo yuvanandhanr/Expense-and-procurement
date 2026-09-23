@@ -16,12 +16,42 @@ export const Assets: React.FC = () => {
   // Filter State
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [activeCategory, setActiveCategory] = useState<string>("All Categories");
+  const [activeMainCategory, setActiveMainCategory] = useState<string>("All");
+  const [activeSubCategory, setActiveSubCategory] = useState<string>("All");
+
 
   // Add Asset State
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
   const [editingAssetId, setEditingAssetId] = useState<number | null>(null);
   const [newAsset, setNewAsset] = useState({ name: "", category_id: "", cost: "", status: "Unassigned" });
+
+  const MAIN_CATEGORIES = [
+    "All",
+    "Hardware",
+    "Network",
+    "Server & Storage",
+    "Software",
+    "Software Licenses",
+    "Cloud",
+    "Security",
+    "Communication",
+    "Office",
+    "Vehicle"
+  ];
+  
+  const SUB_CATEGORIES: Record<string, string[]> = {
+    "Hardware": ["All", "Laptop", "Desktop", "Monitor", "Mobile", "Tablet", "Printer", "Other Peripherals"],
+    "Network": ["All", "Router", "Switch", "Firewall", "Access Point", "Network Equipment"],
+    "Server & Storage": ["All", "Server", "NAS", "Storage", "Backup"],
+    "Software": ["All", "Operating System", "Application", "Database", "Development Software"],
+    "Software Licenses": ["All", "Subscription", "Enterprise License", "User License"],
+    "Cloud": ["All", "VM", "Storage", "Database", "Cloud Service", "SaaS"],
+    "Security": ["All", "Security Device", "Certificate", "Security Key", "Security Software"],
+    "Communication": ["All", "IP Phone", "Headset", "Webcam", "Conference Equipment"],
+    "Office": ["All", "Desk", "Chair", "Projector", "UPS"],
+    "Vehicle": ["All", "Car", "Bike", "Other"]
+  };
+
 
   // Transfer Modal State
   const [transferAsset, setTransferAsset] = useState<Asset | null>(null);
@@ -140,15 +170,6 @@ export const Assets: React.FC = () => {
   const isOutOfServiceAsset = (a: Asset) => ["Out of Service", "Retired", "Damaged", "Disposed", "Lost", "Under Maintenance", "Reported"].includes(a.status);
   const isUnassignedAsset = (a: Asset) => !isAssignedAsset(a) && !isOutOfServiceAsset(a);
 
-  // We only count based on the current category filter so the counts are accurate for the current view
-  const categoryFilteredAssets = assets.filter(a => activeCategory === "All Categories" || a.category === activeCategory);
-  const counts = {
-    "All Assets": categoryFilteredAssets.length,
-    "Assigned": categoryFilteredAssets.filter(isAssignedAsset).length,
-    "Unassigned": categoryFilteredAssets.filter(isUnassignedAsset).length,
-    "Out of Service": categoryFilteredAssets.filter(isOutOfServiceAsset).length,
-  };
-
   const filteredAssigneeUsers = users
     .filter(u => !u.roles?.some(r => r.role_name.toLowerCase().includes("vendor")))
     .filter(u => {
@@ -158,14 +179,53 @@ export const Assets: React.FC = () => {
       const roleMatch = u.roles?.some(r => r.role_name.toLowerCase().includes(q)) || false;
       return nameMatch || roleMatch;
     });
-    
+
+  const getMainCategoryCount = (mainCat: string) => {
+    if (mainCat === "All") return assets.length;
+    const allowedSubcats = SUB_CATEGORIES[mainCat] || [];
+    return assets.filter(a => allowedSubcats.includes(a.category)).length;
+  };
+
+  const getSubCategoryCount = (subCat: string, mainCat: string) => {
+    if (subCat === "All") return getMainCategoryCount(mainCat);
+    return assets.filter(a => a.category === subCat).length;
+  };
+
+  const handleMainCategoryChange = (mainCat: string) => {
+    setActiveMainCategory(mainCat);
+    setActiveSubCategory("All");
+  };
+
+  // We only count based on the current category filter so the counts are accurate for the current view
+  const categoryFilteredAssets = assets.filter(a => {
+    if (activeMainCategory === "All") return true;
+    if (activeSubCategory !== "All") {
+      return a.category === activeSubCategory;
+    } else {
+      const allowedSubcats = SUB_CATEGORIES[activeMainCategory] || [];
+      return allowedSubcats.includes(a.category);
+    }
+  });
+
+  const counts = {
+    "All Assets": categoryFilteredAssets.length,
+    "Assigned": categoryFilteredAssets.filter(isAssignedAsset).length,
+    "Unassigned": categoryFilteredAssets.filter(isUnassignedAsset).length,
+    "Out of Service": categoryFilteredAssets.filter(isOutOfServiceAsset).length,
+  };
+
   const filteredAssets = assets.filter(a => {
     const matchesSearch = a.asset_code.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           a.asset_name.toLowerCase().includes(searchTerm.toLowerCase());
     
     let matchesCategory = true;
-    if (activeCategory !== "All Categories") {
-      matchesCategory = a.category === activeCategory;
+    if (activeMainCategory !== "All") {
+      if (activeSubCategory !== "All") {
+        matchesCategory = a.category === activeSubCategory;
+      } else {
+        const allowedSubcats = SUB_CATEGORIES[activeMainCategory] || [];
+        matchesCategory = allowedSubcats.includes(a.category);
+      }
     }
 
     let matchesStatus = true;
@@ -175,6 +235,7 @@ export const Assets: React.FC = () => {
     
     return matchesSearch && matchesCategory && matchesStatus;
   });
+
 
   return (
     <div className="space-y-6">
@@ -193,58 +254,57 @@ export const Assets: React.FC = () => {
       </div>
 
       
-      {/* Filters (Categories & Status) */}
+      {/* Filters (Categories) */}
       <div className="space-y-4">
-        {/* Category Filters */}
+        {/* Main Category Filters */}
         <div className="flex flex-wrap items-center gap-2 bg-muted/40 p-1.5 rounded-xl w-full border border-border/50">
-          <button
-            onClick={() => setActiveCategory("All Categories")}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
-              activeCategory === "All Categories"
-                ? "bg-primary text-primary-foreground shadow-sm font-bold"
-                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-            }`}
-          >
-            All
-          </button>
-          {categories.map((c) => (
+          {MAIN_CATEGORIES.map((cat) => (
             <button
-              key={c.id}
-              onClick={() => setActiveCategory(c.name)}
+              key={cat}
+              onClick={() => handleMainCategoryChange(cat)}
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
-                activeCategory === c.name
+                activeMainCategory === cat
                   ? "bg-primary text-primary-foreground shadow-sm font-bold"
                   : "text-muted-foreground hover:text-foreground hover:bg-background/50"
               }`}
             >
-              {c.name}
-            </button>
-          ))}
-        </div>
-
-        {/* Status Filters */}
-        <div className="flex flex-wrap items-center gap-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50">
-          {(["All Assets", "Assigned", "Unassigned", "Out of Service"] as const).map((status) => (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status === "All Assets" ? "All" : status)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
-                (statusFilter === "All" && status === "All Assets") || statusFilter === status
-                  ? "bg-primary text-primary-foreground shadow-sm font-bold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-              }`}
-            >
-              <span>{status}</span>
+              <span>{cat}</span>
               <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-                (statusFilter === "All" && status === "All Assets") || statusFilter === status
+                activeMainCategory === cat
                   ? "bg-primary-foreground/20 text-primary-foreground font-bold"
                   : "bg-muted text-muted-foreground"
               }`}>
-                {counts[status]}
+                {getMainCategoryCount(cat)}
               </span>
             </button>
           ))}
         </div>
+
+        {/* Sub Category Filters */}
+        {activeMainCategory !== "All" && SUB_CATEGORIES[activeMainCategory] && (
+          <div className="flex flex-wrap items-center gap-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50">
+            {SUB_CATEGORIES[activeMainCategory].map((subCat) => (
+              <button
+                key={subCat}
+                onClick={() => setActiveSubCategory(subCat)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
+                  activeSubCategory === subCat
+                    ? "bg-primary text-primary-foreground shadow-sm font-bold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                }`}
+              >
+                <span>{subCat}</span>
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+                  activeSubCategory === subCat
+                    ? "bg-primary-foreground/20 text-primary-foreground font-bold"
+                    : "bg-muted text-muted-foreground"
+                }`}>
+                  {getSubCategoryCount(subCat, activeMainCategory)}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 space-y-4">
@@ -262,7 +322,15 @@ export const Assets: React.FC = () => {
                     className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-border bg-background focus:ring-2 focus:ring-violet outline-none"
                   />
                 </div>
-
+                <div className="flex items-center space-x-2">
+                  <Filter className="w-4 h-4 text-muted-foreground" />
+                  <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-40 text-sm">
+                    <option value="All">All Statuses</option>
+                    <option value="Assigned">Assigned</option>
+                    <option value="Unassigned">Unassigned</option>
+                    <option value="Out of Service">Out of Service</option>
+                  </Select>
+                </div>
               </div>
 
               {loading ? (
