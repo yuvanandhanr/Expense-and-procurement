@@ -30,9 +30,10 @@ async def get_pending_approvals(
         # Determine status filter based on role
         statuses = []
         if "Manager" in user_roles:
-            statuses.append("Reported")
+            statuses.append("Submitted")
         if "Admin" in user_roles or "IT" in user_roles:
-            statuses.append("Pending Fulfillment")
+            statuses.append("Manager Approved")
+            statuses.append("Admin Approved")
             statuses.append("Waiting for Procurement")
             
         stmt = (
@@ -50,7 +51,7 @@ async def get_pending_approvals(
         for incident, asset, reporter in result.all():
             # Exclude Approved incidents if the user is a Manager who is not an Admin/IT
             # (Handled by the status filter above)
-            workflow_step = "Manager Review" if incident.status == "Reported" else "Pending Fulfillment"
+            workflow_step = "Manager Review" if incident.status == "Submitted" else "Pending Fulfillment"
             asset_name_str = asset.model if asset.model else "Asset"
             pending_workflows.append({
                 "workflow_id": incident.incident_id, # using incident_id as workflow_id since entity_type distinguishes it
