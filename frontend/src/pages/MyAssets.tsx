@@ -67,7 +67,7 @@ export const MyAssets: React.FC = () => {
     setIsViewModalOpen(true);
   };
 
-  const submitIncident = async (e: React.FormEvent) => {
+  const submitIncident = async (e: React.FormEvent, isDraft = false) => {
     e.preventDefault();
     if (!selectedAsset || !incidentDescription) return;
 
@@ -82,7 +82,8 @@ export const MyAssets: React.FC = () => {
         asset_id: selectedAsset.asset_id,
         description: incidentDescription,
         incident_type: incidentType,
-        image_url: imageUrl || null
+        image_url: imageUrl || null,
+        is_draft: isDraft
       });
       toast.success("Incident reported successfully");
       setIsIncidentModalOpen(false);
@@ -130,36 +131,25 @@ export const MyAssets: React.FC = () => {
       </div>
 
       <div className="flex items-center justify-between mb-4 mt-6">
-        <div className="flex items-center space-x-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50">
+        <div className="flex items-center space-x-2 bg-card p-3 rounded-lg border border-border">
+          <span className="text-xs font-semibold text-muted-foreground uppercase px-2">View:</span>
           <button
             onClick={() => setActiveTab("Assets")}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
-              activeTab === "Assets"
-                ? "bg-primary text-primary-foreground shadow-sm font-bold"
-                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-            }`}
+            className={`px-3 py-1 text-xs font-bold rounded-full transition-all ${activeTab === "Assets"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-accent"
+              }`}
           >
-            <span>My Assets</span>
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-              activeTab === "Assets" ? "bg-primary-foreground/20 text-primary-foreground font-bold" : "bg-muted text-muted-foreground"
-            }`}>
-              {assets.length}
-            </span>
+            My Assets
           </button>
           <button
             onClick={() => setActiveTab("Incidents")}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
-              activeTab === "Incidents"
-                ? "bg-primary text-primary-foreground shadow-sm font-bold"
-                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-            }`}
+            className={`px-3 py-1 text-xs font-bold rounded-full transition-all ${activeTab === "Incidents"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-accent"
+              }`}
           >
-            <span>My Asset Incidents</span>
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-              activeTab === "Incidents" ? "bg-primary-foreground/20 text-primary-foreground font-bold" : "bg-muted text-muted-foreground"
-            }`}>
-              {incidents.length}
-            </span>
+            My Asset Incidents
           </button>
         </div>
       </div>
@@ -249,7 +239,7 @@ export const MyAssets: React.FC = () => {
                         </td>
                         <td className="p-4 text-xs">{new Date(inc.created_at).toLocaleDateString()}</td>
                         <td className="p-4 text-right flex justify-end gap-2">
-                          <Button variant="view" size="sm" onClick={() => openViewModal(inc)} title="View Details">
+                          <Button variant="ghost" size="sm" onClick={() => openViewModal(inc)} title="View Details">
                             <Eye className="w-4 h-4" />
                           </Button>
                           {inc.status === "Returned for Correction" && (
@@ -270,7 +260,7 @@ export const MyAssets: React.FC = () => {
       </div>
 
       <Dialog isOpen={isIncidentModalOpen} onClose={() => setIsIncidentModalOpen(false)} title="Report Asset Issue">
-        <form onSubmit={submitIncident} className="space-y-4">
+        <form onSubmit={(e) => submitIncident(e, false)} className="space-y-4">
           <div className="p-3 bg-accent/30 rounded-md border text-sm">
             Reporting issue for: <span className="font-bold">{selectedAsset?.asset_name}</span> ({selectedAsset?.asset_code})
           </div>
@@ -311,8 +301,9 @@ export const MyAssets: React.FC = () => {
             <p className="text-xs text-muted-foreground">Provide a link to an image showing the issue.</p>
           </div>
 
-          <div className="flex justify-end space-x-2 pt-3 mt-2">
-            <Button variant="close" type="button"  onClick={() => setIsIncidentModalOpen(false)}>Cancel</Button>
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button type="button" variant="outline" onClick={() => setIsIncidentModalOpen(false)}>Cancel</Button>
+            <Button type="button" disabled={isSubmitting || !incidentDescription} variant="outline" onClick={(e) => submitIncident(e as any, true)}>Save Draft</Button>
             <Button type="submit" disabled={isSubmitting || !incidentDescription}>Submit Report</Button>
           </div>
         </form>
@@ -354,8 +345,8 @@ export const MyAssets: React.FC = () => {
             />
           </div>
 
-            <div className="flex justify-end space-x-2 pt-3 mt-2">
-              <Button variant="close" type="button"  onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting || !incidentDescription}>Resubmit Report</Button>
             </div>
           </form>
@@ -413,7 +404,7 @@ export const MyAssets: React.FC = () => {
               )}
 
               <div className="flex justify-end pt-2">
-                <Button variant="close" onClick={() => setIsViewModalOpen(false)}>Close</Button>
+                <Button onClick={() => setIsViewModalOpen(false)}>Close</Button>
               </div>
             </div>
           )}
