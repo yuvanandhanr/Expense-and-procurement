@@ -778,6 +778,7 @@ const Expenses: React.FC = () => {
                                 <FileText className="w-8 h-8" />
                                 <span className="text-[9px] font-bold">PDF</span>
                               </div>
+                            ) : (
                               <img src={receipt.image_path.startsWith('http') ? receipt.image_path : `${import.meta.env.VITE_API_URL || '/api/v1'}/uploads${receipt.image_path.startsWith('/uploads') ? receipt.image_path.replace('/uploads', '') : (receipt.image_path.startsWith('/') ? receipt.image_path : `/${receipt.image_path}`)}`} alt="Receipt" className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity" />
                             )}
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
