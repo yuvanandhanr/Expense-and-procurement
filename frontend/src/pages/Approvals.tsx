@@ -19,7 +19,12 @@ export const Approvals: React.FC = () => {
   const [selectedWorkflow, setSelectedWorkflow] = useState<ApprovalWorkflow | null>(null);
   const [actionType, setActionType] = useState<"approve" | "reject" | "return" | "repair" | "replace" | null>(null);
   const [comment, setComment] = useState("");
-  const [physicalInspectionDone, setPhysicalInspectionDone] = useState(false);
+  
+  const [managerAssessment, setManagerAssessment] = useState("");
+  const [managerComments, setManagerComments] = useState("");
+  const [adminResolution, setAdminResolution] = useState("");
+  const [adminComments, setAdminComments] = useState("");
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchWorkflows = async () => {
@@ -51,6 +56,7 @@ export const Approvals: React.FC = () => {
       let endpoint = "";
       let payload: any = { comments: comment };
       
+
       if (selectedWorkflow.entity_type === "ExpenseReport") {
         endpoint = `/expenses/${selectedWorkflow.entity_id}/${actionType}`;
       } else if (selectedWorkflow.entity_type === "VendorInvoice") {
@@ -60,13 +66,22 @@ export const Approvals: React.FC = () => {
         let actStr = "Approve";
         if (actionType === "reject") actStr = "Reject";
         else if (actionType === "return") actStr = "Return for Correction";
-        else if (actionType === "repair") actStr = "Repair";
-        else if (actionType === "replace") actStr = "Replace";
+        else if (actionType === "complete_procurement") actStr = "Complete Procurement Replacement";
+        else if (actionType === "complete_repair") actStr = "Complete Repair";
         else if (actionType === "assign_replacement") actStr = "Assign Replacement";
-        payload = { action: actStr, resolution: comment, physical_inspection_done: physicalInspectionDone };
+        
+        payload = { 
+            action: actStr, 
+            resolution: comment,
+            manager_inspection_assessment: managerAssessment,
+            manager_inspection_comments: managerComments,
+            admin_inspection_resolution: adminResolution,
+            admin_comments: adminComments
+        };
       } else {
         endpoint = `/pr/${selectedWorkflow.entity_id}/${actionType}`;
       }
+
       
       await api.post(endpoint, payload);
       toast.success(`Workflow successfully ${actionType}d!`);
@@ -74,7 +89,12 @@ export const Approvals: React.FC = () => {
       setSelectedWorkflow(null);
       setActionType(null);
       setComment("");
-      setPhysicalInspectionDone(false);
+      
+      setManagerAssessment("");
+      setManagerComments("");
+      setAdminResolution("");
+      setAdminComments("");
+
       fetchWorkflows();
     } catch (err: any) {
       toast.error(getErrorMessage(err, "Failed to process workflow action."));
@@ -260,40 +280,77 @@ export const Approvals: React.FC = () => {
       {/* Action Dialog */}
       <Dialog 
         isOpen={!!selectedWorkflow} 
-        onClose={() => { setSelectedWorkflow(null); setActionType(null); setComment(""); setPhysicalInspectionDone(false); }}
+        onClose={() => { setSelectedWorkflow(null); setActionType(null); setComment(""); 
+      setManagerAssessment("");
+      setManagerComments("");
+      setAdminResolution("");
+      setAdminComments("");
+ }}
         title={`${actionType ? actionType.charAt(0).toUpperCase() + actionType.slice(1) : ''} ${selectedWorkflow?.entity_type} #${selectedWorkflow?.entity_id}`}
       >
         <div className="space-y-4">
-          {selectedWorkflow?.status === "Reported" && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && (
-            <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-xl border border-border/50">
-              <input 
-                type="checkbox" 
-                id="physicalInspection"
-                checked={physicalInspectionDone}
-                onChange={(e) => setPhysicalInspectionDone(e.target.checked)}
-                className="w-4 h-4 text-primary rounded border-border focus:ring-primary cursor-pointer"
-              />
-              <label htmlFor="physicalInspection" className="text-sm font-semibold text-foreground cursor-pointer select-none">
-                Physical Inspection Completed <span className="text-red-500">*</span>
-              </label>
+          
+          
+          {selectedWorkflow?.status === "Submitted" && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && (
+            <div className="space-y-4 p-3 bg-muted/30 rounded-xl border border-border/50">
+               <div>
+                 <label className="block text-sm font-medium mb-1">Inspection / Resolution Assessment <span className="text-red-500">*</span></label>
+                 <select className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" value={managerAssessment} onChange={(e) => setManagerAssessment(e.target.value)}>
+                   <option value="">Select an option</option>
+                   <option value="No Action Required">No Action Required</option>
+                   <option value="Repair Required">Repair Required</option>
+                   <option value="Replacement Required">Replacement Required</option>
+                   <option value="Further Inspection Required">Further Inspection Required</option>
+                 </select>
+               </div>
+               <div>
+                 <label className="block text-sm font-medium mb-1">Manager Inspection Comments</label>
+                 <Input value={managerComments} onChange={(e) => setManagerComments(e.target.value)} placeholder="Notes..." />
+               </div>
             </div>
           )}
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Comments {(actionType === 'reject' || actionType === 'return' || selectedWorkflow?.entity_type === 'AssetIncident') && <span className="text-red-500">*</span>}
-            </label>
-            <Input 
-              value={comment} 
-              onChange={(e) => setComment(e.target.value)} 
-              placeholder={(actionType === 'reject' || actionType === 'return' || selectedWorkflow?.entity_type === 'AssetIncident') ? "Resolution / Reason (required)..." : "Add a note..."} 
-            />
-          </div>
+          {selectedWorkflow?.status === "Manager Approved" && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && (
+            <div className="space-y-4 p-3 bg-muted/30 rounded-xl border border-border/50">
+               <div>
+                 <label className="block text-sm font-medium mb-1">Admin Inspection / Resolution <span className="text-red-500">*</span></label>
+                 <select className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" value={adminResolution} onChange={(e) => setAdminResolution(e.target.value)}>
+                   <option value="">Select an option</option>
+                   <option value="Repair Required">Repair Required</option>
+                   <option value="Replacement Required">Replacement Required</option>
+                   <option value="Further Inspection Required">Further Inspection Required</option>
+                   <option value="No Replacement Required">No Replacement Required</option>
+                 </select>
+               </div>
+               <div>
+                 <label className="block text-sm font-medium mb-1">Admin Comments / Resolution Notes</label>
+                 <Input value={adminComments} onChange={(e) => setAdminComments(e.target.value)} placeholder="Notes..." />
+               </div>
+            </div>
+          )}
+          {(actionType === 'reject' || actionType === 'return' || selectedWorkflow?.entity_type === 'AssetIncident') && (
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Comments {(actionType === 'reject' || actionType === 'return') && <span className="text-red-500">*</span>}
+              </label>
+              <Input 
+                value={comment} 
+                onChange={(e) => setComment(e.target.value)} 
+                placeholder={(actionType === 'reject' || actionType === 'return') ? "Resolution / Reason (required)..." : "Add a note..."} 
+              />
+            </div>
+          )}
+
           <div className="flex justify-end space-x-2">
-            <Button variant="ghost" onClick={() => { setSelectedWorkflow(null); setActionType(null); setPhysicalInspectionDone(false); }}>Cancel</Button>
+            <Button variant="ghost" onClick={() => { setSelectedWorkflow(null); setActionType(null); 
+      setManagerAssessment("");
+      setManagerComments("");
+      setAdminResolution("");
+      setAdminComments("");
+ }}>Cancel</Button>
             <Button 
               variant={actionType === "approve" ? "primary" : actionType === "reject" ? "danger" : actionType === "return" ? "warning" : "outline"} 
               onClick={handleAction} 
-              disabled={isSubmitting || ((actionType === 'reject' || actionType === 'return' || selectedWorkflow?.entity_type === 'AssetIncident') && !comment.trim()) || (selectedWorkflow?.status === 'Reported' && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && !physicalInspectionDone)}
+              disabled={isSubmitting || ((actionType === "reject" || actionType === "return") && !comment.trim()) || (selectedWorkflow?.status === "Submitted" && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && !managerAssessment) || (selectedWorkflow?.status === "Manager Approved" && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && !adminResolution)}
             >
               {isSubmitting ? "Processing..." : `Confirm ${actionType ? actionType.charAt(0).toUpperCase() + actionType.slice(1) : ''}`}
             </Button>

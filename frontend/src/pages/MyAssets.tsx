@@ -67,7 +67,7 @@ export const MyAssets: React.FC = () => {
     setIsViewModalOpen(true);
   };
 
-  const submitIncident = async (e: React.FormEvent) => {
+  const submitIncident = async (e: React.FormEvent, isDraft = false) => {
     e.preventDefault();
     if (!selectedAsset || !incidentDescription) return;
 
@@ -82,7 +82,8 @@ export const MyAssets: React.FC = () => {
         asset_id: selectedAsset.asset_id,
         description: incidentDescription,
         incident_type: incidentType,
-        image_url: imageUrl || null
+        image_url: imageUrl || null,
+        is_draft: isDraft
       });
       toast.success("Incident reported successfully");
       setIsIncidentModalOpen(false);
@@ -259,7 +260,7 @@ export const MyAssets: React.FC = () => {
       </div>
 
       <Dialog isOpen={isIncidentModalOpen} onClose={() => setIsIncidentModalOpen(false)} title="Report Asset Issue">
-        <form onSubmit={submitIncident} className="space-y-4">
+        <form onSubmit={(e) => submitIncident(e, false)} className="space-y-4">
           <div className="p-3 bg-accent/30 rounded-md border text-sm">
             Reporting issue for: <span className="font-bold">{selectedAsset?.asset_name}</span> ({selectedAsset?.asset_code})
           </div>
@@ -302,6 +303,7 @@ export const MyAssets: React.FC = () => {
 
           <div className="flex justify-end space-x-2 pt-4">
             <Button type="button" variant="outline" onClick={() => setIsIncidentModalOpen(false)}>Cancel</Button>
+            <Button type="button" disabled={isSubmitting || !incidentDescription} variant="outline" onClick={(e) => submitIncident(e as any, true)}>Save Draft</Button>
             <Button type="submit" disabled={isSubmitting || !incidentDescription}>Submit Report</Button>
           </div>
         </form>
