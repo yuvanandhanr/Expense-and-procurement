@@ -132,6 +132,7 @@ class AssetIncidentCreate(BaseModel):
     description: str
     incident_type: str
     image_url: Optional[str] = None
+    is_draft: Optional[bool] = False
 
 
 class AssetIncidentUpdate(BaseModel):
@@ -141,9 +142,12 @@ class AssetIncidentUpdate(BaseModel):
 
 
 class AssetIncidentAction(BaseModel):
-    action: str # Approve, Reject, Repair, Replace, Return for Correction
+    action: str # Approve, Reject, Return for Correction
     resolution: Optional[str] = None
-    physical_inspection_done: Optional[bool] = False
+    manager_inspection_assessment: Optional[str] = None
+    manager_inspection_comments: Optional[str] = None
+    admin_inspection_resolution: Optional[str] = None
+    admin_comments: Optional[str] = None
 
 
 class AssetIncidentSchema(BaseModel):
@@ -159,6 +163,10 @@ class AssetIncidentSchema(BaseModel):
     resolution: Optional[str] = None
     image_url: Optional[str] = None
     physical_inspection_done: Optional[bool] = False
+    manager_inspection_assessment: Optional[str] = None
+    manager_inspection_comments: Optional[str] = None
+    admin_inspection_resolution: Optional[str] = None
+    admin_comments: Optional[str] = None
     linked_pr_id: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

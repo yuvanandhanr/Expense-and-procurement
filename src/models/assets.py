@@ -108,6 +108,15 @@ class AssetIncident(Base):
     resolution: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     image_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     physical_inspection_done: Mapped[Optional[bool]] = mapped_column(Boolean, default=False, server_default='false')
+    
+    # Manager fields
+    manager_inspection_assessment: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    manager_inspection_comments: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Admin fields
+    admin_inspection_resolution: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    admin_comments: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
     linked_pr_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("purchase_requisitions.pr_id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

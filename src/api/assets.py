@@ -81,7 +81,7 @@ async def get_assets(
     current_user: User = Depends(get_current_user)
 ):
     user_roles = [r.role_name for r in current_user.roles]
-    allowed = {"Admin", "CFO", "Finance Manager"}
+    allowed = {"Admin", "CFO", "Finance Manager", "CEO"}
     if not allowed.intersection(user_roles):
         raise HTTPException(status_code=403, detail="Not authorized to view all assets")
 
