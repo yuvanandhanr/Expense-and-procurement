@@ -21,8 +21,8 @@ worker_class = "uvicorn.workers.UvicornWorker"
 
 # Load Balancer (ALB) compatibility settings
 # Keepalive should exceed the load balancer idle timeout (default AWS ALB timeout is 60s)
-keepalive = int(os.getenv("GUNICORN_KEEPALIVE", "120"))
-timeout = int(os.getenv("GUNICORN_TIMEOUT", "120"))
+keepalive = int(os.getenv("GUNICORN_KEEPALIVE", "300"))
+timeout = int(os.getenv("GUNICORN_TIMEOUT", "300"))
 
 # Logging: Output directly to standard out/err to facilitate AWS CloudWatch ingestion
 accesslog = "-"

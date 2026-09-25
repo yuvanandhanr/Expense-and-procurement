@@ -103,7 +103,9 @@ export interface ApprovalWorkflow {
   status: string;
   created_at: string;
   requestor_id?: number;
+  requester_id?: number;
   requestor_name?: string;
+  workflow_step?: string;
   title?: string;
   justification?: string;
   past_approvers?: string[];
@@ -253,6 +255,7 @@ export interface Invoice {
   invoice_date: string;
   due_date: string;
   grand_total: number;
+  amount?: number;
   currency: string;
   status: string;
   matching_status: string;
@@ -313,6 +316,7 @@ export interface Receipt {
   expense_report_id: number;
   merchant_name?: string;
   receipt_date?: string;
+  receipt_number?: string;
   category?: string;
   ocr_amount: number;
   verified_amount: number;
@@ -335,7 +339,22 @@ export interface ExpenseReport {
   status: string;
   currency: string;
   total_amount: number;
+  duplicate_flag?: boolean;
+  policy_flags?: string;
   created_at: string;
   updated_at: string;
   receipts?: Receipt[];
 }
+
+export type CurrentUser = User;
+
+export interface Report {
+  report_id: number;
+  name: string;
+  report_type: string;
+  file_type: string;
+  file_path?: string;
+  status: string;
+  created_at: string;
+}
+

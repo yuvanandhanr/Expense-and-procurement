@@ -53,8 +53,8 @@ async def test_generate_workflow_level1(service, mock_db):
 
     workflow = await service.generate_workflow(pr)
     
-    assert service.step_repo.create.call_count == 1
-    step = service.step_repo.create.call_args[0][0]
+    assert service.step_repo.create.call_count == 2
+    step = service.step_repo.create.call_args_list[0][0][0]
     assert step.step_number == 1
     assert step.approver_role_id == 2
     assert step.approver_id == 2 # Manager ID assigned
@@ -84,12 +84,12 @@ async def test_generate_workflow_level2(service, mock_db):
     assert service.step_repo.create.call_count == 2
     step2 = service.step_repo.create.call_args_list[1][0][0]
     assert step2.step_number == 2
-    assert step2.approver_role_id == 3
-    assert step2.approver_id is None # No specific finance user assigned
+    assert step2.approver_role_id == 4
+    assert step2.approver_id is None
 
 @pytest.mark.anyio
 async def test_generate_workflow_level3(service, mock_db):
-    """PR = 5001 USD: Manager + Finance + CFO"""
+    """PR = 5001 USD: Manager + Admin Inventory Check"""
     pr = make_pr(5001, requestor_id=1)
     def execute_side_effect(query):
         res = MagicMock()
@@ -108,7 +108,10 @@ async def test_generate_workflow_level3(service, mock_db):
     mock_db.execute.side_effect = execute_side_effect
 
     await service.generate_workflow(pr)
-    assert service.step_repo.create.call_count == 3
+    assert service.step_repo.create.call_count == 2
+    step2 = service.step_repo.create.call_args_list[1][0][0]
+    assert step2.step_number == 2
+    assert step2.approver_role_id == 4
 
 @pytest.mark.anyio
 async def test_self_approval_prevention(service, mock_db):

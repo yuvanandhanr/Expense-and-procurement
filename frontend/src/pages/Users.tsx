@@ -4,8 +4,10 @@ import { CurrentUser, Role } from "../types";
 import {Button, Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Dialog, Input, EmptyState} from "../components/ui";
 import toast from "react-hot-toast";
 import { getErrorMessage } from "../utils/helpers";
+import { useAuth } from "../hooks/useAuth";
 
 export const Users: React.FC = () => {
+  const { hasRole } = useAuth();
   const [users, setUsers] = useState<CurrentUser[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,14 +142,16 @@ export const Users: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
           <p className="text-xs text-muted-foreground mt-1">Manage system users, assign roles, and control access.</p>
         </div>
-        <Button onClick={openCreateModal} className="font-bold text-xs uppercase tracking-wider">
-          Add New User
-        </Button>
+        {hasRole("Admin") && (
+          <Button onClick={openCreateModal} className="font-bold text-xs uppercase tracking-wider">
+            Add New User
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -170,7 +174,7 @@ export const Users: React.FC = () => {
                     <th className="p-4">Email</th>
                     <th className="p-4">Roles</th>
                     <th className="p-4">Status</th>
-                    <th className="p-4 text-right">Actions</th>
+                    {hasRole("Admin") && <th className="p-4 text-right">Actions</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border text-sm">
@@ -201,30 +205,32 @@ export const Users: React.FC = () => {
                           <Badge variant="success">Active</Badge>
                         )}
                       </td>
-                      <td className="p-4 text-right space-x-2 whitespace-nowrap">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => openEditModal(user)}
-                        >
-                          Edit
-                        </Button>
-                        <Button 
-                          variant={user.is_locked ? "outline" : "danger"} 
-                          size="sm" 
-                          onClick={() => handleToggleLock(user)}
-                        >
-                          {user.is_locked ? "Unlock" : "Lock"}
-                        </Button>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => handleOffboard(user)}
-                          disabled={user.status !== "Active"}
-                        >
-                          Offboard
-                        </Button>
-                      </td>
+                      {hasRole("Admin") && (
+                        <td className="p-4 text-right space-x-2 whitespace-nowrap">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => openEditModal(user)}
+                          >
+                            Edit
+                          </Button>
+                          <Button 
+                            variant={user.is_locked ? "outline" : "danger"} 
+                            size="sm" 
+                            onClick={() => handleToggleLock(user)}
+                          >
+                            {user.is_locked ? "Unlock" : "Lock"}
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => handleOffboard(user)}
+                            disabled={user.status !== "Active"}
+                          >
+                            Offboard
+                          </Button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -293,10 +299,8 @@ export const Users: React.FC = () => {
               )}
             </div>
           </div>
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
-              Cancel
-            </Button>
+          <div className="flex justify-end space-x-2 pt-3 mt-2">
+            <Button variant="close" type="button"  onClick={() => setIsModalOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Saving..." : (isEditMode ? "Save Changes" : "Create User")}
             </Button>

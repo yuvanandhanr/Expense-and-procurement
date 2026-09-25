@@ -1,11 +1,10 @@
-import requests
+import asyncio
+import httpx
 
-url = "http://localhost:8000/api/v1/invoices/upload"
-files = {'file': open('/app/test_invoice.png', 'rb')}
-# Fake the auth token if needed, or check if it's 401
-try:
-    response = requests.post(url, files=files)
-    print("Status:", response.status_code)
-    print("Body:", response.text)
-except Exception as e:
-    print("Exception:", str(e))
+async def main():
+    async with httpx.AsyncClient() as client:
+        # We need a token. We can get it from /api/v1/auth/login or similar?
+        pass
+
+if __name__ == "__main__":
+    asyncio.run(main())

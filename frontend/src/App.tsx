@@ -6,6 +6,8 @@ import { AuthProvider } from "./hooks/useAuth";
 import { ThemeProvider } from "./hooks/useTheme";
 import { AppRoutes } from "./routes/AppRoutes";
 
+import { ErrorBoundary } from "./components/ErrorBoundary";
+
 // Construct TanStack Query client
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,23 +21,25 @@ const queryClient = new QueryClient({
 
 export const App: React.FC = () => {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <AuthProvider>
-          <BrowserRouter>
-            <AppRoutes />
-            {/* Global toast notifications config */}
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                className: "bg-card text-card-foreground border border-border shadow-md rounded-lg font-sans text-sm",
-                duration: 4000,
-              }}
-            />
-          </BrowserRouter>
-        </AuthProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <AuthProvider>
+            <BrowserRouter>
+              <AppRoutes />
+              {/* Global toast notifications config */}
+              <Toaster
+                position="top-right"
+                toastOptions={{
+                  className: "bg-card text-card-foreground border border-border shadow-md rounded-lg font-sans text-sm",
+                  duration: 4000,
+                }}
+              />
+            </BrowserRouter>
+          </AuthProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 };
 export default App;

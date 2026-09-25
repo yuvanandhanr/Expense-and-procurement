@@ -93,6 +93,22 @@ async def lifespan(app: FastAPI):
     from src.services.job_service import run_scheduler_loop
 
     await initialize_cache()
+    
+    # 2.6 Run raw SQL patches for missing columns (robust fallback for SQLite/Render)
+    from sqlalchemy import text
+    try:
+        async with async_engine.begin() as conn:
+            try:
+                await conn.execute(text("ALTER TABLE purchase_requisitions ADD COLUMN is_inventory_allocation BOOLEAN;"))
+            except Exception:
+                pass
+            try:
+                await conn.execute(text("ALTER TABLE purchase_requisitions ADD COLUMN allocated_asset_id BIGINT;"))
+            except Exception:
+                pass
+        logger.info("Database schema patch applied successfully.")
+    except Exception as e:
+        logger.error(f"Error applying database schema patch on startup: {e}")
 
     try:
         async with async_session() as session:
@@ -150,7 +166,11 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust for production configurations
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://expense-frontend-rxv8.onrender.com",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -158,7 +178,7 @@ app.add_middleware(
 
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["*"] if settings.ENVIRONMENT != "production" else ["localhost", "127.0.0.1"]
+    allowed_hosts=["*"] if settings.ENVIRONMENT != "production" else ["localhost", "127.0.0.1", "*.onrender.com"]
 )
 
 # Include Authentication and Authorization routes
@@ -209,18 +229,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
-
-
-@app.get("/", tags=["system"])
-async def get_root():
-    """
-    Welcome endpoint returning basic api versioning and status info.
-    """
-    return {
-        "message": "Welcome to the Enterprise Expense & Procurement Workflow Platform API",
-        "version": settings.APP_VERSION,
-        "environment": settings.ENVIRONMENT
-    }
+app.mount("/api/v1/uploads", StaticFiles(directory=UPLOAD_DIR), name="api_uploads")
 
 
 @app.get("/health", tags=["system"])
@@ -261,3 +270,40 @@ async def get_version():
     return {
         "version": settings.APP_VERSION
     }
+
+
+from fastapi.responses import FileResponse
+
+# Mount Frontend SPA Build if available
+FRONTEND_DIST = os.path.join(BASE_DIR, "frontend", "dist")
+if os.path.exists(FRONTEND_DIST):
+    STATIC_DIR = os.path.join(FRONTEND_DIST, "static")
+    if os.path.exists(STATIC_DIR):
+        app.mount("/static", StaticFiles(directory=STATIC_DIR), name="spa_static")
+
+    @app.get("/{full_path:path}", tags=["frontend"])
+    async def serve_spa(full_path: str = ""):
+        # Allow api, uploads, docs, redoc, openapi.json, health to bypass
+        if full_path and full_path.startswith(("api/", "uploads/", "docs", "redoc", "openapi.json", "health", "ready", "version")):
+            raise HTTPException(status_code=404, detail="Not Found")
+        
+        if full_path:
+            file_path = os.path.join(FRONTEND_DIST, full_path)
+            if os.path.isfile(file_path):
+                return FileResponse(file_path)
+        
+        index_file = os.path.join(FRONTEND_DIST, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        raise HTTPException(status_code=404, detail="Frontend build not found")
+else:
+    @app.get("/", tags=["system"])
+    async def get_root():
+        """
+        Welcome endpoint returning basic api versioning and status info.
+        """
+        return {
+            "message": "Welcome to the Enterprise Expense & Procurement Workflow Platform API",
+            "version": settings.APP_VERSION,
+            "environment": settings.ENVIRONMENT
+        }

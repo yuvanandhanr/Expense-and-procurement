@@ -1,10 +1,11 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { Button, Input, Card, CardHeader, CardTitle, CardContent } from "../components/ui";
+import { Button, Input } from "../components/ui";
 import { api } from "../services/api";
 import toast from "react-hot-toast";
 import { QRCodeSVG } from 'qrcode.react';
+import { ShieldCheck, UserCheck, Briefcase, ChevronRight, Lock, Sparkles, Building2 } from "lucide-react";
 
 declare global {
   interface Window {
@@ -12,12 +13,37 @@ declare global {
   }
 }
 
+const GoogleIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
+  <svg className={className} viewBox="0 0 24 24">
+    <path
+      fill="#4285F4"
+      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+    />
+    <path
+      fill="#34A853"
+      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+    />
+    <path
+      fill="#FBBC05"
+      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+    />
+    <path
+      fill="#EA4335"
+      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+    />
+  </svg>
+);
+
 export const Login: React.FC = () => {
   const { googleLogin, vendorLogin } = useAuth();
   const navigate = useNavigate();
   
   // Tab controller: "employee" | "vendor"
   const [activeTab, setActiveTab] = React.useState<"employee" | "vendor">("employee");
+  
+  // Employee Google Email input state
+  const [employeeEmail, setEmployeeEmail] = React.useState("");
+  const [showEmailInput, setShowEmailInput] = React.useState(false);
   
   // Vendor OTP form state
   const [vendorEmail, setVendorEmail] = React.useState("");
@@ -35,6 +61,7 @@ export const Login: React.FC = () => {
     setError("");
     try {
       await googleLogin(response.credential);
+      toast.success("Authenticated with Google Workspace!");
       setTimeout(() => {
         navigate("/");
       }, 100);
@@ -46,19 +73,40 @@ export const Login: React.FC = () => {
     }
   };
 
+
+
+  const handleCustomGoogleEmailSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!employeeEmail.trim()) {
+      setError("Please enter your corporate Google email address.");
+      return;
+    }
+    const cleanEmail = employeeEmail.trim().toLowerCase();
+    handleCredentialResponse({ credential: `mock_google_${cleanEmail}` });
+  };
+
   React.useEffect(() => {
     const initializeGoogle = () => {
-      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "placeholder";
+      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "548174577821-mockgoogleclientid.apps.googleusercontent.com";
       
-      if (window.google && activeTab === "employee" && clientId !== "placeholder" && clientId.length > 20) {
-        window.google.accounts.id.initialize({
-          client_id: clientId,
-          callback: handleCredentialResponse,
-        });
-        window.google.accounts.id.renderButton(
-          document.getElementById("google-signin-btn"),
-          { theme: "filled_blue", size: "large", width: "100%", shape: "rectangular" }
-        );
+      if (window.google && activeTab === "employee") {
+        try {
+          window.google.accounts.id.initialize({
+            client_id: clientId,
+            callback: handleCredentialResponse,
+            auto_select: false,
+            cancel_on_tap_outside: true,
+          });
+          const btnElem = document.getElementById("google-signin-btn");
+          if (btnElem) {
+            window.google.accounts.id.renderButton(
+              btnElem,
+              { theme: "filled_blue", size: "large", width: "100%", shape: "rectangular", text: "signin_with" }
+            );
+          }
+        } catch (err) {
+          console.warn("Google SDK init warning:", err);
+        }
       }
     };
 
@@ -124,30 +172,42 @@ export const Login: React.FC = () => {
     }
   };
 
+  const testAccounts = [
+    { name: "Alex Rivera", role: "Admin", email: "mock_google_y.raja@dataeko.ai", badgeColor: "bg-blue-500/15 text-blue-500 border-blue-500/30" },
+    { name: "Sarah Chen", role: "CEO", email: "mock_google_ceo@dataeko.ai", badgeColor: "bg-purple-500/15 text-purple-500 border-purple-500/30" },
+    { name: "Marcus Johnson", role: "CFO", email: "mock_google_cfo@dataeko.ai", badgeColor: "bg-emerald-500/15 text-emerald-500 border-emerald-500/30" },
+    { name: "Elena Rodriguez", role: "Finance Mgr", email: "mock_google_finance@dataeko.ai", badgeColor: "bg-teal-500/15 text-teal-500 border-teal-500/30" },
+    { name: "David Kim", role: "Manager", email: "mock_google_manager@dataeko.ai", badgeColor: "bg-amber-500/15 text-amber-500 border-amber-500/30" },
+    { name: "Rachel Foster", role: "Employee", email: "mock_google_employee@dataeko.ai", badgeColor: "bg-slate-500/15 text-slate-500 border-slate-500/30" },
+  ];
+
   return (
-    <div className="relative min-h-screen flex items-center justify-center overflow-hidden p-4">
-      <Card className="w-full max-w-md relative z-10 glass-panel shadow-2xl p-4">
-        <CardHeader className="text-center pb-2 border-b-0">
-          <div className="w-[48px] h-[48px] rounded-[16px] gradient-accent flex items-center justify-center text-white font-bold text-2xl mx-auto shadow-lg shadow-violet/20">
-            E
-          </div>
-          <CardTitle className="text-2xl font-bold font-display tracking-tight mt-4">
-            Portal Access
-          </CardTitle>
-          <p className="text-[10.5px] font-semibold text-muted-foreground uppercase tracking-[1.6px] mt-1">
-            Enterprise Procurement Suite
-          </p>
-        </CardHeader>
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden p-4 sm:p-6">
+      {/* Apple Frosted Card Container */}
+      <div className="w-full max-w-[440px] relative z-10 apple-card rounded-3xl p-6 sm:p-8 backdrop-blur-3xl shadow-2xl animate-spring-in border border-border/80">
         
-        <CardContent className="space-y-6 pt-4">
-          {/* Tab Selector */}
-          <div className="grid grid-cols-2 p-1 bg-card-2 border border-border rounded-lg">
+        {/* Apple Brand Identity Header */}
+        <div className="text-center pt-2 pb-4 border-b border-border/50">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#0071E3] to-[#0077ED] flex items-center justify-center text-white font-extrabold text-xl mx-auto shadow-apple-glow mb-3">
+            ✦
+          </div>
+          <h2 className="text-2xl font-extrabold tracking-tight text-foreground">
+            ProcureSync
+          </h2>
+          <p className="text-xs font-semibold text-muted-foreground mt-1 tracking-tight">
+            Enterprise Single Sign-On Portal
+          </p>
+        </div>
+        
+        <div className="space-y-6 pt-3">
+          {/* Apple Segmented Pill Switcher */}
+          <div className="p-1 bg-muted/70 backdrop-blur-md rounded-full border border-border/60 flex items-center shadow-inner">
             <button
               type="button"
               onClick={() => { setActiveTab("employee"); setError(""); }}
-              className={`py-2 text-xs font-bold rounded-md transition-all ${
+              className={`flex-1 py-2 px-3 text-xs font-bold rounded-full transition-all duration-300 ${
                 activeTab === "employee"
-                  ? "gradient-accent text-white shadow"
+                  ? "bg-[#0071E3] text-white shadow-apple-sm border border-[#0071E3]/50 scale-[1.01]"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -156,118 +216,126 @@ export const Login: React.FC = () => {
             <button
               type="button"
               onClick={() => { setActiveTab("vendor"); setError(""); }}
-              className={`py-2 text-xs font-bold rounded-md transition-all ${
+              className={`flex-1 py-2 px-3 text-xs font-bold rounded-full transition-all duration-300 ${
                 activeTab === "vendor"
-                  ? "gradient-accent text-white shadow"
+                  ? "bg-[#0071E3] text-white shadow-apple-sm border border-[#0071E3]/50 scale-[1.01]"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              Vendor Login
+              Supplier Partner
             </button>
           </div>
 
           {activeTab === "employee" ? (
-            <div className="space-y-6">
-              <div className="text-center space-y-2">
-                <h3 className="text-sm font-semibold text-foreground">Sign in using Google Workspace</h3>
-                <p className="text-xs text-muted-foreground">Use your corporate @dataeko.ai credentials to authenticate securely.</p>
+            <div className="space-y-4 animate-fade-in">
+              <div className="text-center space-y-1">
+                <p className="text-xs text-muted-foreground">
+                  Authenticate securely using your corporate Google Workspace account.
+                </p>
               </div>
 
               {error && (
-                <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium">
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-medium animate-fade-in">
                   {error}
                 </div>
               )}
 
-              <div className="space-y-2">
-                <div id="google-signin-btn" className="w-full flex justify-center min-h-[40px] pb-2"></div>
-                
-                <div className="text-center">
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Test Environments</span>
+              {/* Primary Google OAuth Action */}
+              <div className="space-y-3">
+                {/* Google SDK render container */}
+                <div id="google-signin-btn" className="w-full flex justify-center min-h-[44px]"></div>
+
+                {/* Custom Google Workspace Email Drawer */}
+                {!showEmailInput ? (
+                  <div className="text-center">
+                    <button
+                      type="button"
+                      onClick={() => setShowEmailInput(true)}
+                      className="text-[11px] text-primary font-semibold hover:underline"
+                    >
+                      Or enter Google Workspace email (@dataeko.ai)
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleCustomGoogleEmailSubmit} className="space-y-2 p-3 bg-muted/40 rounded-2xl border border-border/60 animate-fade-in">
+                    <div className="flex gap-2">
+                      <Input
+                        type="email"
+                        placeholder="yourname@dataeko.ai"
+                        value={employeeEmail}
+                        onChange={(e) => setEmployeeEmail(e.target.value)}
+                        className="text-xs flex-1"
+                        autoFocus
+                      />
+                      <Button type="submit" size="sm" disabled={isSubmitting}>
+                        Login
+                      </Button>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] text-muted-foreground px-1">
+                      <span>Must be registered corporate domain</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowEmailInput(false)}
+                        className="text-muted-foreground hover:text-foreground underline"
+                      >
+                        Hide
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                <div className="relative flex py-1 items-center">
+                  <div className="flex-grow border-t border-border/60"></div>
+                  <span className="flex-shrink mx-3 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    Quick Access Profiles
+                  </span>
+                  <div className="flex-grow border-t border-border/60"></div>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full text-xs font-semibold py-2"
-                    onClick={() => handleCredentialResponse({ credential: "mock_google_y.raja@dataeko.ai" })}
-                    disabled={isSubmitting}
-                  >
-                    Alex Rivera (Admin)
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full text-xs font-semibold py-2"
-                    onClick={() => handleCredentialResponse({ credential: "mock_google_ceo@dataeko.ai" })}
-                    disabled={isSubmitting}
-                  >
-                    Sarah Chen (CEO)
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full text-xs font-semibold py-2"
-                    onClick={() => handleCredentialResponse({ credential: "mock_google_cfo@dataeko.ai" })}
-                    disabled={isSubmitting}
-                  >
-                    Marcus Johnson (CFO)
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full text-xs font-semibold py-2"
-                    onClick={() => handleCredentialResponse({ credential: "mock_google_finance@dataeko.ai" })}
-                    disabled={isSubmitting}
-                  >
-                    Elena Rodriguez (Fin. Mgr)
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full text-xs font-semibold py-2 col-span-2"
-                    onClick={() => handleCredentialResponse({ credential: "mock_google_manager@dataeko.ai" })}
-                    disabled={isSubmitting}
-                  >
-                    David Kim (Manager)
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full text-xs font-semibold py-2 col-span-2"
-                    onClick={() => handleCredentialResponse({ credential: "mock_google_employee@dataeko.ai" })}
-                    disabled={isSubmitting}
-                  >
-                    Rachel Foster (Employee)
-                  </Button>
+                {/* Apple Interactive Profile Tiles Grid */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  {testAccounts.map((acc, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleCredentialResponse({ credential: acc.email })}
+                      disabled={isSubmitting}
+                      className="bg-[#0071E3]/5 hover:bg-[#0071E3]/10 border border-[#0071E3]/10 transition-all duration-250 p-2.5 rounded-xl flex items-center justify-between text-left group cursor-pointer hover:border-[#0071E3]/30 hover:scale-[1.02]"
+                    >
+                      <div className="min-w-0 pr-1">
+                        <p className="text-xs font-bold text-foreground truncate group-hover:text-[#0071E3] transition-colors">
+                          {acc.name}
+                        </p>
+                        <span className={`inline-block px-1.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wider border mt-0.5 ${acc.badgeColor}`}>
+                          {acc.role}
+                        </span>
+                      </div>
+                      <ChevronRight className="w-3.5 h-3.5 text-[#0071E3]/40 group-hover:text-[#0071E3] group-hover:translate-x-0.5 transition-all shrink-0" />
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
           ) : (
-            <form onSubmit={otpSent ? handleVerifyOtp : handleRequestOtp} className="space-y-4">
+            <form onSubmit={otpSent ? handleVerifyOtp : handleRequestOtp} className="space-y-4 animate-fade-in">
               <div className="text-center space-y-1">
-                <h3 className="text-sm font-semibold text-foreground">Supplier Partner Access</h3>
                 <p className="text-xs text-muted-foreground">
                   {mfaSetupData
-                    ? "Set up your Authenticator App to secure your account."
+                    ? "Scan QR code with your Authenticator App."
                     : isMfaRequired 
-                    ? "Enter the code from your Authenticator App." 
-                    : "Enter your registered email to login."}
+                    ? "Enter your 6-digit Authenticator code." 
+                    : "Enter your registered vendor email address."}
                 </p>
               </div>
 
               {mfaSetupData && (
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center animate-in fade-in zoom-in duration-300">
-                  <p className="text-xs text-slate-300 mb-4">
-                    1. Scan this QR code using an Authenticator app (like Google Authenticator or Authy).
+                <div className="apple-card p-4 rounded-2xl text-center animate-spring-in">
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Scan using Google Authenticator or Apple Passwords:
                   </p>
-                  <div className="flex justify-center bg-white p-3 rounded-xl mx-auto w-fit mb-4">
-                    <QRCodeSVG value={mfaSetupData.uri} size={130} />
+                  <div className="flex justify-center bg-white p-3 rounded-2xl mx-auto w-fit mb-3 shadow-inner">
+                    <QRCodeSVG value={mfaSetupData.uri} size={120} />
                   </div>
-                  <p className="text-xs text-slate-400">
-                    2. Then enter the 6-digit code below to log in.
-                  </p>
                 </div>
               )}
 
@@ -279,98 +347,81 @@ export const Login: React.FC = () => {
                 value={vendorEmail}
                 onChange={(e) => setVendorEmail(e.target.value)}
                 disabled={otpSent}
-                className="bg-card-2 border-border text-foreground placeholder:text-muted-foreground"
               />
 
               {otpSent && (
-                <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="space-y-2 animate-spring-in">
                   <Input
                     id="otp"
                     type="text"
-                    label={isMfaRequired ? "Authenticator Code" : "One-Time Verification Code (OTP)"}
-                    placeholder="Enter 6-digit code"
+                    label={isMfaRequired ? "Authenticator Code" : "Verification Code (OTP)"}
+                    placeholder="••••••"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
-                    className="bg-card-2 border-border text-foreground placeholder:text-muted-foreground text-center tracking-[0.5em] font-bold text-lg font-mono"
+                    className="text-center tracking-[0.4em] font-bold text-lg font-mono"
                   />
                 </div>
               )}
 
               {error && (
-                <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium">
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-medium">
                   {error}
                 </div>
               )}
 
               <Button
                 type="submit"
-                className="w-full font-bold text-sm tracking-wider uppercase py-3"
+                className="w-full py-2.5 text-xs font-bold"
                 disabled={sendingOtp || isSubmitting}
               >
                 {sendingOtp
-                  ? "Checking Email..."
+                  ? "Checking..."
                   : isSubmitting
                   ? "Verifying..."
                   : otpSent
-                  ? "Verify & Login"
+                  ? "Verify & Continue"
                   : "Continue"}
               </Button>
               
-              <div className="space-y-2">
-                <Button 
-                  type="button"
-                  variant="outline" 
-                  className="w-full text-xs py-2" 
-                  onClick={async () => {
-                    try {
-                      await vendorLogin("vendor@example.com", "123456");
-                      setTimeout(() => navigate("/vendor-portal"), 100);
-                    } catch (err) {
-                      console.error("Mock Vendor Login failed:", err);
-                    }
-                  }}
-                >
-                  Mock Vendor (Apex Systems)
-                </Button>
+              <div className="space-y-2 pt-1">
+                <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest text-center">
+                  Mock Supplier Accounts
+                </span>
                 
-                <Button 
-                  type="button"
-                  variant="outline" 
-                  className="w-full text-xs py-2" 
-                  onClick={async () => {
-                    try {
-                      await vendorLogin("vendor2@example.com", "123456");
-                      setTimeout(() => navigate("/vendor-portal"), 100);
-                    } catch (err) {
-                      console.error("Mock Vendor Login failed:", err);
-                    }
-                  }}
-                >
-                  Mock Vendor (Nexus Tech Solutions)
-                </Button>
-
-                <Button 
-                  type="button"
-                  variant="outline" 
-                  className="w-full text-xs py-2" 
-                  onClick={async () => {
-                    try {
-                      await vendorLogin("vendor3@example.com", "123456");
-                      setTimeout(() => navigate("/vendor-portal"), 100);
-                    } catch (err) {
-                      console.error("Mock Vendor Login failed:", err);
-                    }
-                  }}
-                >
-                  Mock Vendor (Global Supply Co)
-                </Button>
+                <div className="space-y-1.5">
+                  {[
+                    { name: "Apex Systems", email: "vendor@example.com" },
+                    { name: "Nexus Tech Solutions", email: "vendor2@example.com" },
+                    { name: "Global Supply Co", email: "vendor3@example.com" }
+                  ].map((v, i) => (
+                    <button 
+                      key={i}
+                      type="button"
+                      className="w-full apple-user-tile py-2 px-3 rounded-xl text-xs font-semibold text-foreground flex items-center justify-between" 
+                      onClick={async () => {
+                        try {
+                          await vendorLogin(v.email, "123456");
+                          setTimeout(() => navigate("/vendor-portal"), 100);
+                        } catch (err) {
+                          console.error("Mock Vendor Login failed:", err);
+                        }
+                      }}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Building2 className="w-3.5 h-3.5 text-primary" />
+                        {v.name}
+                      </span>
+                      <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {otpSent && (
                 <button
                   type="button"
                   onClick={() => { setOtpSent(false); setOtp(""); setMfaSetupData(null); }}
-                  className="w-full text-center text-xs text-slate-400 hover:text-white underline"
+                  className="w-full text-center text-xs text-primary hover:underline pt-1"
                 >
                   Change Email Address
                 </button>
@@ -378,11 +429,11 @@ export const Login: React.FC = () => {
             </form>
           )}
 
-          <div className="text-center text-[10px] text-muted-foreground font-semibold uppercase tracking-[1.6px] pt-2">
-            Restricted System access for authorized personnel only.
+          <div className="text-center text-[10.5px] text-muted-foreground font-medium pt-2 border-t border-border/40">
+            Restricted access for authorized personnel only.
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 };

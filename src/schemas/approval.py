@@ -58,10 +58,13 @@ class InboxApprovalWorkflowSchema(BaseModel):
     current_step_sequence: int
     status: str
     created_at: datetime
+    updated_at: Optional[datetime] = None
     requestor_id: Optional[int] = None
     requestor_name: str
     title: Optional[str] = None
     justification: Optional[str] = None
+    total_amount: Optional[Decimal] = None
+    amount: Optional[Decimal] = None
     past_approvers: List[str] = []
     steps: List[ApprovalStepSchema] = []
     can_approve: bool = False
@@ -114,6 +117,7 @@ class CommentSchema(CommentBase):
 # Actions Payload Schemas
 class PRApproveRequest(BaseModel):
     comments: Optional[str] = Field(None, description="Optional approval comments")
+    physical_inspection_done: Optional[bool] = Field(False, description="Whether physical inspection was completed by Manager")
 
 
 class PRRejectRequest(BaseModel):

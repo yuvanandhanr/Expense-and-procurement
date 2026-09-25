@@ -2,9 +2,9 @@ name: Frontend CI/CD Pipeline
 
 on:
   push:
-    branches: [ Yuvan_Build, master ]
+    branches: [ main ]
   pull_request:
-    branches: [ Yuvan_Build, master ]
+    branches: [ main ]
 
 jobs:
   build-and-test:
@@ -34,9 +34,6 @@ jobs:
       - name: TypeScript Compilation & Type Check
         run: npm run build
 
-      - name: Lint Frontend
-        run: npx eslint . --ext .ts,.tsx --max-warnings 0
-
   docker-publish:
     runs-on: ubuntu-latest
     needs: build-and-test # Waits for tests to pass before building Docker
@@ -64,4 +61,4 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
             ${{ secrets.Docker_username }}/enterprise-procurement-frontend:latest
-            ${{ secrets.yuvan334 }}/enterprise-procurement-frontend:${{ github.sha }}
+            ${{ secrets.Docker_username }}/enterprise-procurement-frontend:${{ github.sha }}

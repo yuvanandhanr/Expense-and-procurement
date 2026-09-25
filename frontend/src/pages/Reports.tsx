@@ -84,7 +84,7 @@ export const Reports: React.FC = () => {
                   onChange={(e) => setReportType(e.target.value)}
                   className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring"
                 >
-                  <option value="PR">Purchase Requisitions</option>
+                  <option value="PR">My Requisitions</option>
                   <option value="PO">Purchase Orders</option>
                   <option value="Vendor">Vendor Catalog</option>
                   <option value="Invoice">Invoices & Match Status</option>

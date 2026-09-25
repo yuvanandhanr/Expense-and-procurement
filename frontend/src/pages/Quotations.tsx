@@ -1,35 +1,37 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
+import { Quotation, RFQ } from "../types";
 import { useAuth } from "../hooks/useAuth";
-import {Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Button, EmptyState} from "../components/ui";
+import { Card, CardHeader, CardTitle, CardContent, Badge, StatusBadge, Skeleton, Button, EmptyState } from "../components/ui";
+import { Check, Eye } from "lucide-react";
 import toast from "react-hot-toast";
-import { Quotation } from "../types";
 
 export const Quotations: React.FC = () => {
   const { user } = useAuth();
-  const [quotes, setQuotes] = useState<Quotation[]>([]);
+  const [rfqs, setRfqs] = useState<RFQ[]>([]);
+  const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedRfqId, setExpandedRfqId] = useState<number | null>(null);
+  const [expandedRfq, setExpandedRfq] = useState<number | null>(null);
 
-  const groupedQuotes = React.useMemo(() => {
-    return quotes.reduce((acc: Record<number, Quotation[]>, q) => {
-      if (!acc[q.rfq_id]) acc[q.rfq_id] = [];
-      acc[q.rfq_id].push(q);
-      return acc;
-    }, {});
-  }, [quotes]);
+  const isFinanceManager = user?.roles?.some(r => r.role_name === "Finance Manager" || r.role_name === "CFO" || r.role_name === "Admin");
 
   const fetchData = async () => {
+    setLoading(true);
     try {
-      const [quotesRes, poRes] = await Promise.all([
+      const [rfqRes, quoteRes, poRes] = await Promise.all([
+        api.get("/rfq"),
         api.get("/quotations"),
-        api.get("/purchase-orders")
+        api.get("/purchase-orders").catch(() => ({ data: [] }))
       ]);
-      setQuotes(quotesRes.data);
+      setRfqs(rfqRes.data);
+      setQuotations(quoteRes.data);
       setPurchaseOrders(poRes.data);
+      if (Array.isArray(rfqRes?.data) && rfqRes.data.length > 0 && expandedRfq === null) {
+        setExpandedRfq(rfqRes.data[0]?.rfq_id || null);
+      }
     } catch (err) {
-      console.error("Failed to load data:", err);
+      console.error("Failed to load quotations:", err);
     } finally {
       setLoading(false);
     }
@@ -39,185 +41,111 @@ export const Quotations: React.FC = () => {
     fetchData();
   }, []);
 
-  const handleApprove = async (quote: any) => {
+  const handleApprove = async (quote: Quotation) => {
     try {
-      await api.post(`/rfq/${quote.rfq_id}/select-vendor`, {
-        selected_vendor_id: quote.vendor_id,
-        selected_quotation_id: quote.quotation_id,
-        reason: "Approved by Finance"
-      });
-      toast.success("Quotation approved and Purchase Order auto-generated!");
-      // Refetch both quotes and POs to get the newly generated PO
+      await api.post(`/quotations/${quote.quotation_id}/approve`);
+      toast.success("Quotation selected! Purchase Order auto-generated.");
       fetchData();
     } catch (err: any) {
-      console.error(err);
-      toast.error(err.response?.data?.detail || "Failed to approve quotation.");
+      toast.error(err.response?.data?.detail || "Failed to select quotation.");
     }
   };
-
-  const isFinanceManager = user?.roles?.some(r => ["Finance Manager", "CFO", "Admin"].includes(r.role_name)) || false;
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Quotations Repository</h1>
-        <p className="text-xs text-muted-foreground mt-1">Review proposals submitted by invited suppliers.</p>
+        <h1 className="text-3xl font-bold tracking-tight">Quotations Inbox</h1>
+        <p className="text-xs text-muted-foreground mt-1">Review vendor bids for open RFQs, evaluate delivery timelines, and award purchase orders.</p>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="p-6 space-y-4">
-              <Skeleton className="h-8 w-full" />
-            </div>
-          ) : quotes.length === 0 ? (
-            <EmptyState title="No bids or quotations recorded yet." description="Data will appear here once available." />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm border-collapse">
-                <thead>
-                  <tr className="border-b border-border bg-accent/40 text-xs font-bold text-muted-foreground uppercase">
-                    <th className="p-4">RFQ ID</th>
-                    <th className="p-4">Total Bids</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {Object.entries(groupedQuotes).map(([rfqIdStr, rfqQuotes]) => {
-                    const rfqId = Number(rfqIdStr);
-                    const isExpanded = expandedRfqId === rfqId;
-                    const hasSelected = rfqQuotes.some(q => q.is_selected || q.status === "Selected");
+      <div className="grid grid-cols-1 gap-6">
+        {loading ? (
+          <Skeleton className="h-64 w-full" />
+        ) : rfqs.length === 0 ? (
+          <EmptyState title="No RFQs available." description="Create RFQs to receive vendor quotation proposals." />
+        ) : (
+          rfqs.map((rfq) => {
+            const rfqQuotes = quotations.filter(q => q.rfq_id === rfq.rfq_id);
+            const isExpanded = expandedRfq === rfq.rfq_id;
+            const hasSelected = rfqQuotes.some(q => q.status === "Selected" || q.is_selected);
 
-                    return (
-                      <React.Fragment key={rfqId}>
-                        <tr className="hover:bg-accent/20 cursor-pointer" onClick={() => setExpandedRfqId(isExpanded ? null : rfqId)}>
-                          <td className="p-4 font-bold text-xs tracking-wider text-primary">
-                            <span className="mr-2 text-muted-foreground font-mono">
-                              {isExpanded ? "▼" : "▶"}
-                            </span>
-                            #RFQ-{rfqId}
-                          </td>
-                          <td className="p-4 font-medium">{rfqQuotes.length} Bid{rfqQuotes.length !== 1 ? 's' : ''}</td>
-                          <td className="p-4">
-                            <Badge variant={hasSelected ? "success" : "neutral"}>
-                              {hasSelected ? "Awarded" : "Under Review"}
-                            </Badge>
-                          </td>
-                          <td className="p-4 text-right">
-                            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setExpandedRfqId(isExpanded ? null : rfqId); }}>
-                              {isExpanded ? "Close" : "Review Bids"}
-                            </Button>
-                          </td>
-                        </tr>
-                        {isExpanded && (
-                          <tr className="bg-accent/5">
-                            <td colSpan={4} className="p-4">
-                              <div className="bg-background rounded-lg border border-border overflow-hidden">
-                                <table className="w-full text-left text-xs border-collapse">
-                                  <thead>
-                                    <tr className="bg-accent/30 text-muted-foreground uppercase border-b border-border">
-                                      <th className="p-3 pl-4">Vendor</th>
-                                      <th className="p-3">Quotation Ref</th>
-                                      <th className="p-3">Total Price</th>
-                                      <th className="p-3">Timeline</th>
-                                      <th className="p-3">Status</th>
-                                      <th className="p-3 text-right">Action</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-border">
-                                    {rfqQuotes.map((q) => {
-                                      // Display "Rejected" dynamically if another quote is selected but not saved to db yet, 
-                                      // though the backend should handle setting it to Rejected now.
-                                      let statusDisplay = q.status;
-                                      let variant = "neutral";
-                                      if (q.status === "Selected" || q.is_selected) {
-                                        statusDisplay = "Selected";
-                                        variant = "success";
-                                      } else if (q.status === "Rejected") {
-                                        variant = "destructive";
-                                      } else if (hasSelected) {
-                                        statusDisplay = "Rejected";
-                                        variant = "destructive";
-                                      }
+            return (
+              <Card key={rfq.rfq_id} className="overflow-hidden border border-border">
+                <div 
+                  className="p-4 bg-muted/20 hover:bg-muted/30 cursor-pointer flex items-center justify-between transition-colors"
+                  onClick={() => setExpandedRfq(isExpanded ? null : rfq.rfq_id)}
+                >
+                  <div className="flex items-center space-x-3">
+                    <span className="text-muted-foreground font-mono">{isExpanded ? "▼" : "▶"}</span>
+                    <div>
+                      <h3 className="font-bold text-base text-foreground">{rfq.title}</h3>
+                      <p className="text-xs text-muted-foreground font-mono">RFQ #{rfq.rfq_number}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <span className="text-xs text-muted-foreground">{rfqQuotes.length} Proposals Submitted</span>
+                    <StatusBadge status={hasSelected ? "Awarded" : rfq.status} />
+                  </div>
+                </div>
 
-                                      return (
-                                        <React.Fragment key={q.quotation_id}>
-                                          <tr className="hover:bg-accent/10">
-                                            <td className="p-3 pl-4 font-medium">{(q as any).vendor?.vendor_name || `Vendor #${q.vendor_id}`}</td>
-                                            <td className="p-3 font-mono text-muted-foreground">#QT-{q.quotation_id}</td>
-                                            <td className="p-3 font-bold text-primary">${Number(q.total_amount).toLocaleString()}</td>
-                                            <td className="p-3">{q.lead_time_days} days</td>
-                                            <td className="p-3">
-                                              <Badge variant={variant as any}>{statusDisplay}</Badge>
-                                            </td>
-                                            <td className="p-3 text-right">
-                                              {isFinanceManager && !hasSelected && (
-                                                <Button size="sm" onClick={() => handleApprove(q)}>Approve</Button>
-                                              )}
-                                            </td>
-                                          </tr>
-                                          
-                                          {/* Auto-Generated Purchase Order Details if this quote is selected */}
-                                          {(q.is_selected || q.status === "Selected") && (
-                                            (() => {
-                                              const linkedPo = purchaseOrders.find(
-                                                po => po.rfq_id === q.rfq_id && po.vendor_id === q.vendor_id
-                                              );
-                                              if (!linkedPo) return null;
-                                              return (
-                                                <tr className="bg-primary/5">
-                                                  <td colSpan={6} className="p-4 border-l-4 border-primary">
-                                                    <div className="flex items-center justify-between mb-2">
-                                                      <h4 className="font-bold text-sm text-foreground">Auto-Generated Purchase Order</h4>
-                                                      <Badge variant="neutral">{linkedPo.status}</Badge>
-                                                    </div>
-                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                                                      <div>
-                                                        <p className="text-muted-foreground mb-1">PO Number</p>
-                                                        <p className="font-mono font-bold text-primary">{linkedPo.po_number}</p>
-                                                      </div>
-                                                      <div>
-                                                        <p className="text-muted-foreground mb-1">Grand Total</p>
-                                                        <p className="font-bold">${linkedPo.grand_total?.toLocaleString()}</p>
-                                                      </div>
-                                                      <div>
-                                                        <p className="text-muted-foreground mb-1">Delivery Date</p>
-                                                        <p className="font-medium">{new Date(linkedPo.delivery_date || linkedPo.created_at).toLocaleDateString()}</p>
-                                                      </div>
-                                                      <div>
-                                                        <p className="text-muted-foreground mb-1">Generated On</p>
-                                                        <p className="font-medium">{new Date(linkedPo.created_at).toLocaleDateString()}</p>
-                                                      </div>
-                                                    </div>
-                                                    <div className="mt-3 flex justify-end">
-                                                      <Button variant="outline" size="sm" onClick={() => window.location.href='/purchase-orders'}>
-                                                        View Full PO
-                                                      </Button>
-                                                    </div>
-                                                  </td>
-                                                </tr>
-                                              );
-                                            })()
-                                          )}
-                                        </React.Fragment>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                {isExpanded && (
+                  <div className="p-0 border-t border-border">
+                    {rfqQuotes.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-muted-foreground">
+                        No vendor quotations submitted for this RFQ yet.
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead>
+                            <tr className="border-b border-border bg-muted/40 font-semibold text-muted-foreground uppercase">
+                              <th className="p-3 pl-4 whitespace-nowrap">Vendor</th>
+                              <th className="p-3 whitespace-nowrap">Quotation Ref</th>
+                              <th className="p-3 whitespace-nowrap">Total Price</th>
+                              <th className="p-3 whitespace-nowrap">Timeline</th>
+                              <th className="p-3 whitespace-nowrap">Status</th>
+                              <th className="p-3 text-right whitespace-nowrap">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {rfqQuotes.map((q) => {
+                              let statusDisplay = q.status;
+                              if (q.status === "Selected" || q.is_selected) {
+                                statusDisplay = "Selected";
+                              } else if (q.status === "Rejected" || hasSelected) {
+                                statusDisplay = "Rejected";
+                              }
+
+                              return (
+                                <tr key={q.quotation_id} className="hover:bg-accent/10">
+                                  <td className="p-3 pl-4 font-medium whitespace-nowrap">{(q as any).vendor?.vendor_name || `Vendor #${q.vendor_id}`}</td>
+                                  <td className="p-3 font-mono text-muted-foreground whitespace-nowrap">#QT-{q.quotation_id}</td>
+                                  <td className="p-3 font-bold text-primary whitespace-nowrap">${Number(q.total_amount).toLocaleString()}</td>
+                                  <td className="p-3 whitespace-nowrap">{q.lead_time_days} days</td>
+                                  <td className="p-3 whitespace-nowrap">
+                                    <StatusBadge status={statusDisplay} />
+                                  </td>
+                                  <td className="p-3 text-right whitespace-nowrap">
+                                    {isFinanceManager && !hasSelected && (
+                                      <Button size="sm" variant="success" onClick={() => handleApprove(q)} className="gap-1 font-bold shadow-apple-sm">
+                                        <Check className="w-3.5 h-3.5" /> Select Quote
+                                      </Button>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Card>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 };

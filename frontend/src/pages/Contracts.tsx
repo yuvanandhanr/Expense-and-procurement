@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { Contract } from "../types";
-import {Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, EmptyState} from "../components/ui";
+import { Card, CardHeader, CardTitle, CardContent, Badge, StatusBadge, Skeleton, EmptyState } from "../components/ui";
 import { formatDate } from "../utils/helpers";
 
 export const Contracts: React.FC = () => {
@@ -42,26 +42,24 @@ export const Contracts: React.FC = () => {
               <table className="w-full text-left text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-border bg-accent/40 text-xs font-bold text-muted-foreground uppercase">
-                    <th className="p-4">Contract Number</th>
+                    <th className="p-4 whitespace-nowrap">Contract Number</th>
                     <th className="p-4">Title</th>
-                    <th className="p-4">Start Date</th>
-                    <th className="p-4">End Date</th>
-                    <th className="p-4">Total Value</th>
-                    <th className="p-4">Status</th>
+                    <th className="p-4 whitespace-nowrap">Start Date</th>
+                    <th className="p-4 whitespace-nowrap">End Date</th>
+                    <th className="p-4 whitespace-nowrap">Total Value</th>
+                    <th className="p-4 whitespace-nowrap">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {contracts.map((c) => (
                     <tr key={c.contract_id} className="hover:bg-accent/20">
-                      <td className="p-4 font-bold text-xs tracking-wider text-primary">{c.contract_number}</td>
+                      <td className="p-4 font-bold text-xs tracking-wider text-primary whitespace-nowrap">{c.contract_number}</td>
                       <td className="p-4 font-semibold">{c.title}</td>
-                      <td className="p-4 text-xs text-muted-foreground">{formatDate(c.start_date)}</td>
-                      <td className="p-4 text-xs text-muted-foreground">{formatDate(c.end_date)}</td>
-                      <td className="p-4 font-bold">${c.total_value?.toLocaleString()}</td>
-                      <td className="p-4">
-                        <Badge variant={c.status === "Active" ? "success" : "neutral"}>
-                          {c.status}
-                        </Badge>
+                      <td className="p-4 text-xs text-muted-foreground whitespace-nowrap">{formatDate(c.start_date)}</td>
+                      <td className="p-4 text-xs text-muted-foreground whitespace-nowrap">{formatDate(c.end_date)}</td>
+                      <td className="p-4 font-bold whitespace-nowrap">${c.total_value?.toLocaleString()}</td>
+                      <td className="p-4 whitespace-nowrap">
+                        <StatusBadge status={c.status} />
                       </td>
                     </tr>
                   ))}

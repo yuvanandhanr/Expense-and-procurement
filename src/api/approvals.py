@@ -28,43 +28,10 @@ def verify_approver_role_sync(step: ApprovalStep, current_user: User) -> None:
 
 async def verify_approver_role(step: ApprovalStep, current_user: User, db: AsyncSession) -> None:
     """
-    Enforces that the user has the required role (or Admin status) to approve/action the step.
-    If a specific approver_id is assigned, strictly enforce it.
+    Enforces that the user has the required role (or Admin/CEO status) to approve/action the step.
+    Prevents self-approval of own requests.
     """
-    user_roles = [role.role_name for role in current_user.roles]
-    if "Admin" in user_roles:
-        return
-
-    if step.approver_id is not None:
-        if current_user.user_id != step.approver_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You are not the designated approver for this step."
-            )
-        return
-
-    user_role_ids = [role.role_id for role in current_user.roles]
-
-    from sqlalchemy import select
-    from src.models.auth import Role
-    
-    # Cross-wire "Finance" and "Finance Manager" role IDs
-    is_admin = any(r.role_name == "Admin" for r in current_user.roles)
-    
-    has_finance = any(r.role_name in ["Finance", "Finance Manager"] for r in current_user.roles)
-    if has_finance:
-        res = await db.execute(select(Role.role_id).where(Role.role_name.in_(["Finance", "Finance Manager"])))
-        extra_ids = res.scalars().all()
-        for eid in extra_ids:
-            if eid not in user_role_ids:
-                user_role_ids.append(eid)
-
-    if not is_admin and step.approver_role_id not in user_role_ids:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not possess the required role to action this approval step"
-        )
-        
+    # Check requestor self-approval first
     workflow = await db.execute(select(ApprovalWorkflow).where(ApprovalWorkflow.workflow_id == step.workflow_id))
     workflow = workflow.scalar_one_or_none()
     if workflow:
@@ -75,6 +42,43 @@ async def verify_approver_role(step: ApprovalStep, current_user: User, db: Async
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You cannot approve your own request."
             )
+
+    user_roles = [role.role_name for role in current_user.roles]
+    if "Admin" in user_roles or "CEO" in user_roles:
+        return
+
+    # Check if specifically assigned to this user
+    if step.approver_id is not None and step.approver_id == current_user.user_id:
+        return
+
+    # Resolve required role name for this step
+    res = await db.execute(select(Role).where(Role.role_id == step.approver_role_id))
+    step_role = res.scalar_one_or_none()
+    required_role = step_role.role_name if step_role else ""
+
+    # Manager Step (Step 1)
+    if required_role == "Manager":
+        if any(r in ["Manager", "Admin", "CEO", "Finance Manager", "CFO"] for r in user_roles):
+            return
+
+    # Finance Step (Step 2)
+    if required_role in ["Finance", "Finance Manager"]:
+        if any(r in ["Finance", "Finance Manager", "CFO", "Admin", "CEO"] for r in user_roles):
+            return
+
+    # CFO Step (Step 3)
+    if required_role == "CFO":
+        if any(r in ["CFO", "CEO", "Admin"] for r in user_roles):
+            return
+
+    user_role_ids = [role.role_id for role in current_user.roles]
+    if step.approver_role_id in user_role_ids:
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You do not possess the required role to action this approval step"
+    )
 
 
 @router.post("/{id}/approve", response_model=PRSchema)
@@ -87,7 +91,7 @@ async def approve_pr(
     service = ApprovalService(db)
     active_step = await service.get_active_step(id)
     await verify_approver_role(active_step, current_user, db)
-    return await service.approve_step(id, current_user.user_id, data.comments)
+    return await service.approve_step(id, current_user.user_id, data.comments, getattr(data, "physical_inspection_done", False))
 
 
 @router.post("/{id}/reject", response_model=PRSchema)
@@ -154,7 +158,7 @@ async def get_pr_history(
     pr = await service.pr_repo.get_by_id(id)
     if not pr:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
-    check_pr_access(pr, current_user)
+    await check_pr_access(pr, current_user, db)
     
     return await service.workflow_history_repo.list_by_pr_id(id)
 
@@ -171,7 +175,7 @@ async def get_pr_approvals(
     pr = await service.pr_repo.get_by_id(id)
     if not pr:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
-    check_pr_access(pr, current_user)
+    await check_pr_access(pr, current_user, db)
 
     workflow = await service.workflow_repo.get_by_pr_id(id)
     if not workflow:

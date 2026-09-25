@@ -72,6 +72,7 @@ class AssetCreate(BaseModel):
     asset_number: str
     asset_tag: str
     category_id: Optional[int] = None
+    status: Optional[str] = None
     po_id: Optional[int] = None
     vendor_id: Optional[int] = None
     serial_number: Optional[str] = None
@@ -81,14 +82,20 @@ class AssetCreate(BaseModel):
     purchase_date: Optional[date] = None
     warranty_expiry: Optional[date] = None
     amc_expiry: Optional[date] = None
+    cost: Optional[float] = None
     location: Optional[str] = None
+    cost: Optional[float] = None
 
 
 class AssetUpdate(BaseModel):
-    status: Optional[str] = None # Available, Assigned, Under Maintenance, Disposed, Returned, Lost
+    status: Optional[str] = None
+    model: Optional[str] = None
+    category_id: Optional[int] = None
     location: Optional[str] = None
+    cost: Optional[float] = None
     warranty_expiry: Optional[date] = None
     amc_expiry: Optional[date] = None
+    cost: Optional[float] = None
 
 
 class AssetSchema(BaseModel):
@@ -108,7 +115,10 @@ class AssetSchema(BaseModel):
     purchase_date: Optional[date] = None
     warranty_expiry: Optional[date] = None
     amc_expiry: Optional[date] = None
+    cost: Optional[float] = None
     location: Optional[str] = None
+    cost: Optional[float] = None
+    cost: Optional[float] = None
     status: str
     created_at: datetime
     updated_at: datetime
@@ -120,12 +130,24 @@ class AssetSchema(BaseModel):
 class AssetIncidentCreate(BaseModel):
     asset_id: int
     description: str
-    incident_type: str # Damage, Loss, Theft
+    incident_type: str
+    image_url: Optional[str] = None
+    is_draft: Optional[bool] = False
+
+
+class AssetIncidentUpdate(BaseModel):
+    description: Optional[str] = None
+    incident_type: Optional[str] = None
+    image_url: Optional[str] = None
 
 
 class AssetIncidentAction(BaseModel):
-    action: str # Approve, Reject, Repair, Replace
+    action: str # Approve, Reject, Return for Correction
     resolution: Optional[str] = None
+    manager_inspection_assessment: Optional[str] = None
+    manager_inspection_comments: Optional[str] = None
+    admin_inspection_resolution: Optional[str] = None
+    admin_comments: Optional[str] = None
 
 
 class AssetIncidentSchema(BaseModel):
@@ -139,6 +161,12 @@ class AssetIncidentSchema(BaseModel):
     incident_type: str
     status: str
     resolution: Optional[str] = None
+    image_url: Optional[str] = None
+    physical_inspection_done: Optional[bool] = False
+    manager_inspection_assessment: Optional[str] = None
+    manager_inspection_comments: Optional[str] = None
+    admin_inspection_resolution: Optional[str] = None
+    admin_comments: Optional[str] = None
     linked_pr_id: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

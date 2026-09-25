@@ -1,22 +1,24 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Upload, CheckCircle, XCircle, FileText, AlertCircle, RefreshCw, DollarSign, Clock, CheckSquare, XOctagon } from "lucide-react";
+import { Plus, Upload, CheckCircle, XCircle, FileText, AlertCircle, RefreshCw, DollarSign, Clock, CheckSquare, XOctagon, Trash2, ClipboardList, Building, Briefcase, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "../services/api";
-import { ExpenseReport, Receipt } from "../types";
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Skeleton, Badge, Dialog } from "../components/ui";
+import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Skeleton, Badge, StatusBadge, Dialog, HeroTimestamp, EmptyState } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
+import { isValidText } from "../utils/helpers";
+import { ReimbursementDetailModal } from "../components/expenses/ReimbursementDetailModal";
 
 const Expenses: React.FC = () => {
   const { hasRole, user } = useAuth();
   const queryClient = useQueryClient();
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
-  
+  const [statusFilter, setStatusFilter] = useState("All");
+
   // Create Modal State
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newReport, setNewReport] = useState({
     purpose: "",
-    expense_date: "",
+    submission_date: new Date().toISOString().slice(0, 10),
     department_id: "",
     cost_center_id: "",
     project_code: "",
@@ -29,6 +31,15 @@ const Expenses: React.FC = () => {
   const [declarationChecked, setDeclarationChecked] = useState(false);
 
   const [uploading, setUploading] = useState(false);
+  // Manager Action Modal State
+  const [managerAction, setManagerAction] = useState<{ isOpen: boolean, action: 'return' | 'reject' | null, reportId: number | null }>({ isOpen: false, action: null, reportId: null });
+  const [managerComments, setManagerComments] = useState("");
+
+  // Edit Details State
+  const [isEditDetailsOpen, setIsEditDetailsOpen] = useState(false);
+  const [editDetails, setEditDetails] = useState({ purpose: "", justification: "", department_id: "", cost_center_id: "", project_code: "" });
+  const [previewReceiptUrl, setPreviewReceiptUrl] = useState<string | null>(null);
+
   const [editingReceiptId, setEditingReceiptId] = useState<number | null>(null);
   const [editAmount, setEditAmount] = useState<string>("");
 
@@ -64,12 +75,12 @@ const Expenses: React.FC = () => {
     onSuccess: (data) => {
       toast.success("Expense report created!");
       setIsCreateOpen(false);
-      setNewReport({ purpose: "", expense_date: "", department_id: "", cost_center_id: "", project_code: "", currency: "USD", justification: "" });
+      setNewReport({ purpose: "", submission_date: new Date().toISOString().slice(0, 10), department_id: "", cost_center_id: "", project_code: "", currency: "USD", justification: "" });
       setSelectedReportId(data.expense_report_id);
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
     },
-    onError: () => {
-      toast.error("Failed to create expense report");
+    onError: (err: any) => {
+      toast.error(err.response?.data?.detail || "Failed to create expense report");
     }
   });
 
@@ -88,7 +99,38 @@ const Expenses: React.FC = () => {
       toast.success("Receipts uploaded & OCR completed");
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
     },
-    onError: () => toast.error("Failed to upload receipts")
+    onError: (err: any) => {
+      toast.error(err.response?.data?.detail || err.message || "Failed to upload receipt (Duplicate or Invalid file)");
+    }
+  });
+
+  const deleteReceiptMutation = useMutation({
+    mutationFn: async ({ reportId, receiptId }: { reportId: number; receiptId: number }) => {
+      const res = await api.delete(`/expenses/${reportId}/receipts/${receiptId}`);
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success("Receipt deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.detail || "Failed to delete receipt");
+    }
+  });
+
+  const deleteReportMutation = useMutation({
+    mutationFn: async (reportId: number) => {
+      const res = await api.delete(`/expenses/${reportId}`);
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success("Draft expense report deleted");
+      if (selectedReportId) setSelectedReportId(null);
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.detail || "Failed to delete draft report");
+    }
   });
 
   const submitReportMutation = useMutation({
@@ -106,7 +148,23 @@ const Expenses: React.FC = () => {
       toast.error(err.response?.data?.detail || "Failed to submit report");
     }
   });
-  
+
+  const updateReportMutation = useMutation({
+    mutationFn: async ({ reportId, payload }: { reportId: number, payload: any }) => {
+      const res = await api.put(`/expenses/${reportId}`, payload);
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success("Expense report updated");
+      setIsEditDetailsOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+    },
+    onError: (err: any) => {
+      const detail = err.response?.data?.detail;
+      toast.error(typeof detail === 'string' ? detail : "Failed to update report. Please check your inputs.");
+    }
+  });
+
   const updateReceiptMutation = useMutation({
     mutationFn: async ({ reportId, receiptId, verified_amount }: { reportId: number, receiptId: number, verified_amount: number }) => {
       const res = await api.put(`/expenses/${reportId}/receipts/${receiptId}`, { verified_amount });
@@ -141,41 +199,80 @@ const Expenses: React.FC = () => {
     }
   });
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  const handleCreateSubmit = (e: React.FormEvent, isDraft: boolean = false) => {
     e.preventDefault();
-    if (!newReport.purpose.trim()) return;
-    const payload: any = { 
-      purpose: newReport.purpose, 
+    if (!newReport.purpose.trim() || !isValidText(newReport.purpose)) {
+      toast.error("Business purpose is required and must contain letters or numbers.");
+      return;
+    }
+    if (!newReport.justification.trim() || !isValidText(newReport.justification)) {
+      toast.error("Description / Justification is required and must contain letters or numbers.");
+      return;
+    }
+    const payload: any = {
+      purpose: newReport.purpose,
       currency: newReport.currency,
-      justification: newReport.justification 
+      justification: newReport.justification
     };
     if (newReport.department_id) payload.department_id = parseInt(newReport.department_id);
     if (newReport.cost_center_id) payload.cost_center_id = parseInt(newReport.cost_center_id);
     if (newReport.project_code) payload.project_code = newReport.project_code;
-    
-    createReportMutation.mutate(payload);
+
+    const processCreate = async () => {
+      try {
+        const res = await api.post("/expenses", payload);
+        const reportId = res.data.expense_report_id;
+        if (isDraft) {
+          toast.success("Reimbursement saved as draft!");
+          setSelectedReportId(null);
+        } else {
+          toast.success("Reimbursement created! Please add receipts to submit.");
+          setSelectedReportId(reportId);
+        }
+        setIsCreateOpen(false);
+        setNewReport({ purpose: "", submission_date: new Date().toISOString().slice(0, 10), department_id: "", cost_center_id: "", project_code: "", currency: "USD", justification: "" });
+        queryClient.invalidateQueries({ queryKey: ["expenses"] });
+      } catch (err: any) {
+        toast.error(err.response?.data?.detail || "Failed to process expense report");
+      }
+    };
+    processCreate();
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, reportId: number) => {
     if (e.target.files && e.target.files.length > 0) {
+      const report = expenses.find(item => item.expense_report_id === reportId);
+      const selectedNames = new Set<string>();
+      for (const file of Array.from(e.target.files)) {
+        const normalizedName = file.name.trim().toLowerCase();
+        if (selectedNames.has(normalizedName) || report?.receipts?.some(receipt => receipt.file_name.trim().toLowerCase() === normalizedName)) {
+          toast.error("This receipt is already attached to the reimbursement. Choose a different file.");
+          e.target.value = "";
+          return;
+        }
+        selectedNames.add(normalizedName);
+      }
       setUploading(true);
-      await uploadReceiptsMutation.mutateAsync({ reportId, files: e.target.files });
-      setUploading(false);
-      e.target.value = ''; // Reset
+      try {
+        await uploadReceiptsMutation.mutateAsync({ reportId, files: e.target.files });
+      } finally {
+        setUploading(false);
+        e.target.value = ''; // Reset, including after a rejected duplicate.
+      }
     }
   };
-  
+
   const handleEditAmount = (receipt: Receipt) => {
-      setEditingReceiptId(receipt.receipt_id);
-      setEditAmount(receipt.verified_amount.toString());
+    setEditingReceiptId(receipt.receipt_id);
+    setEditAmount(receipt.verified_amount.toString());
   }
-  
+
   const saveAmount = (reportId: number, receiptId: number) => {
-      updateReceiptMutation.mutate({
-          reportId,
-          receiptId,
-          verified_amount: parseFloat(editAmount) || 0
-      })
+    updateReceiptMutation.mutate({
+      reportId,
+      receiptId,
+      verified_amount: parseFloat(editAmount) || 0
+    })
   }
 
   if (isLoading) return <Skeleton className="w-full h-[600px] rounded-xl" />;
@@ -183,486 +280,769 @@ const Expenses: React.FC = () => {
   const isManager = hasRole("Manager");
   const isFinance = hasRole("Finance") || hasRole("Finance Manager");
   const isManagerOrAdmin = hasRole("Admin") || isManager || isFinance || hasRole("CFO");
+  const isOwner = (report: any) => user?.user_id === report.employee_id;
 
   // Summary Metrics
   const summary = expenses.reduce((acc, r) => {
     acc[r.status] = (acc[r.status] || 0) + 1;
-    if (r.status === "Approved" || r.status === "Closed" || r.status === "Payment Requested" || r.status === "Finance Verified") {
+    if (r.status === "Approved" || r.status === "Payment Requested" || r.status === "Finance Verified") {
       acc.totalReimbursed += Number(r.total_amount || 0);
     }
     return acc;
   }, { totalReimbursed: 0 } as Record<string, number>);
+
+
+  const getStatusBadge = (status: string) => {
+    return <StatusBadge status={status} />;
+  };
+
+  const subTabCounts: Record<string, number> = {
+    All: expenses.length,
+    Draft: expenses.filter((r: any) => r.status === "Draft").length,
+    Submitted: expenses.filter((r: any) => r.status.includes("Pending") || r.status === "Corrected Claim" || r.status === "Payment Requested" || r.status === "Finance Verified").length,
+    Approved: expenses.filter((r: any) => r.status === "Approved").length,
+    Rejected: expenses.filter((r: any) => r.status === "Rejected" || r.status === "Returned for Correction").length,
+  };
+
+  const filteredExpenses = expenses.filter((r: any) => {
+    if (statusFilter === "All") return true;
+    if (statusFilter === "Draft") return r.status === "Draft";
+    if (statusFilter === "Submitted") return r.status.includes("Pending") || r.status === "Corrected Claim" || r.status === "Payment Requested" || r.status === "Finance Verified";
+    if (statusFilter === "Approved") return r.status === "Approved";
+    if (statusFilter === "Rejected") return r.status === "Rejected" || r.status === "Returned for Correction";
+    return r.status === statusFilter;
+  });
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            {isManager && !isFinance && !hasRole("Admin") ? "Team Reimbursements" : "My Reimbursements"}
+            My Reimbursements
           </h1>
-          <p className="text-muted-foreground mt-1">Manage, verify, and track employee expense reports.</p>
+          <p className="text-xs text-muted-foreground mt-1">Manage, verify, and track employee expense reports.</p>
         </div>
-        {!isManagerOrAdmin && (
-          <Button onClick={() => setIsCreateOpen(true)} className="flex items-center gap-2">
-            <Plus className="w-4 h-4" /> New Reimbursement
+        <div className="flex items-center space-x-4">
+          <HeroTimestamp />
+          <Button onClick={() => setIsCreateOpen(true)} className="font-bold text-xs uppercase tracking-wider">
+            New Reimbursement
           </Button>
-        )}
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <Card className="bg-muted/10 border-muted">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Draft</p>
-              <h3 className="text-2xl font-bold">{summary["Draft"] || 0}</h3>
-            </div>
-            <FileText className="w-8 h-8 text-muted-foreground/40" />
-          </CardContent>
-        </Card>
-        <Card className="bg-amber-500/10 border-amber-500/20">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Pending</p>
-              <h3 className="text-2xl font-bold text-amber-700">{summary["Pending Approval"] || 0}</h3>
-            </div>
-            <Clock className="w-8 h-8 text-amber-600/40" />
-          </CardContent>
-        </Card>
-        <Card className="bg-blue-500/10 border-blue-500/20">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Approved</p>
-              <h3 className="text-2xl font-bold text-blue-700">{summary["Approved"] || 0}</h3>
-            </div>
-            <CheckSquare className="w-8 h-8 text-blue-600/40" />
-          </CardContent>
-        </Card>
-        <Card className="bg-emerald-500/10 border-emerald-500/20">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Paid / Closed</p>
-              <h3 className="text-2xl font-bold text-emerald-700">{summary["Closed"] || 0}</h3>
-            </div>
-            <CheckCircle className="w-8 h-8 text-emerald-600/40" />
-          </CardContent>
-        </Card>
-        <Card className="bg-rose-500/10 border-rose-500/20">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-rose-700 uppercase tracking-wider">Rejected</p>
-              <h3 className="text-2xl font-bold text-rose-700">{(summary["Rejected"] || 0) + (summary["Returned for Correction"] || 0)}</h3>
-            </div>
-            <XOctagon className="w-8 h-8 text-rose-600/40" />
-          </CardContent>
-        </Card>
-        <Card className="bg-primary/10 border-primary/20">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-primary uppercase tracking-wider">Total Value</p>
-              <h3 className="text-2xl font-bold text-primary">${summary.totalReimbursed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h3>
-            </div>
-            <DollarSign className="w-8 h-8 text-primary/40" />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-        {/* Left Column: List of Reports */}
-        <div className="lg:col-span-1 space-y-4">
-          <Card className="h-[600px] flex flex-col">
-            <CardHeader className="pb-3 shrink-0">
-              <CardTitle className="text-lg">Reports List</CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 overflow-y-auto pt-0">
-              <div className="space-y-2">
-                {expenses.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No reports found.</p>}
-                {expenses.map(report => (
-                  <div 
-                    key={report.expense_report_id}
-                    onClick={() => setSelectedReportId(report.expense_report_id)}
-                    className={`p-3 border rounded-lg cursor-pointer transition-colors ${selectedReportId === report.expense_report_id ? 'border-primary bg-primary/5 shadow-sm' : 'hover:bg-accent'}`}
-                  >
-                    <div className="flex justify-between items-start mb-1">
-                      <div className="font-medium text-sm truncate pr-2">{report.purpose}</div>
-                      <Badge variant={
-                        report.status === "Draft" ? "outline" : 
-                        report.status === "Approved" || report.status === "Closed" ? "success" : 
-                        report.status.includes("Pending") ? "warning" : "error"
-                      }>{report.status}</Badge>
-                    </div>
-                    <div className="text-xs text-muted-foreground truncate mb-2">{report.justification || "No description"}</div>
-                    <div className="flex justify-between items-center text-xs text-muted-foreground">
-                      <span>{new Date(report.created_at).toLocaleDateString()}</span>
-                      <span className="font-bold text-foreground">${Number(report.total_amount).toFixed(2)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
         </div>
+      </div>
 
-        {/* Right Column: Report Details & Receipts */}
-        <div className="lg:col-span-2">
-          {selectedReportId ? (() => {
-            const report = expenses.find(r => r.expense_report_id === selectedReportId);
-            if (!report) return null;
-            return (
-              <Card className="h-full border-t-4 border-t-primary shadow-lg flex flex-col">
-                <CardHeader className="flex flex-row justify-between items-start shrink-0">
-                  <div>
-                    <CardTitle className="text-2xl">{report.purpose}</CardTitle>
-                    <div className="text-sm text-muted-foreground mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                      <span>Status: <strong className="text-foreground">{report.status}</strong></span>
-                      <span>Created: {new Date(report.created_at).toLocaleDateString()}</span>
-                      {report.department_id && <span>Dept ID: {report.department_id}</span>}
-                      {report.project_code && <span>Project: {report.project_code}</span>}
-                    </div>
-                    {report.justification && (
-                      <p className="mt-3 text-sm text-foreground/80 bg-muted/30 p-2 rounded">{report.justification}</p>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-3xl font-bold text-primary">
-                      ${Number(report.total_amount).toFixed(2)}
-                    </div>
-                    <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Verified Total</div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-6 flex-1 overflow-y-auto">
-                  {/* Timeline */}
-                  <div className="flex justify-between items-center mb-6 px-4">
-                    {["Draft", "Pending Approval", "Finance Verified", "Payment Requested", "Closed"].map((s, i) => {
-                      const statuses = ["Draft", "Pending Approval", "Finance Verified", "Payment Requested", "Closed"];
-                      let currentIndex = statuses.indexOf(report.status);
-                      if (report.status === "Approved") currentIndex = 1; // Approved -> waiting for finance
-                      if (report.status === "Pending Finance Verification") currentIndex = 1;
-                      
-                      const isCompleted = i <= currentIndex;
-                      const isRejected = report.status === "Rejected" || report.status === "Returned for Correction";
-                      
-                      return (
-                        <div key={s} className="flex flex-col items-center w-1/5 relative">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold z-10 text-xs
-                            ${isCompleted ? (isRejected && i === currentIndex ? 'bg-red-500 text-white' : 'bg-primary text-primary-foreground') : 'bg-muted text-muted-foreground'}`}>
-                            {i + 1}
-                          </div>
-                          <span className="text-[10px] mt-2 text-center text-muted-foreground leading-tight font-medium uppercase">{s}</span>
-                          {i < statuses.length - 1 && (
-                            <div className={`absolute top-4 left-1/2 w-full h-1 -z-0 ${i < currentIndex ? 'bg-primary' : 'bg-muted'}`} />
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                  
-                  {report.duplicate_flag && (
-                    <div className="bg-red-50 text-red-700 p-3 rounded-lg border border-red-200 flex items-center gap-2 mb-4">
-                      <AlertCircle className="w-5 h-5" />
-                      <strong>Warning:</strong> Duplicate receipts detected across other reports.
-                    </div>
-                  )}
-                  {report.policy_flags && (
-                    <div className="bg-amber-50 text-amber-700 p-3 rounded-lg border border-amber-200 flex items-center gap-2 mb-4">
-                      <AlertCircle className="w-5 h-5" />
-                      <strong>Policy Flag:</strong> {report.policy_flags}
-                    </div>
-                  )}
+      {/* Filters & Controls */}
+      <div className="flex items-center space-x-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50">
+        {["All", "Draft", "Submitted", "Approved", "Rejected"].map((status) => (
+          <button
+            key={status}
+            onClick={() => setStatusFilter(status)}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
+              statusFilter === status
+                ? "bg-primary text-primary-foreground shadow-sm font-bold"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+            }`}
+          >
+            <span>{status}</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+              statusFilter === status ? "bg-primary-foreground/20 text-primary-foreground font-bold" : "bg-muted text-muted-foreground"
+            }`}>
+              {subTabCounts[status]}
+            </span>
+          </button>
+        ))}
+      </div>
 
-                  {/* Actions */}
-                  {report.status === "Draft" && (
-                    <div className="flex flex-col sm:flex-row gap-4 p-4 bg-muted/30 rounded-xl border border-dashed border-primary/20">
-                      <div className="flex-1">
-                        <label htmlFor="receipt-upload" className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-background hover:bg-muted/50 border-primary/30 transition-colors">
-                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                            {uploading ? (
-                              <RefreshCw className="w-6 h-6 text-primary animate-spin mb-2" />
-                            ) : (
-                              <Upload className="w-6 h-6 text-primary mb-2" />
-                            )}
-                            <p className="text-sm text-muted-foreground">
-                              {uploading ? "Extracting OCR..." : "Click to upload multiple receipts"}
-                            </p>
-                          </div>
-                          <input id="receipt-upload" type="file" multiple accept="image/*,.pdf" className="hidden" onChange={(e) => handleFileUpload(e, report.expense_report_id)} disabled={uploading} />
-                        </label>
-                      </div>
-                      <div className="flex items-center">
+      {/* Table List */}
+      <Card>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-6 space-y-4">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          ) : filteredExpenses.length === 0 ? (
+            <EmptyState
+              icon={<FileText className="w-10 h-10" />}
+              title="No Reimbursements Found"
+              description={`There are no expense reports matching "${statusFilter}".`}
+              actionLabel={(!isFinance && !hasRole("CFO")) ? "Create new reimbursement" : undefined}
+              onAction={(!isFinance && !hasRole("CFO")) ? () => setIsCreateOpen(true) : undefined}
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-border bg-accent/40 text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    <th className="p-4">Report ID</th>
+                    <th className="p-4">Purpose</th>
+                    <th className="p-4">Total Amount</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4">Date Created</th>
+                    <th className="p-4">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border text-sm">
+                  {filteredExpenses.map((report: any) => (
+                    <tr key={report.expense_report_id} className="hover:bg-accent/20 transition-colors">
+                      <td className="p-4 font-bold text-xs tracking-wider text-primary">{report.expense_report_id}</td>
+                      <td className="p-4">
+                        <div className="font-semibold">{report.purpose}</div>
+                        <div className="text-xs text-muted-foreground truncate max-w-[200px]">{report.justification}</div>
+                      </td>
+                      <td className="p-4 font-bold text-foreground">
+                        ${Number(report.total_amount).toFixed(2)}
+                      </td>
+                      <td className="p-4">
+                        {getStatusBadge(report.status)}
+                      </td>
+                      <td className="p-4 text-xs text-muted-foreground">{new Date(report.created_at).toLocaleDateString()}</td>
+                      <td className="p-4 flex items-center gap-2">
+                        {report.status === "Draft" && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded shrink-0"
+                            title="Delete Draft Report"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm("Are you sure you want to delete this draft expense report?")) {
+                                deleteReportMutation.mutate(report.expense_report_id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                         <Button 
-                          size="lg" 
-                          className="w-full sm:w-auto font-semibold shadow-md"
-                          onClick={() => setIsReviewOpen(true)}
-                          disabled={submitReportMutation.isPending || !report.receipts?.length}
+                          size="sm" 
+                          variant={["Approved", "Rejected", "Returned for Correction"].includes(report.status) ? "view" : "primary"}
+                          onClick={() => setSelectedReportId(report.expense_report_id)}
+                          className="gap-1.5"
                         >
-                          Review & Submit
+                          {(() => {
+                            if (["Approved", "Rejected", "Returned for Correction"].includes(report.status)) return <><Eye className="w-3.5 h-3.5" /> View</>;
+                            if (report.status === "Draft") return "Edit Draft";
+                            return "View Details";
+                          })()}
                         </Button>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Manager Review */}
-                  {(report.status === "Pending Manager Approval" || report.status === "Pending Finance Manager Approval") && (hasRole("Manager") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin")) && (
-                    <div className="flex flex-col gap-3 p-4 bg-amber-500/10 rounded-xl border border-amber-500/20">
-                      <h4 className="font-semibold text-amber-800 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> Manager Review Required</h4>
-                      <div className="flex gap-2">
-                        <Button onClick={() => managerActionMutation.mutate({ reportId: report.expense_report_id, action: 'approve', comments: 'Looks good' })} className="bg-emerald-600 hover:bg-emerald-700 text-white">Approve Claim</Button>
-                        <Button onClick={() => managerActionMutation.mutate({ reportId: report.expense_report_id, action: 'return', comments: 'Please clarify' })} variant="outline" className="bg-white">Return to Employee</Button>
-                        <Button onClick={() => managerActionMutation.mutate({ reportId: report.expense_report_id, action: 'reject', comments: 'Rejected due to policy' })} variant="outline" className="bg-white text-red-600 hover:bg-red-50">Reject</Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Finance Review */}
-                  {report.status === "Pending Finance Verification" && (hasRole("Finance") || hasRole("Admin")) && (
-                    <div className="flex flex-col gap-3 p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
-                       <h4 className="font-semibold text-blue-800 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> Finance Verification</h4>
-                      <Button onClick={() => financeActionMutation.mutate({ reportId: report.expense_report_id, action: 'finance-verify' })} className="w-max bg-blue-600 hover:bg-blue-700 text-white">Verify All Receipts</Button>
-                    </div>
-                  )}
-
-                  {/* Payment */}
-                  {report.status === "Payment Requested" && (hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin")) && (
-                    <div className="flex flex-col gap-3 p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-                       <h4 className="font-semibold text-emerald-800 flex items-center gap-2"><DollarSign className="w-4 h-4" /> Payment Authorization</h4>
-                      <Button onClick={() => financeActionMutation.mutate({ reportId: report.expense_report_id, action: 'pay' })} className="w-max bg-emerald-600 hover:bg-emerald-700 text-white">Authorize Payment</Button>
-                    </div>
-                  )}
-
-                  {/* Receipts List */}
-                  <div className="mt-6">
-                    <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
-                      <FileText className="w-5 h-5 text-muted-foreground" />
-                      Attached Receipts ({report.receipts?.length || 0})
-                    </h3>
-                    
-                    <div className="space-y-3">
-                      {report.receipts?.length === 0 && (
-                        <div className="p-8 text-center text-muted-foreground border rounded-lg bg-muted/10">
-                          No receipts added yet. Upload receipts to build your report.
-                        </div>
-                      )}
-                      {report.receipts?.map(receipt => {
-                        const lowConfidence = receipt.ocr_confidence && receipt.ocr_confidence < 50;
-                        const needsVerification = Number(receipt.verified_amount) === 0;
-                        const alert = lowConfidence || needsVerification;
-
-                        return (
-                          <div key={receipt.receipt_id} className={`flex flex-col md:flex-row gap-4 p-4 border rounded-xl shadow-sm transition-all ${alert && report.status === "Draft" ? 'border-amber-300 bg-amber-50 dark:bg-amber-950/20' : 'bg-card hover:shadow-md'}`}>
-                            {/* Preview */}
-                            <div 
-                              className="w-full md:w-24 h-24 shrink-0 rounded overflow-hidden bg-muted flex items-center justify-center border group relative cursor-pointer"
-                              onClick={() => receipt.image_path && window.open(`http://localhost:8000${receipt.image_path}`, '_blank')}
-                            >
-                               {receipt.image_path ? (
-                                 <img src={`http://localhost:8000${receipt.image_path}`} alt="Receipt" className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity" />
-                               ) : (
-                                 <FileText className="w-8 h-8 text-muted-foreground/50" />
-                               )}
-                               <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                 <span className="text-white text-xs font-bold">View</span>
-                               </div>
-                            </div>
-                            
-                            {/* Details */}
-                            <div className="flex-1 flex flex-col justify-center min-w-0">
-                              <div className="font-medium flex items-center gap-2 text-base truncate">
-                                {receipt.merchant_name || 'Unknown Merchant'}
-                                {alert && report.status === "Draft" && <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" title="Low OCR confidence, please verify amount" />}
-                              </div>
-                              <div className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
-                                <span>Date: <strong className="text-foreground">{receipt.receipt_date || 'N/A'}</strong></span>
-                                <span>Category: <strong className="text-foreground">{receipt.category || 'Uncategorized'}</strong></span>
-                                <span className="flex items-center gap-1 bg-muted/50 px-2 py-0.5 rounded">
-                                  OCR Confidence: <span className={lowConfidence ? "text-amber-600 font-semibold" : "text-green-600 font-medium"}>{receipt.ocr_confidence}%</span>
-                                </span>
-                              </div>
-                              {report.status !== "Draft" && (
-                                <div className="text-xs text-muted-foreground mt-2">
-                                  OCR Extracted: ${Number(receipt.ocr_amount).toFixed(2)}
-                                </div>
-                              )}
-                            </div>
-                            
-                            {/* Amount & Actions */}
-                            <div className="flex items-center justify-end shrink-0 md:min-w-[150px]">
-                              {editingReceiptId === receipt.receipt_id ? (
-                                <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
-                                  <div className="relative">
-                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">$</span>
-                                    <Input 
-                                      type="number" 
-                                      className="w-24 pl-6 pr-2 text-right font-bold h-9 bg-background" 
-                                      value={editAmount}
-                                      onChange={e => setEditAmount(e.target.value)}
-                                      autoFocus
-                                    />
-                                  </div>
-                                  <Button size="icon" variant="ghost" onClick={() => saveAmount(report.expense_report_id, receipt.receipt_id)} className="h-9 w-9 text-green-600 hover:text-green-700 hover:bg-green-100 rounded"><CheckCircle className="w-5 h-5" /></Button>
-                                  <Button size="icon" variant="ghost" onClick={() => setEditingReceiptId(null)} className="h-9 w-9 text-red-600 hover:text-red-700 hover:bg-red-100 rounded"><XCircle className="w-5 h-5" /></Button>
-                                </div>
-                              ) : (
-                                <div 
-                                  className={`flex flex-col items-end cursor-pointer rounded-lg px-3 py-2 transition-colors border ${alert && report.status === "Draft" ? "border-amber-300 bg-amber-100/50 hover:bg-amber-200" : "border-transparent hover:bg-muted"}`}
-                                  onClick={() => { if(report.status === "Draft") handleEditAmount(receipt); }}
-                                  title={report.status === "Draft" ? "Click to correct amount" : ""}
-                                >
-                                  <span className="text-2xl font-bold text-foreground">
-                                    ${Number(receipt.verified_amount).toFixed(2)}
-                                  </span>
-                                  {report.status === "Draft" && (
-                                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mt-1">
-                                      {alert ? "Verify Amount" : "Click to Edit"}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })() : (
-            <div className="h-full flex items-center justify-center p-12 border rounded-xl bg-muted/10 text-muted-foreground">
-              <div className="text-center max-w-sm">
-                <FileText className="w-16 h-16 mx-auto mb-4 opacity-40 text-primary" />
-                <h3 className="text-lg font-semibold text-foreground mb-2">No Report Selected</h3>
-                <p className="text-sm">Select a reimbursement report from the list to view its receipts, status, and policy flags, or create a new one.</p>
-              </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Create Reimbursement Modal */}
       <Dialog isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="New Expense Reimbursement">
-        <form onSubmit={handleCreateSubmit} className="space-y-4">
-          <Input 
-            label="Business Purpose" 
-            placeholder="e.g. Q3 Sales Offsite in NYC" 
+        <form onSubmit={(e) => handleCreateSubmit(e, false)} className="space-y-4">
+          <Input
+            label="Business Purpose *"
+            placeholder="e.g. Q3 Sales Offsite in NYC"
             value={newReport.purpose}
-            onChange={e => setNewReport({...newReport, purpose: e.target.value})}
+            onChange={e => setNewReport({ ...newReport, purpose: e.target.value.replace(/[^a-zA-Z0-9\s.,-]/g, '') })}
             required
           />
           <div className="grid grid-cols-2 gap-4">
-            <Input 
-              label="Expense Date" 
+            <Input
+              label="Date of Submission"
               type="date"
-              value={newReport.expense_date}
-              onChange={e => setNewReport({...newReport, expense_date: e.target.value})}
+              value={newReport.submission_date}
+              readOnly
             />
-            <Input 
-              label="Currency" 
+            <Input
+              label="Currency *"
               value={newReport.currency}
-              onChange={e => setNewReport({...newReport, currency: e.target.value})}
+              onChange={e => setNewReport({ ...newReport, currency: e.target.value })}
               required
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <Select 
+            <Select
               label="Department"
               value={newReport.department_id}
-              onChange={e => setNewReport({...newReport, department_id: e.target.value})}
+              onChange={e => setNewReport({ ...newReport, department_id: e.target.value })}
               options={[
                 { label: "None", value: "" },
                 ...departments.map((d: any) => ({ label: d.department_name, value: d.department_id.toString() }))
               ]}
             />
-            <Select 
+            <Select
               label="Cost Center"
               value={newReport.cost_center_id}
-              onChange={e => setNewReport({...newReport, cost_center_id: e.target.value})}
+              onChange={e => setNewReport({ ...newReport, cost_center_id: e.target.value })}
               options={[
                 { label: "None", value: "" },
                 ...costCenters.map((cc: any) => ({ label: cc.cost_center_name, value: cc.cost_center_id.toString() }))
               ]}
             />
           </div>
-          <Input 
-            label="Project Code" 
+          <Input
+            label="Project Code"
             placeholder="e.g. PRJ-2024-X"
             value={newReport.project_code}
-            onChange={e => setNewReport({...newReport, project_code: e.target.value})}
+            onChange={e => setNewReport({ ...newReport, project_code: e.target.value.replace(/[^a-zA-Z0-9\s-]/g, '') })}
           />
           <div>
             <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-              Description / Justification
+              Description / Justification <span className="text-red-500">*</span>
             </label>
             <textarea
-              className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200"
+              className="w-full px-3 py-2 text-sm rounded-lg bg-background dark:bg-black dark:text-white border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200"
               rows={3}
               placeholder="Provide a detailed justification for this expense claim..."
               value={newReport.justification}
-              onChange={e => setNewReport({...newReport, justification: e.target.value})}
+              onChange={e => setNewReport({ ...newReport, justification: e.target.value.replace(/[^a-zA-Z0-9\s.,!?-]/g, '') })}
+              required
             ></textarea>
           </div>
-          <div className="pt-4 flex justify-end gap-2 border-t border-border">
-            <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={createReportMutation.isPending || !newReport.purpose}>Create Report</Button>
+          <div className="flex justify-end space-x-2 pt-3 border-t border-border mt-2">
+            <Button variant="close" type="button"  onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+            <Button type="button" variant="secondary" onClick={(e) => handleCreateSubmit(e, true)} disabled={!newReport.purpose.trim() || !newReport.justification.trim()}>Save as Draft</Button>
+            <Button type="submit" disabled={!newReport.purpose.trim() || !newReport.justification.trim()}>Save & Add Receipts</Button>
           </div>
         </form>
       </Dialog>
 
-      {/* Review & Submit Modal */}
-      <Dialog isOpen={isReviewOpen} onClose={() => setIsReviewOpen(false)} title="Review and Submit Claim">
-        {selectedReportId && (() => {
-          const report = expenses.find(r => r.expense_report_id === selectedReportId);
-          if (!report) return null;
-          
-          const unverified = report.receipts?.filter(r => Number(r.verified_amount) === 0).length || 0;
-          
+
+      {/* Right Column: Report Details & Receipts */}
+      {selectedReportId && (() => {
+        const report = expenses.find(r => Number(r.expense_report_id) === Number(selectedReportId));
+        if (!report) return null;
+
+        const isEditable = report.status === "Draft" || report.status === "Returned for Correction";
+        if (!isEditable) {
           return (
-            <div className="space-y-6">
-              <div className="bg-muted/30 p-4 rounded-xl border">
-                <h3 className="font-bold text-lg mb-2">{report.purpose}</h3>
-                <div className="flex justify-between items-center text-sm border-t border-border pt-3 mt-3">
-                  <span className="text-muted-foreground">Total Receipts:</span>
-                  <span className="font-medium">{report.receipts?.length || 0}</span>
+            <ReimbursementDetailModal
+              isOpen={!!selectedReportId}
+              onClose={() => setSelectedReportId(null)}
+              receiptDetails={report}
+              isPendingForUser={false} // Only read-only for employees here
+              onAction={() => {}}
+            />
+          );
+        }
+
+        const isRejected = report.status === "Rejected";
+        const isReturned = report.status === "Returned for Correction";
+        const isApproved = report.status === "Approved";
+
+        const isPendingManager = report.status === "Pending Manager Approval" || report.status === "Pending Approval" || report.status === "Corrected Claim";
+        const isPendingFinance = report.status === "Pending Finance Manager Approval" || report.status === "Pending Finance Approval" || report.status === "Pending Finance Verification";
+
+
+        const steps = [
+          { name: "Draft", key: "draft" },
+          { name: "Manager Approval", key: "manager" },
+          { name: "Finance Approval", key: "finance" },
+          { name: "Completed", key: "completed" }
+        ];
+
+        let currentStepIdx = 0;
+        if (isPendingManager) currentStepIdx = 1;
+        else if (isPendingFinance || report.status === "Payment Requested") currentStepIdx = 2;
+        else if (isApproved) currentStepIdx = 3;
+
+        return (
+          <Dialog isOpen={true} onClose={() => setSelectedReportId(null)} title={report.purpose || "Untitled Expense"} maxWidthClass="max-w-2xl">
+            <div className="flex flex-col space-y-8 mt-4">
+              {/* Header Section */}
+              <div className="flex items-center justify-between px-2">
+                <div className="flex items-center gap-4">
+                  <Badge 
+                    variant={
+                      report.status === 'Approved' ? 'success' :
+                        (report.status.includes('Rejected') || report.status.includes('Returned')) ? 'error' :
+                          (report.status.includes('Pending') || report.status.includes('Review')) ? 'info' :
+                            'neutral'
+                    }
+                    className={report.status === 'Draft' ? 'bg-blue-100 text-blue-600 border-none' : ''}
+                  >{report.status}</Badge>
+                  <span className="text-sm text-muted-foreground font-medium">
+                    Created: {new Date(report.created_at).toLocaleDateString()}
+                  </span>
                 </div>
-                <div className="flex justify-between items-center text-sm mt-2">
-                  <span className="text-muted-foreground">Calculated Claim Total:</span>
-                  <span className="text-xl font-bold text-primary">${Number(report.total_amount).toFixed(2)}</span>
+                <div className="text-right">
+                  <div className="text-3xl font-black text-blue-600">
+                    ${Number(report.total_amount).toFixed(2)}
+                  </div>
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">Verified Total</div>
                 </div>
               </div>
-              
-              {unverified > 0 && (
-                <div className="bg-rose-50 text-rose-700 p-3 rounded-lg border border-rose-200 flex items-start gap-2">
-                  <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
-                  <div>
-                    <strong>Action Required:</strong> You have {unverified} receipt(s) with an unverified or $0.00 amount. Please review and correct the amounts before submission.
-                  </div>
+
+              {/* Compact Progress Bar */}
+              <div className="flex justify-between items-center px-8 py-6 relative">
+                <div className="absolute top-1/2 left-10 right-10 h-0.5 bg-muted -z-10 -translate-y-1/2 rounded-full" />
+                {(() => {
+                  const requestorRoles = report.employee?.roles?.map((r: any) => r.role_name) || [];
+                  const routesToCfo = requestorRoles.includes("Admin") || requestorRoles.includes("CEO") || requestorRoles.includes("Finance Manager") || requestorRoles.includes("Finance");
+                  const routesToFinanceManager = requestorRoles.includes("CFO") || (requestorRoles.includes("Manager") && !routesToCfo);
+
+                  let steps = ["Draft", "Submitted", "Manager", "Finance", "Payment", "Closed"];
+                  if (routesToCfo) {
+                    steps = ["Draft", "Submitted", "CFO", "Payment", "Closed"];
+                  } else if (routesToFinanceManager) {
+                    steps = ["Draft", "Submitted", "Finance Manager", "Payment", "Closed"];
+                  }
+                    
+                  let currentIndex = 0;
+                  if (report.status === "Draft") currentIndex = 0;
+                  else if (report.status === "Corrected Claim") currentIndex = 1;
+                  else if (report.status === "Pending Manager Approval") currentIndex = steps.indexOf("Manager") !== -1 ? steps.indexOf("Manager") : 1;
+                  else if (report.status === "Pending Finance Approval" || report.status === "Pending Finance Manager Approval" || report.status === "Pending CFO Approval") {
+                      if (steps.includes("CFO")) currentIndex = steps.indexOf("CFO");
+                      else if (steps.includes("Finance Manager")) currentIndex = steps.indexOf("Finance Manager");
+                      else currentIndex = steps.indexOf("Finance");
+                  }
+                  else if (report.status === "Payment Requested") currentIndex = steps.indexOf("Payment");
+                  else if (report.status === "Approved" || report.status === "Approved") currentIndex = steps.indexOf("Closed");
+                  else currentIndex = 1;
+
+                  return steps.map((s, i) => {
+                    const isCompleted = i < currentIndex;
+                    const isRejected = report.status.includes("Reject") || report.status.includes("Return");
+                    const isActive = i === currentIndex;
+                    
+                    // Progressive blue shades for completed steps
+                    const blueShades = [
+                      "bg-blue-200 text-blue-800",
+                      "bg-blue-300 text-blue-900",
+                      "bg-blue-400 text-white",
+                      "bg-blue-500 text-white",
+                      "bg-blue-600 text-white",
+                      "bg-blue-700 text-white"
+                    ];
+                    const completedStyle = isRejected && isActive ? 'bg-red-500 text-white shadow-red-500/20' : blueShades[Math.min(i, blueShades.length - 1)];
+                    const activeStyle = 'border-2 border-blue-400 bg-background text-blue-600';
+                    const defaultStyle = 'bg-muted border border-border text-muted-foreground';
+
+                    return (
+                      <div key={s} className="flex flex-col items-center gap-2.5 relative group z-10 w-20">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold z-10 transition-all
+                            ${isCompleted ? completedStyle : (isActive ? activeStyle : defaultStyle)}`}
+                        >
+                          {i + 1}
+                        </div>
+                        <span className={`text-[10px] font-bold uppercase tracking-wider text-center w-full leading-tight
+                            ${isActive || isCompleted ? 'text-blue-600' : 'text-muted-foreground'}`}>
+                          {s}
+                        </span>
+                        {i < currentIndex && (
+                          <div className="absolute top-4 left-10 w-[calc(100%+30px)] h-[2px] bg-border -z-10" />
+                        )}
+                        {i === currentIndex && i !== steps.length - 1 && (
+                          <div className="absolute top-4 left-10 w-[calc(100%+30px)] h-[2px] bg-border -z-10" />
+                        )}
+                      </div>
+                    )
+                  });
+                })()}
+              </div>
+
+              {report.justification && (
+                <div className="text-sm text-foreground/90 italic border-l-4 border-blue-500 pl-4 py-1 mx-2">
+                  "{report.justification}"
                 </div>
               )}
 
-              <label className="flex items-start gap-3 p-4 border rounded-xl cursor-pointer hover:bg-muted/50 transition-colors">
-                <input 
-                  type="checkbox" 
-                  className="mt-1 w-4 h-4 text-primary rounded border-border focus:ring-primary"
-                  checked={declarationChecked}
-                  onChange={e => setDeclarationChecked(e.target.checked)}
-                />
-                <span className="text-sm leading-relaxed text-muted-foreground">
-                  <strong>Employee Declaration:</strong> I certify that these expenses were incurred for legitimate business purposes in accordance with company policy, and I have not previously claimed or been reimbursed for these expenses.
-                </span>
-              </label>
+              <div className="flex flex-wrap gap-6 text-sm text-foreground font-medium bg-card p-4 rounded-2xl border border-border shadow-sm mx-2 mt-4">
+                {report.department_id && (
+                  <span className="flex items-center gap-2.5">
+                    <div className="bg-blue-100 p-1.5 rounded-lg text-blue-600">
+                      <Building className="w-4 h-4" />
+                    </div>
+                    Dept: {report.department_id}
+                  </span>
+                )}
+                {report.project_code && (
+                  <span className="flex items-center gap-2.5">
+                    <div className="bg-blue-100 p-1.5 rounded-lg text-blue-600">
+                      <Briefcase className="w-4 h-4" />
+                    </div>
+                    Proj: {report.project_code}
+                  </span>
+                )}
+              </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-border">
-                <Button variant="ghost" onClick={() => setIsReviewOpen(false)}>Back to Editing</Button>
-                <Button 
-                  onClick={() => submitReportMutation.mutate(report.expense_report_id)}
-                  disabled={!declarationChecked || unverified > 0 || submitReportMutation.isPending}
-                  className="font-bold shadow-md"
-                >
-                  Confirm & Submit
-                </Button>
+              {report.duplicate_flag && (
+                <div className="bg-red-500/10 text-red-500 text-sm p-4 rounded-xl border border-red-500/20 flex items-center gap-3 mx-2">
+                  <AlertCircle className="w-5 h-5 shrink-0" />
+                  <span><strong>Warning:</strong> Duplicate receipts detected across other reports.</span>
+                </div>
+              )}
+              {report.policy_flags && (
+                <div className="bg-amber-500/10 text-amber-500 text-sm p-4 rounded-xl border border-amber-500/20 flex items-center gap-3 mx-2">
+                  <AlertCircle className="w-5 h-5 shrink-0" />
+                  <span><strong>Policy Flag:</strong> {report.policy_flags}</span>
+                </div>
+              )}
+
+              {/* Unified Action Area */}
+              {(report.status === "Draft" || (report.status === "Returned for Correction" && isOwner(report))) && (
+                <div className="flex flex-col gap-6 pt-2">
+                  <div className="p-6 bg-card rounded-2xl border border-dashed border-border/80 shadow-sm mx-2">
+                    <div className="flex items-start gap-3 mb-4">
+                      <Upload className="w-5 h-5 text-blue-500 mt-0.5" />
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground">Upload Receipts</h4>
+                        <p className="text-xs text-muted-foreground mt-1">Upload multiple receipts to build your report.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center w-full mb-4 shadow-sm rounded-lg overflow-hidden border border-border/60">
+                      <label className="cursor-pointer bg-muted hover:bg-muted/80 border-r border-border/60 px-5 py-2.5 text-sm font-semibold text-foreground transition-colors h-full flex items-center shrink-0">
+                        Choose File
+                        <input id="receipt-upload" type="file" multiple accept="image/*,.pdf" className="hidden" onChange={(e) => handleFileUpload(e, report.expense_report_id)} disabled={uploading} />
+                      </label>
+                      <div className="flex-1 bg-background px-4 py-2.5 text-sm text-muted-foreground flex items-center h-full">
+                        {uploading ? "Extracting OCR..." : "No file chosen"}
+                        {uploading && <RefreshCw className="w-4 h-4 text-blue-500 animate-spin ml-auto" />}
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-muted-foreground font-medium">Accepted formats: JPG, PNG, PDF (Max size: 10MB each)</p>
+                  </div>
+
+                  <div className="flex justify-end gap-4 w-full">
+                    <Button
+                      size="default"
+                      variant="outline"
+                      className="text-sm font-semibold h-10 px-6 border-[#3E3E4A] hover:bg-[#2A2A35] rounded-md text-foreground"
+                      onClick={() => {
+                        setEditDetails({
+                          purpose: report.purpose,
+                          justification: report.justification || "",
+                          department_id: report.department_id ? report.department_id.toString() : "",
+                          cost_center_id: report.cost_center_id ? report.cost_center_id.toString() : "",
+                          project_code: report.project_code || ""
+                        });
+                        setIsEditDetailsOpen(true);
+                      }}
+                    >
+                      Edit Details
+                    </Button>
+                    <Button
+                      size="default"
+                      variant="primary"
+                      className="text-sm font-bold h-10 px-6 bg-gradient-to-r from-[#A78BFA] to-[#F472B6] hover:opacity-90 border-0 rounded-md text-white shadow-none"
+                      onClick={() => setIsReviewOpen(true)}
+                      disabled={submitReportMutation.isPending || !report.receipts?.length}
+                    >
+                      Review & Submit
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {!isOwner(report) && report.status === "Draft" && (
+                <div className="text-muted-foreground italic text-sm text-center p-4 bg-muted/30 rounded-xl mx-2">Draft report - Waiting for submission</div>
+              )}
+
+
+            {/* Receipts List */}
+            <div className="mt-6 space-y-3">
+              <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
+                <FileText className="w-4 h-4 text-primary" />
+                Attached Receipts ({report.receipts?.length || 0})
+              </h3>
+
+              <div className="space-y-3">
+                {report.receipts?.length === 0 && (
+                  <div className="p-8 text-center text-muted-foreground border rounded-lg bg-muted/10">
+                    No receipts added yet. Upload receipts to build your report.
+                  </div>
+                )}
+                {report.receipts?.map(receipt => {
+                  const lowConfidence = receipt.ocr_confidence && receipt.ocr_confidence < 50;
+                  const needsVerification = Number(receipt.verified_amount) === 0;
+                  const alert = lowConfidence || needsVerification;
+
+                  return (
+                    <div key={receipt.receipt_id} className={`flex flex-col md:flex-row gap-4 p-4 rounded-2xl border transition-all duration-200 shadow-apple-sm ${alert && (report.status === "Draft" || report.status === "Returned for Correction") ? 'border-amber-500/40 bg-amber-500/10' : 'apple-card'}`}>
+                      {/* Apple Thumbnail Preview */}
+                      <div
+                        className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/60 rounded-xl border border-border flex items-center justify-center overflow-hidden shrink-0 group relative shadow-inner cursor-pointer"
+                        onClick={() => {
+                            const basePath = import.meta.env.VITE_API_URL || '/api/v1';
+                            const cleanPath = receipt.image_path.startsWith('/uploads') ? receipt.image_path.replace('/uploads', '') : (receipt.image_path.startsWith('/') ? receipt.image_path : `/${receipt.image_path}`);
+                            const fullUrl = receipt.image_path.startsWith('http') ? receipt.image_path : `${basePath}/uploads${cleanPath}`;
+                            setPreviewReceiptUrl(fullUrl);
+                        }}
+                      >
+                        {receipt.image_path ? (
+                          <>
+                            {receipt.image_path.toLowerCase().endsWith('.pdf') ? (
+                              <div className="flex flex-col items-center justify-center gap-1 text-red-500">
+                                <FileText className="w-8 h-8" />
+                                <span className="text-[9px] font-bold">PDF</span>
+                              </div>
+                            ) : (
+                              <img src={receipt.image_path.startsWith('http') ? receipt.image_path : `${import.meta.env.VITE_API_URL || '/api/v1'}/uploads${receipt.image_path.startsWith('/uploads') ? receipt.image_path.replace('/uploads', '') : (receipt.image_path.startsWith('/') ? receipt.image_path : `/${receipt.image_path}`)}`} alt="Receipt" className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity" />
+                            )}
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <Eye className="w-5 h-5 text-white" />
+                            </div>
+                          </>
+                        ) : (
+                          <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-muted-foreground/50" />
+                        )}
+                      </div>
+
+                      {/* Details */}
+                      <div className="flex-1 flex flex-col justify-center min-w-0">
+                        <div className="font-bold flex items-center gap-2 text-sm text-foreground truncate">
+                          {receipt.merchant_name || 'QuickBite Restaurant'}
+                          {alert && report.status === "Draft" && <span title="Low OCR confidence, please verify amount"><AlertCircle className="w-4 h-4 text-amber-500 shrink-0" /></span>}
+                        </div>
+                        <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                          <span>Date: <strong className="text-foreground">{receipt.receipt_date || 'N/A'}</strong></span>
+                          <span>Category: <strong className="text-foreground">{receipt.category || 'Uncategorized'}</strong></span>
+                          <span className="flex items-center gap-1 bg-muted/50 px-2 py-0.5 rounded">
+                            OCR Confidence: <span className={lowConfidence ? "text-amber-600 font-semibold" : "text-green-600 font-medium"}>{receipt.ocr_confidence}%</span>
+                          </span>
+                        </div>
+                        {report.status !== "Draft" && (
+                          <div className="text-[11px] text-muted-foreground mt-1.5 font-medium">
+                            OCR Extracted: ${Number(receipt.ocr_amount).toFixed(2)}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Amount & Actions */}
+                      <div className="flex items-center justify-end shrink-0 md:min-w-[160px] gap-2">
+                        {editingReceiptId === receipt.receipt_id ? (
+                          <div className="flex items-center gap-1.5 bg-muted/80 p-1.5 rounded-xl border border-border">
+                            <div className="relative">
+                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-bold">$</span>
+                              <Input
+                                type="number"
+                                className="w-24 pl-6 pr-2 text-right font-bold h-8 text-xs bg-background rounded-lg"
+                                value={editAmount}
+                                onChange={e => setEditAmount(e.target.value)}
+                                autoFocus
+                              />
+                            </div>
+                            <Button size="sm" variant="primary" onClick={() => saveAmount(report.expense_report_id, receipt.receipt_id)} className="h-8 px-2.5 rounded-lg"><CheckCircle className="w-4 h-4" /></Button>
+                            <Button size="sm" variant="ghost" onClick={() => setEditingReceiptId(null)} className="h-8 px-2 rounded-lg text-rose-500"><XCircle className="w-4 h-4" /></Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={`flex flex-col items-end cursor-pointer rounded-xl px-3 py-1.5 transition-colors border ${alert && (report.status === "Draft" || report.status === "Returned for Correction") ? "border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20" : "border-transparent hover:bg-muted/60"}`}
+                              onClick={() => { if (report.status === "Draft" || (report.status === "Returned for Correction" && isOwner(report))) handleEditAmount(receipt); }}
+                              title={report.status === "Draft" || (report.status === "Returned for Correction" && isOwner(report)) ? "Click to correct amount" : ""}
+                            >
+                              <span className="text-xl font-extrabold text-foreground tracking-tight">
+                                ${Number(receipt.verified_amount).toFixed(2)}
+                              </span>
+                              {(report.status === "Draft" || (report.status === "Returned for Correction" && isOwner(report))) && (
+                                <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider mt-0.5">
+                                  {alert ? "Verify Amount" : "Click to Edit"}
+                                </span>
+                              )}
+                            </div>
+
+                            {report.status === "Draft" && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-9 w-9 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded"
+                                title="Delete Receipt / OCR"
+                                onClick={() => {
+                                  if (window.confirm("Are you sure you want to delete this receipt?")) {
+                                    deleteReceiptMutation.mutate({ reportId: report.expense_report_id, receiptId: receipt.receipt_id });
+                                  }
+                                }}
+                                disabled={deleteReceiptMutation.isPending}
+                              >
+                                <Trash2 className="w-4.5 h-4.5" />
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          );
-        })()}
+          </div>
+        </Dialog>
+      );
+    })()}
+
+
+{/* Review & Submit Modal */ }
+<Dialog isOpen={isReviewOpen} onClose={() => setIsReviewOpen(false)} title="Review and Submit Claim">
+  {selectedReportId && (() => {
+    const report = expenses.find(r => r.expense_report_id === selectedReportId);
+    if (!report) return null;
+
+    const unverified = report.receipts?.filter(r => Number(r.verified_amount) === 0).length || 0;
+
+    return (
+      <div className="space-y-6">
+        <div className="bg-muted/30 p-4 rounded-xl border">
+          <h3 className="font-bold text-lg mb-2">{report.purpose}</h3>
+          <div className="flex justify-between items-center text-sm border-t border-border pt-3 mt-3">
+            <span className="text-muted-foreground">Total Receipts:</span>
+            <span className="font-medium">{report.receipts?.length || 0}</span>
+          </div>
+          <div className="flex justify-between items-center text-sm mt-2">
+            <span className="text-muted-foreground">Calculated Claim Total:</span>
+            <span className="text-xl font-bold text-primary">${Number(report.total_amount).toFixed(2)}</span>
+          </div>
+        </div>
+
+        {unverified > 0 && (
+          <div className="bg-rose-50 text-rose-700 p-3 rounded-lg border border-rose-200 flex items-start gap-2">
+            <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
+            <div>
+              <strong>Action Required:</strong> You have {unverified} receipt(s) with an unverified or $0.00 amount. Please review and correct the amounts before submission.
+            </div>
+          </div>
+        )}
+
+        <label className="flex items-start gap-3 p-4 border rounded-xl cursor-pointer hover:bg-muted/50 transition-colors">
+          <input
+            type="checkbox"
+            className="mt-1 w-4 h-4 text-primary rounded border-border focus:ring-primary"
+            checked={declarationChecked}
+            onChange={e => setDeclarationChecked(e.target.checked)}
+          />
+          <span className="text-sm leading-relaxed text-muted-foreground">
+            <strong>Employee Declaration:</strong> I certify that these expenses were incurred for legitimate business purposes in accordance with company policy, and I have not previously claimed or been reimbursed for these expenses.
+          </span>
+        </label>
+
+        <div className="flex justify-end gap-3 pt-3 mt-2 border-t border-border">
+          <Button variant="ghost" onClick={() => setIsReviewOpen(false)}>Back to Editing</Button>
+          <Button
+            onClick={() => submitReportMutation.mutate(report.expense_report_id)}
+            disabled={!declarationChecked || unverified > 0 || submitReportMutation.isPending}
+            className="font-bold shadow-md"
+          >
+            Confirm & Submit
+          </Button>
+        </div>
+      </div>
+    );
+  })()}
+</Dialog>
+
+{/* Manager Action Modal */ }
+<Dialog isOpen={managerAction.isOpen} onClose={() => setManagerAction({ isOpen: false, action: null, reportId: null })} title={managerAction.action === 'return' ? "Return to Employee" : "Reject Expense Claim"}>
+  <div className="space-y-4">
+    <p className="text-sm text-muted-foreground">Please provide a justification for this action. This will be visible to the employee.</p>
+    <textarea
+      className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background dark:bg-black dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
+      rows={4}
+      placeholder="Enter your justification..."
+      value={managerComments}
+      onChange={e => setManagerComments(e.target.value)}
+    />
+    <div className="flex justify-end gap-2 pt-3 mt-2 border-t border-border">
+      <Button variant="close" onClick={() => setManagerAction({ isOpen: false, action: null, reportId: null })}>Cancel</Button>
+      <Button
+        disabled={!managerComments.trim() || managerActionMutation.isPending}
+        onClick={() => {
+          if (!isValidText(managerComments)) {
+            toast.error("Please enter a valid justification (letters or numbers required).");
+            return;
+          }
+          if (managerAction.reportId && managerAction.action) {
+            managerActionMutation.mutate({ reportId: managerAction.reportId, action: managerAction.action, comments: managerComments });
+            setManagerAction({ isOpen: false, action: null, reportId: null });
+            setManagerComments("");
+          }
+        }}
+        className={managerAction.action === 'reject' ? "bg-red-600 hover:bg-red-700 text-white" : ""}
+      >
+        {managerAction.action === 'return' ? "Return" : "Reject"}
+      </Button>
+    </div>
+  </div>
+</Dialog>
+
+{/* Edit Details Modal */ }
+<Dialog isOpen={isEditDetailsOpen} onClose={() => setIsEditDetailsOpen(false)} title="Edit Report Details">
+  <form onSubmit={(e) => {
+    e.preventDefault();
+    if (selectedReportId) {
+      const payload: any = {
+        purpose: editDetails.purpose,
+        justification: editDetails.justification,
+        project_code: editDetails.project_code || null
+      };
+      if (editDetails.department_id) payload.department_id = parseInt(editDetails.department_id);
+      else payload.department_id = null;
+      if (editDetails.cost_center_id) payload.cost_center_id = parseInt(editDetails.cost_center_id);
+      else payload.cost_center_id = null;
+
+      updateReportMutation.mutate({ reportId: selectedReportId, payload });
+    }
+  }} className="space-y-4">
+    <Input
+      label="Business Purpose *"
+      value={editDetails.purpose}
+      onChange={e => setEditDetails({ ...editDetails, purpose: e.target.value.replace(/[^a-zA-Z0-9\s.,-]/g, '') })}
+      required
+    />
+    <div className="grid grid-cols-2 gap-4">
+      <Select
+        label="Department"
+        value={editDetails.department_id}
+        onChange={e => setEditDetails({ ...editDetails, department_id: e.target.value })}
+        options={[
+          { label: "None", value: "" },
+          ...departments.map((d: any) => ({ label: d.department_name, value: d.department_id.toString() }))
+        ]}
+      />
+      <Select
+        label="Cost Center"
+        value={editDetails.cost_center_id}
+        onChange={e => setEditDetails({ ...editDetails, cost_center_id: e.target.value })}
+        options={[
+          { label: "None", value: "" },
+          ...costCenters.map((cc: any) => ({ label: cc.cost_center_name, value: cc.cost_center_id.toString() }))
+        ]}
+      />
+    </div>
+    <Input
+      label="Project Code"
+      value={editDetails.project_code}
+      onChange={e => setEditDetails({ ...editDetails, project_code: e.target.value.replace(/[^a-zA-Z0-9\s-]/g, '') })}
+    />
+    <div>
+      <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+        Description / Justification <span className="text-red-500">*</span>
+      </label>
+      <textarea
+        className="w-full px-3 py-2 text-sm rounded-lg bg-background dark:bg-black dark:text-white border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200"
+        rows={3}
+        value={editDetails.justification}
+        onChange={e => setEditDetails({ ...editDetails, justification: e.target.value.replace(/[^a-zA-Z0-9\s.,!?-]/g, '') })}
+        required
+      ></textarea>
+    </div>
+    <div className="pt-3 mt-2 flex justify-end gap-2 border-t border-border">
+      <Button variant="close" type="button"  onClick={() => setIsEditDetailsOpen(false)}>Cancel</Button>
+      <Button type="submit" disabled={updateReportMutation.isPending || !editDetails.purpose.trim() || !editDetails.justification.trim()}>Save Changes</Button>
+    </div>
+  </form>
+</Dialog>
+      <Dialog isOpen={!!previewReceiptUrl} onClose={() => setPreviewReceiptUrl(null)} title="Receipt Preview" maxWidthClass="max-w-4xl">
+        <div className="flex items-center justify-center bg-black/10 dark:bg-black/50 rounded-xl overflow-hidden p-2 min-h-[50vh]">
+          {previewReceiptUrl && (
+            previewReceiptUrl.toLowerCase().endsWith('.pdf') ? (
+              <iframe src={previewReceiptUrl} className="w-full h-[80vh] rounded-lg border-none" title="PDF Preview" />
+            ) : (
+              <img src={previewReceiptUrl} alt="Receipt Preview" className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-sm" />
+            )
+          )}
+        </div>
       </Dialog>
     </div>
   );

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { useAuth } from "../hooks/useAuth";
 import {Card, CardHeader, CardTitle, CardContent, Button, Badge, Skeleton, Dialog, Input, EmptyState} from "../components/ui";
-import { formatDate } from "../utils/helpers";
+import { formatDate, isValidText } from "../utils/helpers";
 import toast from "react-hot-toast";
 
 export const VendorPortal: React.FC = () => {
@@ -55,8 +55,8 @@ export const VendorPortal: React.FC = () => {
 
   const handleSubmitBid = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!timeline) {
-      toast.error("Please enter a delivery timeline.");
+    if (!timeline || !isValidText(timeline)) {
+      toast.error("Please enter a valid delivery timeline (letters or numbers required).");
       return;
     }
     
@@ -231,44 +231,6 @@ export const VendorPortal: React.FC = () => {
               <span className="font-bold text-sm text-foreground/90">{selectedRfq.title}</span>
             </div>
 
-            {(selectedRfq.pr_description || selectedRfq.pr_justification) && (
-              <div className="bg-muted/40 p-4 rounded-lg border border-border text-xs space-y-3 mt-4">
-                <h4 className="font-bold text-sm text-foreground/90 border-b border-border pb-2 mb-2 flex items-center gap-2">
-                  <span className="text-primary">Original Purchase Requisition</span>
-                </h4>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  {selectedRfq.pr_project_code && (
-                    <div>
-                      <span className="block font-semibold text-muted-foreground uppercase text-[10px]">Project Code</span>
-                      <span className="text-foreground/90 font-medium">{selectedRfq.pr_project_code}</span>
-                    </div>
-                  )}
-                  {selectedRfq.pr_priority && (
-                    <div>
-                      <span className="block font-semibold text-muted-foreground uppercase text-[10px]">Priority</span>
-                      <Badge variant={selectedRfq.pr_priority === 'High' || selectedRfq.pr_priority === 'Urgent' ? 'warning' : 'neutral'}>
-                        {selectedRfq.pr_priority}
-                      </Badge>
-                    </div>
-                  )}
-                </div>
-
-                {selectedRfq.pr_description && (
-                  <div>
-                    <span className="block font-semibold text-muted-foreground uppercase text-[10px] mb-1">Description</span>
-                    <p className="text-foreground/80 whitespace-pre-wrap leading-relaxed">{selectedRfq.pr_description}</p>
-                  </div>
-                )}
-
-                {selectedRfq.pr_justification && (
-                  <div>
-                    <span className="block font-semibold text-muted-foreground uppercase text-[10px] mb-1">Business Justification</span>
-                    <p className="text-foreground/80 whitespace-pre-wrap leading-relaxed">{selectedRfq.pr_justification}</p>
-                  </div>
-                )}
-              </div>
-            )}
 
             {selectedRfq.items && selectedRfq.items.length > 0 && (
               <div className="bg-background rounded-lg border border-border mt-4">
@@ -301,7 +263,8 @@ export const VendorPortal: React.FC = () => {
                               type="number"
                               min="0"
                               step="0.01"
-                              className="w-24 px-2 py-1 text-xs border border-border rounded bg-background"
+                              className="w-24 px-2 py-1.5 text-xs border border-primary/40 rounded-md bg-muted/50 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all shadow-sm"
+                              placeholder="0.00"
                               value={pricing.unit_price}
                               onChange={(e) => setItemPrices({
                                 ...itemPrices,
@@ -314,7 +277,8 @@ export const VendorPortal: React.FC = () => {
                               type="number"
                               min="0"
                               step="0.01"
-                              className="w-20 px-2 py-1 text-xs border border-border rounded bg-background"
+                              className="w-20 px-2 py-1.5 text-xs border border-primary/40 rounded-md bg-muted/50 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all shadow-sm"
+                              placeholder="0.00"
                               value={pricing.tax_amount}
                               onChange={(e) => setItemPrices({
                                 ...itemPrices,
@@ -350,10 +314,8 @@ export const VendorPortal: React.FC = () => {
               onChange={(e) => setTimeline(e.target.value)}
             />
 
-            <div className="flex justify-end space-x-2 pt-4 border-t border-border">
-              <Button variant="outline" type="button" onClick={() => setSelectedRfq(null)}>
-                Cancel
-              </Button>
+            <div className="flex justify-end space-x-2 pt-3 mt-2 border-t border-border">
+              <Button variant="close" type="button" onClick={() => setSelectedRfq(null)}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Submitting Bid..." : "Submit Quotation Bid"}
               </Button>

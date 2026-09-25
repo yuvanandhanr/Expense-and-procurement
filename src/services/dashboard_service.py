@@ -12,6 +12,7 @@ from src.models.vendor import Vendor, VendorPerformance
 from src.models.contract import Contract
 from src.models.assets import Asset
 from src.models.invoice import VendorInvoice
+from src.models.expense import ExpenseReport
 from src.models.rfq import RequestForQuotation
 from src.models.payments import PaymentRequest
 from src.models.organization import Department, BudgetCode
@@ -33,16 +34,7 @@ class DashboardService:
         """
         Compiles executive dashboard data filtered by role and caches it.
         """
-        cache_key = f"dashboard:role={role}:user={user_id}"
-        cached = await self.cache.get(cache_key)
-        if cached:
-            logger.info(f"Dashboard cache hit for key '{cache_key}'")
-            return cached
-
-        # Fetch active widgets configuration for the role
-        logger.info(f"Dashboard cache miss. Computing metrics for role '{role}'")
-        
-        # Base dashboard widgets
+        # Base dashboard widgets - computed live in real-time
         data = {
             "role": role,
             "timestamp": datetime.utcnow().isoformat(),
@@ -81,16 +73,15 @@ class DashboardService:
             data["widgets"]["employee_reimbursements"] = await self._get_reimbursements_summary()
             data["widgets"]["vendor_invoices"] = await self._get_vendor_invoices_summary()
 
-        if role_upper == "EMPLOYEE":
-            data["widgets"]["my_purchase_requests"] = await self._get_employee_pr_summary(user_id)
-            data["widgets"]["my_reimbursements"] = await self._get_reimbursements_summary(employee_id=user_id)
-            data["widgets"]["my_monthly_trend"] = await self._get_employee_monthly_trend(employee_id=user_id)
-            data["widgets"]["my_requisitions"] = await self._get_employee_my_requisitions(user_id)
-            data["widgets"]["my_assets"] = await self._get_employee_my_assets(user_id)
-            data["widgets"]["recent_expenses"] = await self._get_employee_recent_expenses(user_id)
+        # Personal metrics for all roles ("My Requests")
+        data["widgets"]["my_purchase_requests"] = await self._get_employee_pr_summary(user_id)
+        data["widgets"]["my_reimbursements"] = await self._get_reimbursements_summary(employee_id=user_id)
+        data["widgets"]["my_monthly_trend"] = await self._get_employee_monthly_trend(employee_id=user_id)
+        data["widgets"]["my_requisitions"] = await self._get_employee_my_requisitions(user_id)
+        data["widgets"]["my_assets"] = await self._get_employee_my_assets(user_id)
+        data["widgets"]["recent_expenses"] = await self._get_employee_recent_expenses(user_id)
 
-        # Cache data for 5 minutes
-        await self.cache.set(cache_key, data, expire_seconds=300)
+        # Real-time metrics computed directly
         return data
 
     async def get_spend_analytics(self) -> Dict[str, Any]:
@@ -163,11 +154,35 @@ class DashboardService:
         return activities
 
     async def _get_pending_approvals_count(self, manager_id: Optional[int] = None) -> int:
-        # Return count of PRs in 'Pending Approval' status
-        query = select(func.count(PurchaseRequisition.pr_id)).where(PurchaseRequisition.status == "Pending Approval")
-        # If manager_id is passed, we can filter by requisition's manager or approval assignments if mapping exists
-        result = await self.db.execute(query)
-        return result.scalar() or 0
+        from src.models.expense import ExpenseApproval
+        from src.models.approval import ApprovalStep
+        from src.models.auth import User
+        count = 0
+        if manager_id:
+            from sqlalchemy import select
+            from sqlalchemy.orm import selectinload
+            result = await self.db.execute(select(User).options(selectinload(User.roles)).where(User.user_id == manager_id))
+            user = result.scalar_one_or_none()
+            if user:
+                user_roles = [r.role_id for r in user.roles]
+                
+                # PR approvals
+                pr_query = select(func.count(ApprovalStep.step_id)).where(
+                    (ApprovalStep.approver_id == manager_id) |
+                    (ApprovalStep.approver_id.is_(None) & ApprovalStep.approver_role_id.in_(user_roles)),
+                    ApprovalStep.status == "Pending"
+                )
+                pr_res = await self.db.execute(pr_query)
+                count += pr_res.scalar() or 0
+                
+                # Expense approvals
+                exp_query = select(func.count(ExpenseApproval.approval_id)).where(
+                    ExpenseApproval.approver_id == manager_id,
+                    ExpenseApproval.status == "Pending"
+                )
+                exp_res = await self.db.execute(exp_query)
+                count += exp_res.scalar() or 0
+        return count
 
     async def _get_department_spend(self, manager_id: Optional[int] = None) -> List[Dict[str, Any]]:
         query = select(
@@ -427,16 +442,17 @@ class DashboardService:
         ]
 
     async def _get_employee_recent_expenses(self, user_id: int) -> List[Dict[str, Any]]:
-        query = select(VendorInvoice).where(
-            VendorInvoice.employee_id == user_id
-        ).order_by(desc(VendorInvoice.created_at)).limit(5)
+        query = select(ExpenseReport).where(
+            ExpenseReport.employee_id == user_id,
+            ExpenseReport.status.in_(["Approved", "Finance Verified", "Payment Requested"])
+        ).order_by(desc(ExpenseReport.created_at)).limit(5)
         result = await self.db.execute(query)
         expenses = result.scalars().all()
         return [
             {
-                "id": exp.invoice_id,
-                "title": exp.description or exp.invoice_number,
-                "amount": float(exp.grand_total or 0.0),
+                "id": exp.expense_report_id,
+                "title": exp.purpose,
+                "amount": float(exp.total_amount or 0.0),
                 "date": exp.created_at.isoformat() if exp.created_at else None,
                 "status": exp.status
             }

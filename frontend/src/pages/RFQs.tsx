@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { RFQ } from "../types";
-import {Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Button, EmptyState} from "../components/ui";
+import { Card, CardHeader, CardTitle, CardContent, Badge, StatusBadge, Skeleton, Button, EmptyState } from "../components/ui";
 import { formatDate } from "../utils/helpers";
 
 export const RFQs: React.FC = () => {
@@ -42,22 +42,20 @@ export const RFQs: React.FC = () => {
               <table className="w-full text-left text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-border bg-accent/40 text-xs font-bold text-muted-foreground uppercase">
-                    <th className="p-4">RFQ Number</th>
+                    <th className="p-4 whitespace-nowrap">RFQ Number</th>
                     <th className="p-4">Title</th>
-                    <th className="p-4">Submission Deadline</th>
-                    <th className="p-4">Status</th>
+                    <th className="p-4 whitespace-nowrap">Submission Deadline</th>
+                    <th className="p-4 whitespace-nowrap">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {rfqs.map((r) => (
                     <tr key={r.rfq_id} className="hover:bg-accent/20">
-                      <td className="p-4 font-bold text-xs tracking-wider text-primary">{r.rfq_number}</td>
+                      <td className="p-4 font-bold text-xs tracking-wider text-primary whitespace-nowrap">{r.rfq_number}</td>
                       <td className="p-4 font-semibold">{r.title}</td>
-                      <td className="p-4 text-xs text-muted-foreground">{formatDate(r.submission_deadline)}</td>
-                      <td className="p-4">
-                        <Badge variant={r.status === "Closed" ? "neutral" : "success"}>
-                          {r.status}
-                        </Badge>
+                      <td className="p-4 text-xs text-muted-foreground whitespace-nowrap">{formatDate(r.submission_deadline)}</td>
+                      <td className="p-4 whitespace-nowrap">
+                        <StatusBadge status={r.status} />
                       </td>
                     </tr>
                   ))}

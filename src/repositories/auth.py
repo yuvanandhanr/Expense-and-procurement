@@ -15,9 +15,12 @@ class UserRepository(BaseRepository[User]):
 
     async def get_by_id(self, user_id: int) -> Optional[User]:
         """
-        Retrieves a user by their integer primary key.
+        Retrieves a user by their integer primary key, eagerly loading roles.
         """
-        return await self.session.get(User, user_id)
+        from sqlalchemy.orm import selectinload
+        query = select(User).options(selectinload(User.roles)).where(User.user_id == user_id)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
 
     async def get_by_email(self, email: str) -> Optional[User]:
         """

@@ -33,7 +33,7 @@ def mock_manager() -> User:
 
 @pytest.fixture
 def mock_it() -> User:
-    role = Role(role_id=3, role_name="IT", status=True)
+    role = Role(role_id=3, role_name="Admin", status=True)
     return User(
         user_id=3,
         employee_code="IT001",
@@ -107,7 +107,7 @@ async def test_report_incident(
     data = response.json()
     assert data["asset_id"] == 10
     assert data["incident_type"] == "Damage"
-    assert data["status"] == "Reported"
+    assert data["status"] == "Submitted"
 
 
 @pytest.mark.anyio
@@ -123,7 +123,7 @@ async def test_manager_approve_incident(
         reporter_id=1,
         description="Screen cracked",
         incident_type="Damage",
-        status="Reported",
+        status="Submitted",
         incident_date=date.today(),
         asset=mock_asset
     )
@@ -136,12 +136,14 @@ async def test_manager_approve_incident(
         "/api/v1/asset-incidents/1/action",
         json={
             "action": "Approve",
-            "resolution": "Please inspect physically"
+            "manager_inspection_assessment": "Needs repair or replacement",
+            "manager_inspection_comments": "Please inspect physically"
         }
     )
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.json()["status"] == "Inspection Pending"
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["status"] == "Manager Approved"
 
 
 @pytest.mark.anyio
@@ -157,7 +159,7 @@ async def test_manager_reject_incident(
         reporter_id=1,
         description="Screen cracked",
         incident_type="Damage",
-        status="Reported",
+        status="Submitted",
         incident_date=date.today(),
         asset=mock_asset
     )
@@ -194,17 +196,21 @@ async def test_it_replace_incident(
         reporter_id=1,
         description="Screen cracked",
         incident_type="Damage",
-        status="Inspection Pending",
+        status="Admin Approved",
         incident_date=date.today(),
         asset=mock_asset
     )
 
     mock_result = MagicMock()
     mock_result.scalar_one_or_none.return_value = mock_incident
-    mock_cat_result = MagicMock()
-    mock_cat_result.scalar_one_or_none.return_value = AssetCategory(category_id=1, category_name="IT Assets")
     
-    override_db.execute = AsyncMock(side_effect=[mock_result, mock_cat_result])
+    mock_avail_result = MagicMock()
+    mock_avail_result.scalars().first.return_value = None
+
+    mock_cat_result = MagicMock()
+    mock_cat_result.scalar_one_or_none.return_value = AssetCategory(category_id=1, category_name="Hardware")
+    
+    override_db.execute = AsyncMock(side_effect=[mock_result, mock_avail_result, mock_cat_result])
     
     # Mock PR Service
     mock_pr_service_inst = mock_pr_service_cls.return_value
@@ -216,11 +222,11 @@ async def test_it_replace_incident(
     response = await async_client.post(
         "/api/v1/asset-incidents/1/action",
         json={
-            "action": "Replace",
+            "action": "Assign Replacement",
             "resolution": "Unrepairable, need new unit"
         }
     )
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.json()["status"] == "Replacement"
+    assert response.json()["status"] == "Waiting for Procurement"
     assert response.json()["linked_pr_id"] == 99

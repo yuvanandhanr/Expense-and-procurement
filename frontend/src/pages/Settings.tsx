@@ -94,7 +94,7 @@ export const Settings: React.FC = () => {
           </Card>
         ))}
 
-        <div className="flex justify-end pt-4">
+        <div className="flex justify-end pt-3 mt-2">
           <Button type="submit" disabled={saving} className="font-bold text-xs uppercase px-8 py-3">
             {saving ? "Saving Configurations..." : "Save System Settings"}
           </Button>

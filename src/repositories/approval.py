@@ -63,10 +63,11 @@ class ApprovalWorkflowRepository(BaseRepository[ApprovalWorkflow]):
         query = (
             select(self.model)
             .where(self.model.pr_id == pr_id)
+            .order_by(self.model.created_at.desc())
             .options(selectinload(self.model.steps))
         )
         result = await self.session.execute(query)
-        return result.scalar_one_or_none()
+        return result.scalars().first()
 
 
 class ApprovalStepRepository(BaseRepository[ApprovalStep]):

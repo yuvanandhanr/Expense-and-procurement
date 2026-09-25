@@ -16,11 +16,11 @@ async def get_audit_logs(
     skip: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db_session),
-    current_user = Depends(RoleChecker(["CEO", "CFO", "Finance"]))
+    current_user = Depends(RoleChecker(["Admin", "CEO", "CFO", "Finance", "CTO"]))
 ):
     """
     Retrieves system security audit logs, filterable by module and action.
-    Restricted to CEO, CFO, and Finance.
+    Restricted to Admin, CEO, CFO, and Finance.
     """
     service = AuditService(db)
     logs = await service.audit_repo.list_logs(module=module, action=action, skip=skip, limit=limit)

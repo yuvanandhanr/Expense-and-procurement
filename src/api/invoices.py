@@ -73,7 +73,21 @@ async def get_invoices(
         stmt = stmt.where(VendorInvoice.invoice_id == -1) # return none
         
     result = await session.execute(stmt)
-    return result.scalars().all()
+    invoices = result.scalars().all()
+    
+    # Filter Drafts
+    filtered_invoices = []
+    for inv in invoices:
+        if inv.status == "Draft":
+            if current_user.email and inv.vendor and inv.vendor.email == current_user.email:
+                filtered_invoices.append(inv)
+            elif inv.employee_id == current_user.user_id:
+                filtered_invoices.append(inv)
+            # If Draft and not owner, skip
+        else:
+            filtered_invoices.append(inv)
+            
+    return filtered_invoices
 
 @router.post("/upload-batch", response_model=List[InvoiceSchema])
 async def upload_invoice_batch(

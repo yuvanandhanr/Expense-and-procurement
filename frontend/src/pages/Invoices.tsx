@@ -2,10 +2,10 @@ import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { Invoice } from "../types";
 import { useAuth } from "../hooks/useAuth";
-import { Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Button, Dialog, EmptyState } from "../components/ui";
+import { Card, CardHeader, CardTitle, CardContent, Badge, StatusBadge, Skeleton, Button, Dialog, EmptyState } from "../components/ui";
 import { formatDate } from "../utils/helpers";
 import toast from "react-hot-toast";
-import { FileText, CheckCircle, XCircle, AlertTriangle, Upload } from "lucide-react";
+import { FileText, CheckCircle, XCircle, AlertTriangle, Upload, Eye, Check, X } from "lucide-react";
 
 export const Invoices: React.FC = () => {
   const { user } = useAuth();
@@ -59,41 +59,38 @@ export const Invoices: React.FC = () => {
   };
 
   const handleOpenUploadModal = async () => {
-    setIsUploadModalOpen(true);
-    setUploadFile(null);
-    setSelectedPO("");
     try {
-      const response = await api.get("/purchase-orders");
-      // Filter only approved POs if we are strict, or just show all
-      setAvailablePOs(response.data);
+      const res = await api.get("/purchase-orders");
+      setAvailablePOs(res.data);
+      setIsUploadModalOpen(true);
     } catch (err) {
-      console.error("Failed to load POs:", err);
+      toast.error("Failed to load purchase orders.");
     }
   };
 
-  const handleUploadInvoice = async () => {
-    if (!uploadFile) {
-      toast.error("Please select a file to upload.");
+  const handleUploadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPO || !uploadFile) {
+      toast.error("Please select a PO and choose a file.");
       return;
     }
-    
+
     const formData = new FormData();
-    formData.append("files", uploadFile);
-    if (selectedPO) {
-      formData.append("po_id", selectedPO);
-    }
-    
+    formData.append("po_id", selectedPO);
+    formData.append("file", uploadFile);
+
     setIsSubmitting(true);
-    toast.loading("Uploading & extracting OCR...", { id: "upload-invoice" });
     try {
-      await api.post("/invoices/upload-batch", formData, {
+      await api.post("/invoices/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" }
       });
-      toast.success("Invoice uploaded & OCR completed", { id: "upload-invoice" });
+      toast.success("Invoice uploaded and 3-way matching triggered!");
       setIsUploadModalOpen(false);
+      setSelectedPO("");
+      setUploadFile(null);
       fetchInvoices();
     } catch (err: any) {
-      toast.error("Failed to upload invoice", { id: "upload-invoice" });
+      toast.error(err.response?.data?.detail || "Failed to upload invoice.");
     } finally {
       setIsSubmitting(false);
     }
@@ -133,8 +130,8 @@ export const Invoices: React.FC = () => {
           <p className="text-xs text-muted-foreground mt-1">Review vendor billings against POs and GRNs.</p>
         </div>
         <div>
-          <Button onClick={handleOpenUploadModal}>
-            <Upload className="w-4 h-4 mr-2" /> Upload Invoice
+          <Button onClick={handleOpenUploadModal} className="gap-1.5 shadow-apple-glow">
+            <Upload className="w-4 h-4" /> Upload Invoice
           </Button>
         </div>
       </div>
@@ -153,35 +150,37 @@ export const Invoices: React.FC = () => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-border bg-accent/30 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                    <th className="p-4">Invoice #</th>
-                    <th className="p-4">Vendor</th>
-                    <th className="p-4">Date</th>
-                    <th className="p-4">Amount</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4">Match Status</th>
-                    <th className="p-4 text-right">Action</th>
+                    <th className="p-4 whitespace-nowrap">Invoice #</th>
+                    <th className="p-4 whitespace-nowrap">Vendor</th>
+                    <th className="p-4 whitespace-nowrap">Date</th>
+                    <th className="p-4 whitespace-nowrap">Amount</th>
+                    <th className="p-4 whitespace-nowrap">Status</th>
+                    <th className="p-4 whitespace-nowrap">Match Status</th>
+                    <th className="p-4 text-right whitespace-nowrap">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border text-sm">
                   {invoices.map((inv) => (
                     <tr key={inv.invoice_id} className="hover:bg-accent/10 transition-colors">
-                      <td className="p-4 font-semibold text-primary">{inv.invoice_number}</td>
-                      <td className="p-4">{inv.vendor_name || `Vendor #${inv.vendor_id}`}</td>
-                      <td className="p-4 text-muted-foreground">{formatDate(inv.invoice_date)}</td>
-                      <td className="p-4 font-mono font-semibold">${Number(inv.grand_total || 0).toLocaleString('en-US')}</td>
-                      <td className="p-4">
-                        <Badge variant={inv.status === "Paid" ? "success" : inv.status === "Approved" ? "info" : "warning"}>
-                          {inv.status}
-                        </Badge>
+                      <td className="p-4 font-semibold text-primary whitespace-nowrap">{inv.invoice_number}</td>
+                      <td className="p-4 whitespace-nowrap">{inv.vendor_name || `Vendor #${inv.vendor_id}`}</td>
+                      <td className="p-4 text-muted-foreground whitespace-nowrap">{formatDate(inv.invoice_date)}</td>
+                      <td className="p-4 font-mono font-semibold whitespace-nowrap">${Number(inv.grand_total || 0).toLocaleString('en-US')}</td>
+                      <td className="p-4 whitespace-nowrap">
+                        <StatusBadge status={inv.status} />
                       </td>
-                      <td className="p-4">
-                        <Badge variant={inv.matching_status === "Matched" ? "success" : inv.matching_status === "Discrepancy" ? "error" : "neutral"}>
-                          {inv.matching_status}
-                        </Badge>
+                      <td className="p-4 whitespace-nowrap">
+                        <StatusBadge status={inv.matching_status} />
                       </td>
-                      <td className="p-4 text-right">
-                        <Button variant="outline" size="sm" onClick={() => setSelectedInvoice(inv)}>
-                          Review Match
+                      <td className="p-4 text-right whitespace-nowrap">
+                        <Button 
+                          size="sm" 
+                          variant="primary" 
+                          onClick={() => setSelectedInvoice(inv)}
+                          className="gap-1.5 shadow-apple-sm"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Review 3-Way Match</span>
                         </Button>
                       </td>
                     </tr>
@@ -231,11 +230,9 @@ export const Invoices: React.FC = () => {
             />
           </div>
 
-          <div className="flex justify-end space-x-3 pt-4 border-t border-border">
-            <Button variant="ghost" onClick={() => setIsUploadModalOpen(false)} disabled={isSubmitting}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleUploadInvoice} disabled={isSubmitting || !uploadFile}>
+          <div className="flex justify-end space-x-3 pt-3 mt-2 border-t border-border">
+            <Button variant="close" onClick={() => setIsUploadModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
+            <Button variant="primary" onClick={handleUploadSubmit} disabled={isSubmitting || !uploadFile}>
               {isSubmitting ? "Uploading..." : "Submit Invoice"}
             </Button>
           </div>
@@ -310,23 +307,23 @@ export const Invoices: React.FC = () => {
               </div>
             )}
 
-            <div className="flex justify-end space-x-3 pt-4 border-t border-border">
-              <Button variant="ghost" onClick={() => setSelectedInvoice(null)} disabled={isSubmitting}>
-                Cancel
-              </Button>
+            <div className="flex justify-end space-x-3 pt-3 mt-2 border-t border-border">
+              <Button variant="close" onClick={() => setSelectedInvoice(null)} disabled={isSubmitting}>Cancel</Button>
               <Button 
                 variant="danger" 
                 onClick={() => handleApproveReject(selectedInvoice.invoice_id, "reject")}
                 disabled={isSubmitting}
+                className="gap-1.5 font-bold"
               >
-                Reject Invoice
+                <X className="w-4 h-4" /> Reject Invoice
               </Button>
               <Button 
-                variant="primary" 
+                variant="success" 
                 onClick={() => handleApproveReject(selectedInvoice.invoice_id, "approve")}
                 disabled={isSubmitting}
+                className="gap-1.5 font-bold shadow-apple-sm"
               >
-                Approve Invoice
+                <Check className="w-4 h-4" /> Approve & Authorize
               </Button>
             </div>
           </div>

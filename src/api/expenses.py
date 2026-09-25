@@ -1,11 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, BackgroundTasks
-from typing import List, Any
+import asyncio
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 import aiofiles
 import os
 import uuid
+import hashlib
+import logging
 from decimal import Decimal
 from datetime import datetime
+from sqlalchemy.exc import IntegrityError
 
 from src.database.dependency import get_db_session
 from src.schemas.expense import ExpenseReportCreate, ExpenseReportUpdate, ExpenseReportResponse, ReceiptResponse, ReceiptUpdate
@@ -17,6 +21,7 @@ from src.models.auth import User
 from src.services.approval_service import ApprovalService
 
 router = APIRouter(prefix="/expenses", tags=["Employee Expenses"])
+logger = logging.getLogger(__name__)
 
 # Helper for file uploads
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -33,21 +38,167 @@ def parse_ocr_date(date_str: str):
             pass
     return None
 
+
+def _roles(user: User) -> set[str]:
+    return {role.role_name for role in user.roles}
+
+
+def _log_action(user: User, action: str, record_id: int | str, *, level: int = logging.INFO) -> None:
+    """Log operational events without receipt contents, OCR text, or other sensitive data."""
+    logger.log(
+        level,
+        "expense_action timestamp=%s user_id=%s action=%s record_id=%s",
+        datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        user.user_id,
+        action,
+        record_id,
+    )
+
+
+def _can_access_report(report: ExpenseReport, user: User) -> bool:
+    if report.status == "Draft":
+        return report.employee_id == user.user_id
+
+    if report.employee_id == user.user_id:
+        return True
+
+    # If user is in the approval chain for this report
+    if any(app.approver_id == user.user_id for app in report.approvals):
+        return True
+
+    user_roles = [r.role_name for r in getattr(user, 'roles', [])]
+    is_admin_or_exec = any(r in user_roles for r in ["Admin", "SuperAdmin", "CEO", "CFO"])
+    
+    # Admin, CFO, CEO can see all non-draft claims globally
+    if is_admin_or_exec:
+        return True
+        
+    has_finance_mgr = "Finance Manager" in user_roles or "Finance" in user_roles
+    creator_roles = [r.role_name for r in getattr(report.employee, 'roles', [])]
+    
+    # Finance Managers can see claims pending manager approval or their stages, except from Admin/Execs
+    if has_finance_mgr:
+        if not any(r in creator_roles for r in ["Admin", "CEO", "CFO", "SuperAdmin"]):
+            if report.status in ["Pending Manager Approval", "Pending Finance Manager Approval", "Payment Requested", "Approved for Payment", "Finance Rejected", "Approved"]:
+                return True
+
+    # If user is the manager of the creator
+    if getattr(report.employee, "manager_id", None) == user.user_id:
+        if not is_admin_or_exec:
+            if any(r in creator_roles for r in ["Admin", "CFO", "CEO", "Finance Manager"]):
+                return False
+        return True
+
+    return False
+def _can_act_on_pending_report(report: ExpenseReport, user: User, explicit_approval: object | None) -> bool:
+    """Whether a user may approve / reject / return a report awaiting review.
+
+    Prevents self-approval of own reports.
+    """
+    # Strict self-approval prevention: No user may approve/action their own expense claim!
+    if report.employee_id == user.user_id:
+        return False
+    if explicit_approval is not None:
+        return True
+    if not _can_access_report(report, user):
+        return False
+    return bool(_roles(user) & {"Admin", "Manager", "Finance Manager", "CFO", "CEO"})
+
+
+async def _get_accessible_report(repo: ExpenseRepository, report_id: int, user: User) -> ExpenseReport:
+    report = await repo.get_report_by_id(report_id)
+    if not report or not _can_access_report(report, user):
+        # Do not disclose the existence of another user's private draft.
+        _log_action(user, "expense_access_denied", report_id, level=logging.WARNING)
+        raise HTTPException(status_code=404, detail="Expense report not found")
+    return report
+
+
+async def _get_owned_editable_report(repo: ExpenseRepository, report_id: int, user: User) -> ExpenseReport:
+    report = await _get_accessible_report(repo, report_id, user)
+    if report.status not in ("Draft", "Returned for Correction"):
+        raise HTTPException(status_code=400, detail="Report is not in an editable state")
+    roles = _roles(user)
+    if report.employee_id != user.user_id and not bool(roles & {"Admin", "Manager"}):
+        _log_action(user, "expense_draft_access_denied", report_id, level=logging.WARNING)
+        raise HTTPException(status_code=403, detail="Not authorized to edit this report")
+    return report
+
+
+def _remove_uploaded_file(image_path: str) -> None:
+    """Best-effort cleanup of a file stored below the receipt upload directory."""
+    filename = os.path.basename(image_path)
+    path = os.path.join(UPLOAD_DIR, filename)
+    try:
+        if os.path.exists(path):
+            os.remove(path)
+    except OSError:
+        logger.exception("Unable to remove receipt file during cleanup")
+
+
+def _present_report(report: ExpenseReport) -> ExpenseReport:
+    """Keep pre-constraint legacy data from breaking read responses before migration runs."""
+    if not report.justification or not report.justification.strip():
+        report.justification = "Legacy report: description unavailable"
+    return report
+
 @router.get("", response_model=List[ExpenseReportResponse])
 async def list_expenses(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
-    repo = ExpenseRepository(db)
-    # Simple role check: if Employee, show their own. If Manager, show their department. If Finance/CFO/Admin, show all.
-    role_names = [r.role_name for r in current_user.roles]
-    if "Admin" in role_names or "Finance" in role_names or "Finance Manager" in role_names or "CFO" in role_names:
-        reports = await repo.get_all_reports()
-    elif "Manager" in role_names:
-        reports = await repo.get_all_reports(department_id=current_user.department_id)
-    else:
-        reports = await repo.get_all_reports(employee_id=current_user.user_id)
-    return reports
+    from sqlalchemy import select, or_
+    from sqlalchemy.orm import selectinload
+    from src.models.expense import ExpenseReport, ExpenseApproval
+    from src.models.auth import User as UserModel, Role
+
+    stmt = select(ExpenseReport).options(
+        selectinload(ExpenseReport.receipts),
+        selectinload(ExpenseReport.approvals),
+        selectinload(ExpenseReport.employee).selectinload(UserModel.roles)
+    ).join(UserModel, ExpenseReport.employee_id == UserModel.user_id).outerjoin(
+        ExpenseApproval, ExpenseApproval.expense_report_id == ExpenseReport.expense_report_id
+    )
+
+    user_roles = [r.role_name for r in current_user.roles]
+    is_admin = any(r in user_roles for r in ["Admin", "SuperAdmin", "CEO", "CFO"])
+    is_manager = "Manager" in user_roles
+
+    conditions = [
+        ExpenseReport.employee_id == current_user.user_id,
+        (ExpenseApproval.approver_id == current_user.user_id) & (ExpenseReport.status != 'Draft')
+    ]
+
+    if is_manager:
+        manager_cond = (UserModel.manager_id == current_user.user_id) & (ExpenseReport.status != 'Draft')
+        if not is_admin:
+            manager_cond = manager_cond & (~UserModel.roles.any(Role.role_name.in_(["Admin", "CFO", "CEO", "Finance Manager"])))
+        conditions.append(manager_cond)
+
+    stmt = stmt.where(or_(*conditions)).order_by(ExpenseReport.created_at.desc())
+    result = await db.execute(stmt)
+    
+    # Deduplicate in case of multiple approvals
+    seen = set()
+    reports = []
+    for r in result.scalars().all():
+        if r.expense_report_id not in seen:
+            seen.add(r.expense_report_id)
+            reports.append(r)
+        
+    accessible_reports = [_present_report(report) for report in reports]
+    
+    # Priority sort: Items requiring approval come first, sorted by creation time (newest first)
+    def _sort_key(report: ExpenseReport):
+        status = report.status or ""
+        is_pending = "pending" in status.lower() or "corrected" in status.lower()
+        has_amount = (report.total_amount or Decimal("0.00")) > Decimal("0.00")
+        priority = 0 if (is_pending and has_amount) else 1
+        created_dt = report.created_at or datetime.min
+        return (priority, -created_dt.timestamp())
+        
+    accessible_reports.sort(key=_sort_key)
+    return accessible_reports
 
 @router.post("", response_model=ExpenseReportResponse)
 async def create_expense_report(
@@ -68,6 +219,7 @@ async def create_expense_report(
         total_amount=Decimal("0.00")
     )
     await repo.create_report(new_report)
+    _log_action(current_user, "expense_draft_created", new_report.expense_report_id)
     loaded_report = await repo.get_report_by_id(new_report.expense_report_id)
     return loaded_report
 
@@ -78,10 +230,8 @@ async def get_expense_report(
     current_user: User = Depends(get_current_user)
 ):
     repo = ExpenseRepository(db)
-    report = await repo.get_report_by_id(report_id)
-    if not report:
-        raise HTTPException(status_code=404, detail="Expense report not found")
-    return report
+    report = await _get_accessible_report(repo, report_id, current_user)
+    return _present_report(report)
 
 @router.post("/{report_id}/receipts/upload", response_model=List[ReceiptResponse])
 async def upload_receipts(
@@ -91,32 +241,99 @@ async def upload_receipts(
     current_user: User = Depends(get_current_user)
 ):
     repo = ExpenseRepository(db)
-    report = await repo.get_report_by_id(report_id)
-    if not report:
-        raise HTTPException(status_code=404, detail="Expense report not found")
-        
-    if report.status != "Draft":
-        raise HTTPException(status_code=400, detail="Cannot add receipts to non-draft report")
+    report = await _get_owned_editable_report(repo, report_id, current_user)
+
+    # Read and validate the whole batch before writing anything. This avoids a
+    # partially uploaded request if one file is a duplicate.
+    uploads: list[tuple[UploadFile, bytes, str]] = []
+    batch_hashes: set[str] = set()
+    for file in files:
+        content = await file.read()
+        content_hash = hashlib.sha256(content).hexdigest()
+        # Check globally for duplicates
+        from sqlalchemy import select
+        query_dup = select(Receipt).where(Receipt.content_hash == content_hash)
+        result_dup = await db.execute(query_dup)
+        if content_hash in batch_hashes or result_dup.scalars().first():
+            _log_action(current_user, "receipt_duplicate_detected", report_id, level=logging.WARNING)
+            raise HTTPException(status_code=409, detail="This exact receipt has already been uploaded previously. Duplicate receipts are not allowed.")
+        batch_hashes.add(content_hash)
+        uploads.append((file, content, content_hash))
 
     created_receipts = []
     total_added = Decimal("0.00")
 
-    for file in files:
-        ext = file.filename.split(".")[-1]
+    written_paths: list[str] = []
+    try:
+      for file, content, content_hash in uploads:
+        filename = file.filename or "receipt.bin"
+        ext = filename.rsplit(".", 1)[-1] if "." in filename else "bin"
         unique_name = f"{uuid.uuid4().hex}.{ext}"
         filepath = os.path.join(UPLOAD_DIR, unique_name)
         
-        content = await file.read()
         async with aiofiles.open(filepath, 'wb') as out_file:
             await out_file.write(content)
+        written_paths.append(filepath)
             
         # Run OCR
-        ocr_result = OCRService.process_receipt_image(content)
+        ocr_result = await asyncio.to_thread(OCRService.process_receipt_image, content)
         
         # Determine verified amount (fallback to 0 if low confidence)
         confidence = ocr_result.get("confidence", Decimal("0.00"))
         ocr_amount = ocr_result.get("total_amount", Decimal("0.00"))
+        parsed_date = parse_ocr_date(ocr_result.get("date"))
+        merchant = ocr_result.get("merchant_name")
+        receipt_number = ocr_result.get("receipt_number")
         
+        # Keep the OCR-based comparison as a second line of defence for legacy
+        # receipts uploaded before content hashes were available.
+        for existing in report.receipts:
+            if existing.file_name == filename:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Duplicate receipt error: File '{filename}' has already been uploaded to this report."
+                )
+            if (
+                merchant 
+                and merchant != "Unknown Merchant" 
+                and merchant != "Unknown"
+                and existing.merchant_name == merchant
+                and parsed_date is not None
+                and existing.receipt_date == parsed_date
+                and ocr_amount > Decimal("0.00")
+                and (existing.ocr_amount == ocr_amount or existing.verified_amount == ocr_amount)
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Duplicate receipt error: Receipt from '{merchant}' dated {parsed_date} for ${ocr_amount} already exists on this report."
+                )
+                
+        # Global duplicate check across all reports for this user
+        if merchant and merchant != "Unknown Merchant" and merchant != "Unknown" and parsed_date and ocr_amount > Decimal("0.00"):
+            from sqlalchemy import select, or_, and_
+            
+            # Check by matching merchant + date + amount
+            conditions = [
+                and_(
+                    Receipt.merchant_name == merchant,
+                    Receipt.receipt_date == parsed_date,
+                    or_(Receipt.ocr_amount == ocr_amount, Receipt.verified_amount == ocr_amount)
+                )
+            ]
+            
+            # Or check by matching receipt_number
+            if receipt_number:
+                conditions.append(and_(Receipt.receipt_number == receipt_number, Receipt.merchant_name == merchant))
+            
+            query_dup = select(Receipt).join(ExpenseReport).where(
+                ExpenseReport.employee_id == current_user.user_id,
+                ExpenseReport.status != "Rejected",
+                or_(*conditions)
+            )
+            result_dup = await db.execute(query_dup)
+            if result_dup.scalars().first():
+                raise HTTPException(status_code=409, detail=f"Duplicate receipt detected across reports (Merchant: {merchant}, Date: {parsed_date}, Amount: {ocr_amount}, Receipt #: {receipt_number or 'N/A'}).")
+
         # If low confidence, employee must manually verify. Default to 0.00 so report cannot be submitted blindly.
         verified_amount = ocr_amount if confidence > Decimal("50.00") else Decimal("0.00")
         
@@ -129,26 +346,78 @@ async def upload_receipts(
         
         receipt = Receipt(
             expense_report_id=report_id,
-            merchant_name=ocr_result.get("merchant_name"),
-            receipt_date=parse_ocr_date(ocr_result.get("date")),
+            merchant_name=merchant,
+            receipt_date=parsed_date,
+            receipt_number=receipt_number,
+            category=ocr_result.get("category"),
             ocr_amount=ocr_amount,
             verified_amount=verified_amount,
             image_path=f"/uploads/receipts/{unique_name}",
             file_name=file.filename,
+            content_hash=content_hash,
             ocr_confidence=confidence,
             ocr_json=safe_ocr_result
         )
         await repo.add_receipt(receipt)
+        _log_action(current_user, "receipt_uploaded_ocr_completed", receipt.receipt_id)
         created_receipts.append(receipt)
         total_added += verified_amount
         
-    # Update total report amount
-    report.total_amount += total_added
+      # Update total report amount
+      report.total_amount += total_added
+      await repo.update_report(report)
+      await db.commit()
+      return created_receipts
+    except HTTPException:
+      await db.rollback()
+      for path in written_paths:
+          _remove_uploaded_file(path)
+      raise
+    except IntegrityError:
+      await db.rollback()
+      for path in written_paths:
+          _remove_uploaded_file(path)
+      _log_action(current_user, "receipt_duplicate_detected", report_id, level=logging.WARNING)
+      raise HTTPException(status_code=409, detail="This exact receipt has already been uploaded previously. Duplicate receipts are not allowed.")
+    except Exception:
+      await db.rollback()
+      for path in written_paths:
+          _remove_uploaded_file(path)
+      _log_action(current_user, "receipt_upload_failed", report_id, level=logging.ERROR)
+      logger.exception("Receipt upload/OCR failed")
+      raise HTTPException(status_code=500, detail="Unable to upload and process receipt")
+
+@router.delete("/{report_id}")
+async def delete_expense_report(
+    report_id: int,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    repo = ExpenseRepository(db)
+    report = await _get_owned_editable_report(repo, report_id, current_user)
+    image_paths = [receipt.image_path for receipt in report.receipts]
+    await repo.delete_report(report)
+    await db.commit()
+    for image_path in image_paths:
+        _remove_uploaded_file(image_path)
+    _log_action(current_user, "expense_draft_deleted", report_id)
+    return {"status": "success", "message": "Draft report deleted successfully"}
+
+@router.put("/{report_id}", response_model=ExpenseReportResponse)
+async def update_expense_report(
+    report_id: int,
+    payload: ExpenseReportUpdate,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    repo = ExpenseRepository(db)
+    report = await _get_owned_editable_report(repo, report_id, current_user)
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(report, field, value)
     await repo.update_report(report)
     await db.commit()
-    
-    # Reload receipts
-    return created_receipts
+    _log_action(current_user, "expense_draft_updated", report_id)
+    return report
 
 @router.put("/{report_id}/receipts/{receipt_id}", response_model=ReceiptResponse)
 async def update_receipt(
@@ -159,9 +428,7 @@ async def update_receipt(
     current_user: User = Depends(get_current_user)
 ):
     repo = ExpenseRepository(db)
-    report = await repo.get_report_by_id(report_id)
-    if not report or report.status != "Draft":
-        raise HTTPException(status_code=400, detail="Report not found or not in draft state")
+    report = await _get_owned_editable_report(repo, report_id, current_user)
         
     receipt = await repo.get_receipt_by_id(receipt_id)
     if not receipt or receipt.expense_report_id != report_id:
@@ -182,6 +449,7 @@ async def update_receipt(
     await repo.update_receipt(receipt)
     await repo.update_report(report)
     await db.commit()
+    _log_action(current_user, "receipt_verified_updated", receipt_id)
     return receipt
     
 @router.delete("/{report_id}/receipts/{receipt_id}")
@@ -192,18 +460,19 @@ async def delete_receipt(
     current_user: User = Depends(get_current_user)
 ):
     repo = ExpenseRepository(db)
-    report = await repo.get_report_by_id(report_id)
-    if not report or report.status != "Draft":
-        raise HTTPException(status_code=400, detail="Report not found or not in draft state")
+    report = await _get_owned_editable_report(repo, report_id, current_user)
         
     receipt = await repo.get_receipt_by_id(receipt_id)
     if not receipt or receipt.expense_report_id != report_id:
         raise HTTPException(status_code=404, detail="Receipt not found")
         
     report.total_amount -= receipt.verified_amount
+    image_path = receipt.image_path
     await repo.delete_receipt(receipt)
     await repo.update_report(report)
     await db.commit()
+    _remove_uploaded_file(image_path)
+    _log_action(current_user, "receipt_ocr_deleted", receipt_id)
     return {"status": "success"}
 
 from pydantic import BaseModel
@@ -218,16 +487,21 @@ async def submit_report(
     current_user: User = Depends(get_current_user)
 ):
     repo = ExpenseRepository(db)
-    report = await repo.get_report_by_id(report_id)
-    if not report:
-        raise HTTPException(status_code=404, detail="Report not found")
-        
-    if report.status != "Draft":
-        raise HTTPException(status_code=400, detail="Report is already submitted")
-        
+    report = await _get_owned_editable_report(repo, report_id, current_user)
+    if not report.receipts:
+        _log_action(current_user, "expense_submission_validation_failed", report_id, level=logging.WARNING)
+        raise HTTPException(status_code=400, detail="Add at least one receipt before submitting the report.")
+    if not report.justification or not report.justification.strip():
+        _log_action(current_user, "expense_submission_validation_failed", report_id, level=logging.WARNING)
+        raise HTTPException(status_code=400, detail="Description / Justification is required")
+    if not report.total_amount or report.total_amount <= Decimal("0.00"):
+        _log_action(current_user, "expense_submission_validation_failed", report_id, level=logging.WARNING)
+        raise HTTPException(status_code=400, detail="Cannot submit an expense claim with $0.00. Please upload and verify receipts with valid amounts.")
+
     # Validate that all receipts have been verified (no 0.00 amounts unless it's a legit 0 receipt)
     for r in report.receipts:
         if r.verified_amount == Decimal("0.00") and r.ocr_confidence and r.ocr_confidence < Decimal("50.00"):
+            _log_action(current_user, "expense_submission_validation_failed", report_id, level=logging.WARNING)
             raise HTTPException(status_code=400, detail=f"Receipt {r.file_name} requires manual verification of the amount.")
             
     # Duplicate and Policy Checks
@@ -251,6 +525,7 @@ async def submit_report(
             result_dup = await db.execute(query_dup)
             if result_dup.scalars().first():
                 duplicates_found = True
+                _log_action(current_user, "receipt_duplicate_detected_across_reports", report_id, level=logging.WARNING)
                 
         if r.verified_amount > Decimal("100.00") and not r.category:
             policy_issues.append(f"Receipt {r.file_name} > $100 requires a category")
@@ -258,11 +533,19 @@ async def submit_report(
     report.duplicate_flag = duplicates_found
     report.policy_flags = ", ".join(policy_issues) if policy_issues else None
     
+    if duplicates_found:
+        raise HTTPException(status_code=400, detail="Duplicate receipts detected. Remove them before submitting.")
+    
     is_manager = any(r.role_name == "Manager" for r in current_user.roles)
     if is_manager and policy_issues and not report.justification:
+        _log_action(current_user, "expense_submission_validation_failed", report_id, level=logging.WARNING)
         raise HTTPException(status_code=400, detail="Policy violations found. Manager claims require justification.")
-    # Transition status
-    report.status = "Pending Manager Approval"
+    # Initial status transition before approval flow kicks in
+    if report.status == "Returned for Correction":
+        report.status = "Corrected Claim"
+    else:
+        report.status = "Submitted"
+        
     await repo.update_report(report)
     
     # Trigger approval engine based on total_amount
@@ -274,13 +557,17 @@ async def submit_report(
             amount=report.total_amount,
             department_id=report.department_id
         )
-    except Exception as e:
+    except Exception:
         # If approval flow fails, we should probably revert status
         report.status = "Draft"
         await repo.update_report(report)
-        raise HTTPException(status_code=500, detail=f"Failed to initialize approval flow: {str(e)}")
+        await db.rollback()
+        _log_action(current_user, "expense_submission_failed", report_id, level=logging.ERROR)
+        logger.exception("Expense approval flow initialization failed")
+        raise HTTPException(status_code=500, detail="Failed to initialize approval flow")
 
     await db.commit()
+    _log_action(current_user, "expense_submitted", report_id)
     return {"status": "submitted", "total_amount": report.total_amount, "duplicates": duplicates_found, "policies": report.policy_flags}
 
 @router.post("/{report_id}/approve")
@@ -299,8 +586,21 @@ async def approve_expense(
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
         
-    if report.status not in ["Pending Manager Approval", "Pending Finance Manager Approval"]:
+    valid_statuses = [
+        "Pending Manager Approval",
+        "Pending Finance Manager Approval",
+        "Pending Finance Approval",
+        "Pending Finance Verification",
+        "Pending Approval",
+        "Corrected Claim",
+        "Pending CFO Approval"
+    ]
+    if report.status not in valid_statuses:
         raise HTTPException(status_code=400, detail="Report is not pending approval")
+        
+    if report.employee_id == current_user.user_id:
+        _log_action(current_user, "expense_approval_self_denied", report_id, level=logging.WARNING)
+        raise HTTPException(status_code=403, detail="Cannot approve your own claim")
         
     query = select(ExpenseApproval).where(
         ExpenseApproval.expense_report_id == report_id,
@@ -308,41 +608,86 @@ async def approve_expense(
         ExpenseApproval.status == "Pending"
     )
     result = await db.execute(query)
-    approval = result.scalar_one_or_none()
-    
-    if not approval and not any(r.role_name == "Admin" for r in current_user.roles):
+    approval = None
+    try:
+        approval = result.scalar_one_or_none()
+    except Exception:
+        try:
+            approval = result.scalars().first()
+        except Exception:
+            approval = None
+            
+    if not _can_act_on_pending_report(report, current_user, approval):
+        _log_action(current_user, "expense_approval_denied", report_id, level=logging.WARNING)
         raise HTTPException(status_code=403, detail="Not authorized to approve this report")
         
     if approval:
         approval.status = "Approved"
         approval.comments = payload.comments
         approval.actioned_at = datetime.utcnow()
+    
+    # Mark any pending approval records for this report as approved
+    unassigned_query = select(ExpenseApproval).where(
+        ExpenseApproval.expense_report_id == report_id,
+        ExpenseApproval.status == "Pending"
+    )
+    unassigned_res = await db.execute(unassigned_query)
+    unassigned_list = []
+    try:
+        unassigned_list = unassigned_res.scalars().all()
+    except Exception:
+        try:
+            one = unassigned_res.scalar_one_or_none()
+            if one:
+                unassigned_list = [one]
+        except Exception:
+            pass
+            
+    for unassigned in unassigned_list:
+        if isinstance(unassigned, ExpenseApproval):
+            unassigned.status = "Approved"
+            if not unassigned.approver_id:
+                unassigned.approver_id = current_user.user_id
+            unassigned.comments = payload.comments
+            unassigned.actioned_at = datetime.utcnow()
         
-    if report.status == "Pending Manager Approval":
-        if report.total_amount > Decimal("1000.00"):
-            report.status = "Pending Finance Manager Approval"
-            
-            # Find a Finance Manager
-            fm_query = select(User).join(User.roles).where(Role.role_name == "Finance Manager", User.status == "Active")
-            fm_result = await db.execute(fm_query)
-            finance_manager = fm_result.scalars().first()
-            
-            fm_approval = ExpenseApproval(
-                expense_report_id=report.expense_report_id,
-                approver_id=finance_manager.user_id if finance_manager else None,
-                status="Pending"
-            )
-            db.add(fm_approval)
-        else:
-            report.status = "Payment Requested"
-            report.payment_status = "Pending Payment"
-    elif report.status == "Pending Finance Manager Approval":
+    roles = _roles(current_user)
+    if report.status in ["Pending Manager Approval", "Corrected Claim", "Pending Approval"]:
+        report.status = "Pending Finance Manager Approval"
+        
+        # Find a Finance Manager who is not the submitter
+        fm_query = select(User).join(User.roles).where(
+            Role.role_name.in_(["Finance Manager", "Finance"]), 
+            User.status == "Active",
+            User.user_id != report.employee_id
+        )
+        fm_result = await db.execute(fm_query)
+        finance_manager = fm_result.scalars().first()
+        
+        fm_approval = ExpenseApproval(
+            expense_report_id=report.expense_report_id,
+            approver_id=finance_manager.user_id if finance_manager else None,
+            status="Pending"
+        )
+        db.add(fm_approval)
+    elif report.status in ["Pending Finance Manager Approval", "Pending Finance Approval"]:
+        # When Finance Manager approves, check if the requestor is CEO, Admin, or Finance Manager
+        # which means it requires CFO approval
+        # Actually, in initialize_approval_flow, CEO/Admin/Finance Manager goes directly to CFO
+        # So "Pending Finance Approval" is only for Manager/Employee claims, or if CFO routed it to Finance
+        report.status = "Payment Requested"
+        report.payment_status = "Pending Payment"
+    elif report.status == "Pending CFO Approval":
+        report.status = "Payment Requested"
+        report.payment_status = "Pending Payment"
+    else:
         report.status = "Payment Requested"
         report.payment_status = "Pending Payment"
         
     await repo.update_report(report)
     await db.commit()
-    return {"status": "Approved"}
+    _log_action(current_user, "expense_approved", report_id)
+    return {"status": "Approved", "new_report_status": report.status}
 
 @router.post("/{report_id}/reject")
 async def reject_expense(
@@ -351,6 +696,9 @@ async def reject_expense(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
+    if not payload.comments or not payload.comments.strip():
+        raise HTTPException(status_code=400, detail="Justification is required for rejecting a claim")
+        
     from src.models.expense import ExpenseApproval
     from sqlalchemy import select
     
@@ -365,16 +713,27 @@ async def reject_expense(
         ExpenseApproval.status == "Pending"
     )
     result = await db.execute(query)
-    approval = result.scalar_one_or_none()
+    approval = result.scalars().first()
+    if not _can_act_on_pending_report(report, current_user, approval):
+        _log_action(current_user, "expense_rejection_denied", report_id, level=logging.WARNING)
+        raise HTTPException(status_code=403, detail="Not authorized to reject this report")
     
-    if approval:
-        approval.status = "Rejected"
-        approval.comments = payload.comments
-        approval.actioned_at = datetime.utcnow()
+    unassigned_query = select(ExpenseApproval).where(
+        ExpenseApproval.expense_report_id == report_id,
+        ExpenseApproval.status == "Pending"
+    )
+    unassigned_res = await db.execute(unassigned_query)
+    for unassigned in unassigned_res.scalars().all():
+        unassigned.status = "Rejected"
+        if not unassigned.approver_id:
+            unassigned.approver_id = current_user.user_id
+        unassigned.comments = payload.comments
+        unassigned.actioned_at = datetime.utcnow()
         
     report.status = "Rejected"
     await repo.update_report(report)
     await db.commit()
+    _log_action(current_user, "expense_rejected", report_id)
     return {"status": "Rejected"}
 
 @router.post("/{report_id}/return")
@@ -384,6 +743,9 @@ async def return_expense(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
+    if not payload.comments or not payload.comments.strip():
+        raise HTTPException(status_code=400, detail="Justification is required for returning a claim")
+        
     from src.models.expense import ExpenseApproval
     from sqlalchemy import select
     
@@ -398,16 +760,27 @@ async def return_expense(
         ExpenseApproval.status == "Pending"
     )
     result = await db.execute(query)
-    approval = result.scalar_one_or_none()
+    approval = result.scalars().first()
+    if not _can_act_on_pending_report(report, current_user, approval):
+        _log_action(current_user, "expense_return_denied", report_id, level=logging.WARNING)
+        raise HTTPException(status_code=403, detail="Not authorized to return this report")
     
-    if approval:
-        approval.status = "Returned"
-        approval.comments = payload.comments
-        approval.actioned_at = datetime.utcnow()
+    unassigned_query = select(ExpenseApproval).where(
+        ExpenseApproval.expense_report_id == report_id,
+        ExpenseApproval.status == "Pending"
+    )
+    unassigned_res = await db.execute(unassigned_query)
+    for unassigned in unassigned_res.scalars().all():
+        unassigned.status = "Returned"
+        if not unassigned.approver_id:
+            unassigned.approver_id = current_user.user_id
+        unassigned.comments = payload.comments
+        unassigned.actioned_at = datetime.utcnow()
         
     report.status = "Returned for Correction"
     await repo.update_report(report)
     await db.commit()
+    _log_action(current_user, "expense_returned", report_id)
     return {"status": "Returned"}
 
 @router.post("/{report_id}/pay")
@@ -422,12 +795,33 @@ async def pay_expense(
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
         
-    if report.status != "Payment Requested":
-        raise HTTPException(status_code=400, detail="Report is not requesting payment")
+    from sqlalchemy import select
+    from src.models.expense import ExpenseApproval
+    
+    if report.status not in ["Payment Requested", "Approved for Payment"]:
+        raise HTTPException(status_code=400, detail="Report is not requesting payment. It must be approved by the Finance Manager first.")
         
-    report.status = "Closed"
+    if report.employee_id == current_user.user_id:
+        _log_action(current_user, "expense_payment_self_denied", report_id, level=logging.WARNING)
+        raise HTTPException(status_code=403, detail="Cannot authorize payment for your own claim")
+        
+    # Extra validation: Ensure no pending approvals exist for this claim
+    pending_approvals_query = select(ExpenseApproval).where(
+        ExpenseApproval.expense_report_id == report_id,
+        ExpenseApproval.status == "Pending"
+    )
+    pending_approvals_result = await db.execute(pending_approvals_query)
+    if pending_approvals_result.scalars().first():
+        raise HTTPException(status_code=400, detail="Cannot authorize payment while there are pending approvals.")
+        
+    if not _roles(current_user) & {"Finance Manager"}:
+        _log_action(current_user, "expense_payment_denied", report_id, level=logging.WARNING)
+        raise HTTPException(status_code=403, detail="Not authorized to authorize payment")
+        
+    report.status = "Approved"
     report.payment_status = "Paid"
     report.payment_reference = f"PAY-EXP-{report_id}-{uuid.uuid4().hex[:6]}"
     await repo.update_report(report)
     await db.commit()
-    return {"status": "Paid", "payment_reference": report.payment_reference}
+    _log_action(current_user, "expense_paid", report_id)
+    return {"status": "Paid", "reference": report.payment_reference, "payment_reference": report.payment_reference}

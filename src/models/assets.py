@@ -1,6 +1,6 @@
 from typing import Optional, List
 from datetime import datetime, date
-from sqlalchemy import BigInteger, String, Text, DateTime, Date, ForeignKey
+from sqlalchemy import BigInteger, String, Text, DateTime, Date, ForeignKey, Boolean, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.database.base import Base
 
@@ -31,6 +31,7 @@ class Asset(Base):
     warranty_expiry: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     amc_expiry: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    cost: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     status: Mapped[Optional[str]] = mapped_column(String(50), default="Available") # Available, Assigned, Under Maintenance, Disposed, Returned, Lost
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
@@ -105,6 +106,17 @@ class AssetIncident(Base):
     incident_type: Mapped[str] = mapped_column(String(100), nullable=False) # Damage, Loss, Theft
     status: Mapped[str] = mapped_column(String(50), default="Reported") # Reported, Inspection Pending, Repair, Replacement, Closed
     resolution: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    image_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    physical_inspection_done: Mapped[Optional[bool]] = mapped_column(Boolean, default=False, server_default='false')
+    
+    # Manager fields
+    manager_inspection_assessment: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    manager_inspection_comments: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Admin fields
+    admin_inspection_resolution: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    admin_comments: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
     linked_pr_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("purchase_requisitions.pr_id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

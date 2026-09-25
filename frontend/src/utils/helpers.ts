@@ -8,10 +8,18 @@ export const getErrorMessage = (err: any, defaultMsg: string = "An error occurre
   const detail = err.response?.data?.detail;
   if (typeof detail === "string") return detail;
   if (Array.isArray(detail)) {
-    return detail.map((d: any) => d.msg || d.type).join(", ");
+    return detail.map((d: any) => {
+      const field = d.loc && d.loc.length > 0 ? d.loc[d.loc.length - 1] : "";
+      return field ? `${field}: ${d.msg || d.type}` : (d.msg || d.type);
+    }).join("\n");
   }
   if (detail && typeof detail === "object") {
     return detail.msg || defaultMsg;
   }
   return err.message || defaultMsg;
+};
+
+export const isValidText = (text?: string | null): boolean => {
+  if (!text) return false;
+  return /[a-zA-Z0-9]/.test(text);
 };

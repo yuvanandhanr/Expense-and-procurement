@@ -2,6 +2,7 @@ from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
 from sqlalchemy import BigInteger, String, Text, Numeric, Boolean, DateTime, ForeignKey
+from sqlalchemy.schema import FetchedValue
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.database.base import Base
 
@@ -59,6 +60,12 @@ class PurchaseRequisition(Base):
     )
     technical_spec_signoff_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime, nullable=True, comment="Timestamp of tech signoff"
+    )
+    is_inventory_allocation: Mapped[Optional[bool]] = mapped_column(
+        Boolean, default=False, nullable=True, comment="True if satisfied from existing inventory"
+    )
+    allocated_asset_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("assets.asset_id", ondelete="SET NULL"), nullable=True, comment="Asset ID allocated from inventory"
     )
     status: Mapped[Optional[str]] = mapped_column(
         String(50), default="Draft", comment="PR status"
@@ -124,13 +131,13 @@ class PRItem(Base):
         Text, nullable=True, comment="Technical specifications description"
     )
     quantity: Mapped[int] = mapped_column(
-        BigInteger, nullable=False, comment="Quantity requested"
+        BigInteger, nullable=False, default=1, comment="Quantity requested"
     )
-    unit_price: Mapped[Decimal] = mapped_column(
-        Numeric(15, 2), nullable=False, comment="Estimated item unit cost"
+    unit_price: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(15, 2), nullable=True, default=0.00, comment="Estimated item unit cost"
     )
     total_price: Mapped[Optional[Decimal]] = mapped_column(
-        Numeric(15, 2), nullable=True, comment="Quantity * Unit Price"
+        Numeric(15, 2), server_default=FetchedValue(), comment="Quantity * Unit Price"
     )
 
     purchase_requisition = relationship("PurchaseRequisition", back_populates="items")

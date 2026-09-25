@@ -6,7 +6,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000, // 30s timeout
+  timeout: 300000, // 300s timeout
 });
 
 // Cache tokens locally for quick synchronous access in interceptors
@@ -66,8 +66,11 @@ api.interceptors.response.use(
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
     
     if (!error.response) {
-      // Network Error
-      toast.error("Network connection refused. Please ensure the backend service is running.");
+      if (error.code === 'ECONNABORTED') {
+        toast.error("Request timed out. The server might be processing a large file.");
+      } else {
+        toast.error(`Network Error: ${error.message}. Please ensure the backend is running.`);
+      }
       return Promise.reject(error);
     }
 
@@ -140,3 +143,45 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Simple In-Memory Cache for Instant Tab Switching
+const cache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 30000; // 30 seconds
+
+const originalGet = api.get;
+api.get = async (url: string, config?: any) => {
+  // Don't cache search queries or live endpoints
+  if (url.includes("/search?q=") || url.includes("/notifications")) {
+    return originalGet.call(api, url, config);
+  }
+  
+  const key = url + (config ? JSON.stringify(config) : "");
+  const cached = cache.get(key);
+  
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return Promise.resolve(cached.data);
+  }
+  
+  const response = await originalGet.call(api, url, config);
+  cache.set(key, { data: response, timestamp: Date.now() });
+  return response;
+};
+
+// Clear cache on mutations to ensure fresh data
+const originalPost = api.post;
+api.post = async (...args: Parameters<typeof originalPost>) => {
+  cache.clear();
+  return originalPost.apply(api, args);
+};
+
+const originalPut = api.put;
+api.put = async (...args: Parameters<typeof originalPut>) => {
+  cache.clear();
+  return originalPut.apply(api, args);
+};
+
+const originalDelete = api.delete;
+api.delete = async (...args: Parameters<typeof originalDelete>) => {
+  cache.clear();
+  return originalDelete.apply(api, args);
+};
