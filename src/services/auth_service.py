@@ -49,7 +49,7 @@ async def verify_google_id_token(credential: str) -> dict:
             signing_key.key,
             algorithms=["RS256"],
             options={"verify_aud": False, "verify_exp": True},
-            leeway=120
+            leeway=600
         )
         return payload
     except Exception as e:
@@ -124,9 +124,12 @@ class AuthenticationService:
         )
 
     async def google_login(self, credential: str, ip: Optional[str] = None, user_agent: Optional[str] = None) -> TokenResponse:
+        credential = credential.strip()
         # 1. Verify Google token signature and expiration
         payload = await verify_google_id_token(credential)
         email = payload.get("email")
+        if email:
+            email = email.strip()
         google_id = payload.get("sub")
         first_name = payload.get("given_name", "Google")
         last_name = payload.get("family_name", "User")
