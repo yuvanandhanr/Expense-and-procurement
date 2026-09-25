@@ -418,7 +418,7 @@ export const Assets: React.FC = () => {
             <label className="block text-sm font-medium mb-1">Category</label>
             <Select value={newAsset.category_id} onChange={e => setNewAsset({ ...newAsset, category_id: e.target.value })}>
               <option value="">Select a category</option>
-              {categories.map(c => (
+              {(categories || []).map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </Select>
@@ -472,7 +472,7 @@ export const Assets: React.FC = () => {
                       <div className="text-xs text-muted-foreground">{u.email}</div>
                     </div>
                     <div className="flex flex-wrap gap-1 justify-end max-w-[120px]">
-                      {u.roles?.slice(0, 2).map(r => (
+                      {(u.roles || []).slice(0, 2).map(r => (
                         <Badge key={r.role_id} variant="neutral" className="text-[10px] py-0">{r.role_name}</Badge>
                       ))}
                     </div>
