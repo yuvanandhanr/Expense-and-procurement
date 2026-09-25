@@ -10,6 +10,7 @@ import jwt
 from jwt import PyJWKClient
 from sqlalchemy import select
 import pyotp
+from src.core.config import settings
 
 async def verify_google_id_token(credential: str) -> dict:
     """
