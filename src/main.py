@@ -168,7 +168,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
+        "http://127.0.0.1:3000",
         "http://localhost:3001",
+        "http://127.0.0.1:3001",
         "https://expense-frontend-rxv8.onrender.com",
     ],
     allow_credentials=True,

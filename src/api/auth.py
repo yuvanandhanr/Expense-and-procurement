@@ -49,6 +49,8 @@ async def login(
     auth_service = AuthenticationService(db)
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
+    if user_agent:
+        user_agent = user_agent[:255]
     
     return await auth_service.login(body, ip=ip_address, user_agent=user_agent)
 
@@ -72,6 +74,8 @@ async def google_login(
     auth_service = AuthenticationService(db)
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
+    if user_agent:
+        user_agent = user_agent[:255]
     
     return await auth_service.google_login(body.credential, ip=ip_address, user_agent=user_agent)
 
@@ -115,6 +119,8 @@ async def verify_vendor_otp(
     auth_service = AuthenticationService(db)
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
+    if user_agent:
+        user_agent = user_agent[:255]
     
     return await auth_service.verify_vendor_otp(body.email, body.otp, ip=ip_address, user_agent=user_agent)
 
