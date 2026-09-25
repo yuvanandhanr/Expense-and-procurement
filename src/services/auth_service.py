@@ -48,8 +48,12 @@ async def verify_google_id_token(credential: str) -> dict:
             credential,
             signing_key.key,
             algorithms=["RS256"],
-            options={"verify_aud": False, "verify_exp": True},
-            leeway=600
+            options={
+                "verify_aud": False,
+                "verify_exp": False,
+                "verify_iat": False,
+                "verify_nbf": False
+            }
         )
         return payload
     except Exception as e:
