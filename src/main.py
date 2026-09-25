@@ -174,6 +174,7 @@ app.add_middleware(
         "http://127.0.0.1:3001",
         "http://127.0.0.1:5173",
         "https://expense-frontend-rxv8.onrender.com",
+        "https://expense-backend-ym4v.onrender.com",
     ],
     allow_origin_regex=r"https://.*\.onrender\.com",
     allow_credentials=True,
