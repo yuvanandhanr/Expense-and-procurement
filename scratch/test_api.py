@@ -1,23 +1,31 @@
-import requests
-import time
+import asyncio
+from src.database.session import async_session
+from src.api.approvals_inbox import get_pending_approvals
+from src.api.asset_incidents import list_incidents
+from src.models.auth import User
+from sqlalchemy.orm import selectinload
+from sqlalchemy import select
 
-# 1. Login to get token
-# Wait for server to start
-time.sleep(2)
-login_url = "http://127.0.0.1:8000/api/v1/auth/google"
-resp = requests.post(login_url, json={"credential": "mock_google_y.raja@dataeko.ai"})
-if resp.status_code != 200:
-    print("Login failed:", resp.status_code, resp.text)
-    exit(1)
+async def main():
+    async with async_session() as db:
+        res = await db.execute(select(User).options(selectinload(User.roles)).where(User.user_id == 2))
+        user = res.scalar_one()
+        print(f"Testing for user: {user.email}")
+        
+        try:
+            print("Testing get_pending_approvals...")
+            res = await get_pending_approvals(db=db, current_user=user)
+            print("get_pending_approvals OK:", res)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
 
-token = resp.json()["access_token"]
-print("Got token")
+        try:
+            print("Testing list_incidents...")
+            res2 = await list_incidents(session=db, current_user=user)
+            print("list_incidents OK:", res2)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
 
-# 2. Fetch expenses
-exp_url = "http://127.0.0.1:8000/api/v1/expenses"
-resp = requests.get(exp_url, headers={"Authorization": f"Bearer {token}"})
-print("Expenses status:", resp.status_code)
-if resp.status_code != 200:
-    print("Response:", resp.text)
-else:
-    print("Success")
+asyncio.run(main())

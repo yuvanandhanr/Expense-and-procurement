@@ -232,7 +232,7 @@ export const Invoices: React.FC = () => {
 
           <div className="flex justify-end space-x-3 pt-3 mt-2 border-t border-border">
             <Button variant="close" onClick={() => setIsUploadModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
-            <Button variant="primary" onClick={handleUploadInvoice} disabled={isSubmitting || !uploadFile}>
+            <Button variant="primary" onClick={handleUploadSubmit} disabled={isSubmitting || !uploadFile}>
               {isSubmitting ? "Uploading..." : "Submit Invoice"}
             </Button>
           </div>

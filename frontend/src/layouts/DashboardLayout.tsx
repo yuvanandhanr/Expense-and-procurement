@@ -259,7 +259,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     const isFinance = hasRole("Finance") || hasRole("Finance Manager");
     const isCFO = hasRole("CFO");
     const isCTO = hasRole("CTO");
-    const isAdmin = hasRole("Admin") || hasRole("CEO");
+    const isAdmin = hasRole("Admin");
     const isCEO = hasRole("CEO");
     const isProcurement = hasRole("Procurement") || hasRole("Procurement Officer") || hasRole("Procurement Manager");
 
@@ -320,14 +320,14 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
           { label: "RFQs & Invitations", path: "/rfqs", icon: Briefcase, show: isProcurement || isFinance || isCFO || isAdmin },
           { label: "Quotations Inbox", path: "/quotations", icon: Layers, show: isProcurement || isFinance || isCFO || isAdmin },
           { label: "Purchase Orders", path: "/pos", icon: Package, show: isProcurement || isFinance || isCFO || isAdmin },
-          { label: "ASSET INVENTORY", path: "/assets", icon: HardDrive, show: hasRole("Finance Manager") || isCFO || isAdmin },
+          { label: "Asset Inventory", path: "/assets", icon: HardDrive, show: hasRole("Finance Manager") || isCFO || isAdmin },
         ]
       },
       {
         title: "Intelligence & Platform",
         items: [
           { label: "Operational Analytics", path: "/analytics", icon: TrendingUp, show: isCTO },
-          { label: "User Management", path: "/users", icon: UserCog, show: isAdmin },
+          { label: "User Management", path: "/users", icon: UserCog, show: isAdmin || isCEO },
         ]
       }
     ];

@@ -241,7 +241,7 @@ export const Assets: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">ASSET INVENTORY</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Asset Inventory</h1>
           <p className="text-xs text-muted-foreground mt-1">Global inventory of hardware, software, licenses, and equipment.</p>
         </div>
         
@@ -408,7 +408,7 @@ export const Assets: React.FC = () => {
           </Card>
         </div>
       {/* Add / Edit Asset Modal */}
-      <Dialog open={isAssetModalOpen} onClose={() => setIsAssetModalOpen(false)} title={editingAssetId ? "Edit Asset" : "Add Asset"} description="Fill in the asset details below.">
+      <Dialog isOpen={isAssetModalOpen} onClose={() => setIsAssetModalOpen(false)} title={editingAssetId ? "Edit Asset" : "Add Asset"} description="Fill in the asset details below.">
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Asset Model / Name</label>
@@ -443,7 +443,7 @@ export const Assets: React.FC = () => {
       </Dialog>
 
       {/* Transfer Asset Modal */}
-      <Dialog open={!!transferAsset} onClose={() => setTransferAsset(null)} title="Assign Asset" description={`Assign ${transferAsset?.asset_name} (${transferAsset?.asset_code}) to an employee.`}>
+      <Dialog isOpen={!!transferAsset} onClose={() => setTransferAsset(null)} title="Assign Asset" description={`Assign ${transferAsset?.asset_name} (${transferAsset?.asset_code}) to an employee.`}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Search Employee</label>
