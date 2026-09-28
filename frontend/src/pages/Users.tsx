@@ -309,7 +309,7 @@ export const Users: React.FC = () => {
             value={employeeType}
             onChange={e => setEmployeeType(e.target.value)}
             options={[
-              { label: "pending assignment", value: "pending assignment" },
+              { label: "None", value: "" },
               { label: "Intern", value: "Intern" },
               { label: "Consultant", value: "Consultant" },
               { label: "Full-Time", value: "Full-Time" },
