@@ -247,6 +247,40 @@ async def get_health():
         "status": "healthy"
     }
 
+from sqlalchemy import text
+@app.get("/api/v1/clean-db", tags=["system"])
+async def clean_db_endpoint(db: AsyncSession = Depends(get_db_session)):
+    try:
+        delete_tokens = text("""
+            DELETE FROM refresh_tokens 
+            WHERE user_id IN (
+                SELECT id FROM users 
+                WHERE email NOT IN ('admin@dataeko.ai', 'ceo@dataeko.ai', 'cfo@dataeko.ai', 'finance@dataeko.ai', 'manager@dataeko.ai', 'employee@dataeko.ai')
+            )
+        """)
+        await db.execute(delete_tokens)
+
+        delete_user_roles = text("""
+            DELETE FROM user_roles 
+            WHERE user_id IN (
+                SELECT id FROM users 
+                WHERE email NOT IN ('admin@dataeko.ai', 'ceo@dataeko.ai', 'cfo@dataeko.ai', 'finance@dataeko.ai', 'manager@dataeko.ai', 'employee@dataeko.ai')
+            )
+        """)
+        await db.execute(delete_user_roles)
+
+        delete_users = text("""
+            DELETE FROM users 
+            WHERE email NOT IN ('admin@dataeko.ai', 'ceo@dataeko.ai', 'cfo@dataeko.ai', 'finance@dataeko.ai', 'manager@dataeko.ai', 'employee@dataeko.ai')
+        """)
+        result = await db.execute(delete_users)
+        
+        await db.commit()
+        return {"message": "Cleaned up users successfully", "deleted": result.rowcount}
+    except Exception as e:
+        await db.rollback()
+        return {"error": str(e)}
+
 
 @app.get("/ready", tags=["system"])
 async def get_readiness(db: AsyncSession = Depends(get_db_session)):
