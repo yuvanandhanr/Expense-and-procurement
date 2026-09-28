@@ -82,7 +82,7 @@ export const Input: React.FC<InputProps> = ({
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
-  options: { label: string; value: string | number }[];
+  options?: { label: string; value: string | number }[];
 }
 
 export const Select: React.FC<SelectProps> = ({
@@ -91,6 +91,7 @@ export const Select: React.FC<SelectProps> = ({
   className = "",
   id,
   options,
+  children,
   ...props
 }) => {
   return (
@@ -107,12 +108,18 @@ export const Select: React.FC<SelectProps> = ({
         } ${className}`}
         {...props}
       >
-        <option value="" disabled>Select an option</option>
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
+        {options ? (
+          <>
+            <option value="" disabled>Select an option</option>
+            {options.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </>
+        ) : (
+          children
+        )}
       </select>
       {error && <p className="text-xs text-destructive font-medium pl-1">{error}</p>}
     </div>
