@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter } from "react-router-dom";
+import { HashRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "./hooks/useAuth";
@@ -25,7 +25,7 @@ export const App: React.FC = () => {
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <AuthProvider>
-            <BrowserRouter>
+            <HashRouter>
               <AppRoutes />
               {/* Global toast notifications config */}
               <Toaster
@@ -35,7 +35,7 @@ export const App: React.FC = () => {
                   duration: 4000,
                 }}
               />
-            </BrowserRouter>
+            </HashRouter>
           </AuthProvider>
         </ThemeProvider>
       </QueryClientProvider>
