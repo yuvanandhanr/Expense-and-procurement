@@ -262,6 +262,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     const isAdmin = hasRole("Admin");
     const isCEO = hasRole("CEO");
     const isProcurement = hasRole("Procurement") || hasRole("Procurement Officer") || hasRole("Procurement Manager");
+    const isExecOrAdmin = isAdmin || isCEO || isCFO || hasRole("Finance Manager");
 
     if (isVendor) {
       return [
@@ -285,7 +286,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       {
         title: "Overview",
         items: [
-          { label: isCFO || isCTO || isAdmin ? "Executive Dashboard" : "Dashboard", path: "/", icon: LayoutDashboard, show: true },
+          { label: isExecOrAdmin || isCTO ? "Executive Dashboard" : "Dashboard", path: "/", icon: LayoutDashboard, show: true },
         ],
       },
       {
@@ -306,8 +307,8 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         title: "Financial Operations",
         items: [
           { label: "Expense Verification", path: "/expenses", icon: FileText, show: isFinance && !isAdmin },
-          { label: "Reimbursements", path: "/expenses", icon: FileText, show: isCFO || isAdmin },
-          { label: isCFO || isAdmin ? "Vendor Payments" : "Vendor Invoices", path: "/invoices", icon: CreditCard, show: isFinance || isCFO || isAdmin },
+          { label: "Reimbursements", path: "/expenses", icon: FileText, show: isExecOrAdmin },
+          { label: isExecOrAdmin ? "Vendor Payments" : "Vendor Invoices", path: "/invoices", icon: CreditCard, show: isFinance || isExecOrAdmin },
           { label: "Financial Analytics", path: "/analytics", icon: TrendingUp, show: isFinance || isCFO || isAdmin || isCEO },
           { label: "Reports", path: "/reports", icon: FileSpreadsheet, show: isFinance || isCFO || isAdmin || isCEO },
         ]
@@ -316,18 +317,18 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         title: "Procurement Cycle",
         items: [
           { label: "Cycle Dashboard", path: "/procurement-dashboard", icon: LayoutDashboard, show: isProcurement || isFinance || isCFO || isAdmin || isCEO },
-          { label: "Vendors & Scores", path: "/vendors", icon: Users, show: isProcurement || isFinance || isCFO || isAdmin },
-          { label: "RFQs & Invitations", path: "/rfqs", icon: Briefcase, show: isProcurement || isFinance || isCFO || isAdmin },
-          { label: "Quotations Inbox", path: "/quotations", icon: Layers, show: isProcurement || isFinance || isCFO || isAdmin },
-          { label: "Purchase Orders", path: "/pos", icon: Package, show: isProcurement || isFinance || isCFO || isAdmin },
-          { label: "Asset Inventory", path: "/assets", icon: HardDrive, show: hasRole("Finance Manager") || isCFO || isAdmin },
+          { label: "Vendors & Scores", path: "/vendors", icon: Users, show: isProcurement || isFinance || isExecOrAdmin },
+          { label: "RFQs & Invitations", path: "/rfqs", icon: Briefcase, show: isProcurement || isFinance || isExecOrAdmin },
+          { label: "Quotations Inbox", path: "/quotations", icon: Layers, show: isProcurement || isFinance || isExecOrAdmin },
+          { label: "Purchase Orders", path: "/pos", icon: Package, show: isProcurement || isFinance || isExecOrAdmin },
+          { label: "Asset Inventory", path: "/assets", icon: HardDrive, show: isExecOrAdmin },
         ]
       },
       {
         title: "Intelligence & Platform",
         items: [
           { label: "Operational Analytics", path: "/analytics", icon: TrendingUp, show: isCTO },
-          { label: "User Management", path: "/users", icon: UserCog, show: isAdmin || isCEO || isCFO },
+          { label: "User Management", path: "/users", icon: UserCog, show: isExecOrAdmin },
         ]
       }
     ];
