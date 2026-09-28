@@ -285,7 +285,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       {
         title: "Overview",
         items: [
-          { label: isCFO || isCTO ? "Executive Dashboard" : "Dashboard", path: "/", icon: LayoutDashboard, show: true },
+          { label: isCFO || isCTO || isAdmin ? "Executive Dashboard" : "Dashboard", path: "/", icon: LayoutDashboard, show: true },
         ],
       },
       {
@@ -307,7 +307,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         items: [
           { label: "Expense Verification", path: "/expenses", icon: FileText, show: isFinance && !isAdmin },
           { label: "Reimbursements", path: "/expenses", icon: FileText, show: isCFO || isAdmin },
-          { label: isCFO ? "Vendor Payments" : "Vendor Invoices", path: "/invoices", icon: CreditCard, show: isFinance || isCFO || isAdmin },
+          { label: isCFO || isAdmin ? "Vendor Payments" : "Vendor Invoices", path: "/invoices", icon: CreditCard, show: isFinance || isCFO || isAdmin },
           { label: "Financial Analytics", path: "/analytics", icon: TrendingUp, show: isFinance || isCFO || isAdmin || isCEO },
           { label: "Reports", path: "/reports", icon: FileSpreadsheet, show: isFinance || isCFO || isAdmin || isCEO },
         ]
@@ -327,7 +327,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         title: "Intelligence & Platform",
         items: [
           { label: "Operational Analytics", path: "/analytics", icon: TrendingUp, show: isCTO },
-          { label: "User Management", path: "/users", icon: UserCog, show: isAdmin || isCEO },
+          { label: "User Management", path: "/users", icon: UserCog, show: isAdmin || isCEO || isCFO },
         ]
       }
     ];

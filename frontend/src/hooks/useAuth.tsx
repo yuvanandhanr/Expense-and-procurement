@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { User } from "../types";
 import { api, setTokens, clearTokens } from "../services/api";
 import toast from "react-hot-toast";
+import TypewriterText from "../components/ui/TypewriterText";
 
 interface AuthContextType {
   user: User | null;
@@ -48,7 +49,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       setUser(userProfile);
       localStorage.setItem("user_profile", JSON.stringify(userProfile));
-      toast.success(`Welcome back, ${userProfile.first_name}!`);
+      toast.success(
+        <TypewriterText 
+          texts={[`Welcome back, ${userProfile.first_name}!`, ""]} 
+          font={{
+            fontFamily: "Inter",
+            fontWeight: 600,
+            fontSize: "14px",
+            lineHeight: "1.2em",
+            letterSpacing: "-0.01em"
+          }}
+          cursorHeight={16}
+          cursorWidth={2}
+          color="currentColor"
+        />
+      );
     } catch (error: any) {
       const msg = error.response?.data?.detail || "Authentication failed. Please check credentials.";
       toast.error(msg);
@@ -72,7 +87,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       setUser(userProfile);
       localStorage.setItem("user_profile", JSON.stringify(userProfile));
-      toast.success(`Welcome back, ${userProfile.first_name}!`);
+      toast.success(
+        <TypewriterText 
+          texts={[`Welcome back, ${userProfile.first_name}!`, ""]} 
+          font={{
+            fontFamily: "Inter",
+            fontWeight: 600,
+            fontSize: "14px",
+            lineHeight: "1.2em",
+            letterSpacing: "-0.01em"
+          }}
+          cursorHeight={16}
+          cursorWidth={2}
+          color="currentColor"
+        />
+      );
     } catch (error: any) {
       const msg = error.response?.data?.detail || "Google Sign-In authentication failed.";
       toast.error(msg);
@@ -96,7 +125,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       setUser(userProfile);
       localStorage.setItem("user_profile", JSON.stringify(userProfile));
-      toast.success(`Welcome back, ${userProfile.first_name || "Supplier"}!`);
+      toast.success(
+        <TypewriterText 
+          texts={[`Welcome back, ${userProfile.first_name || "Supplier"}!`, ""]} 
+          font={{
+            fontFamily: "Inter",
+            fontWeight: 600,
+            fontSize: "14px",
+            lineHeight: "1.2em",
+            letterSpacing: "-0.01em"
+          }}
+          cursorHeight={16}
+          cursorWidth={2}
+          color="currentColor"
+        />
+      );
     } catch (error: any) {
       const msg = error.response?.data?.detail || "Vendor OTP verification failed.";
       toast.error(msg);

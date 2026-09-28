@@ -6,6 +6,7 @@ import { api } from "../services/api";
 import toast from "react-hot-toast";
 import { QRCodeSVG } from 'qrcode.react';
 import { ShieldCheck, UserCheck, Briefcase, ChevronRight, Lock, Sparkles, Building2 } from "lucide-react";
+import TypewriterText from "../components/ui/TypewriterText";
 
 declare global {
   interface Window {
@@ -61,7 +62,21 @@ export const Login: React.FC = () => {
     setError("");
     try {
       await googleLogin(response.credential);
-      toast.success("Authenticated with Google Workspace!");
+      toast.success(
+        <TypewriterText 
+          texts={["Authenticated with Google Workspace!"]} 
+          font={{
+            fontFamily: "Inter",
+            fontWeight: 600,
+            fontSize: "14px",
+            lineHeight: "1.2em",
+            letterSpacing: "-0.01em"
+          }}
+          cursorHeight={16}
+          cursorWidth={2}
+          color="currentColor"
+        />
+      );
       setTimeout(() => {
         navigate("/");
       }, 100);
