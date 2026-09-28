@@ -128,7 +128,7 @@ api.interceptors.response.use(
         processQueue(new Error("Refresh token expired"), null);
         clearTokens();
         toast.error("Session expired. Please log in again.");
-        window.location.href = "/login";
+        window.location.href = "/";
         return Promise.reject(refreshError);
       }
     }
