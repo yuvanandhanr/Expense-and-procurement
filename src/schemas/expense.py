@@ -55,6 +55,8 @@ class ExpenseReportBase(BaseModel):
     cost_center_id: Optional[int] = None
     project_code: Optional[str] = None
     currency: str = "USD"
+    department_name: Optional[str] = None
+    employee_type: Optional[str] = None
 
     @field_validator("justification")
     @classmethod

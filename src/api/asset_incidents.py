@@ -22,6 +22,12 @@ async def report_incident(
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
+    if data.department_name != current_user.department_name or data.employee_type != current_user.employee_type:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid department or employee type. Please use the values assigned to your employee profile."
+        )
+
     stmt = select(Asset).where(Asset.asset_id == data.asset_id)
     result = await session.execute(stmt)
     asset = result.scalar_one_or_none()

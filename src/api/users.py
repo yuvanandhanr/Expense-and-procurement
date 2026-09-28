@@ -108,6 +108,15 @@ async def update_user(
     """
     Updates an existing user's profile details or role assignments.
     """
+    if data.department_name is not None or data.employee_type is not None:
+        is_admin = any(role.role_name == "Admin" for role in current_user.roles)
+        if not is_admin:
+            from fastapi import HTTPException
+            raise HTTPException(
+                status_code=403, 
+                detail="Only Admins can assign department or employee type."
+            )
+            
     service = UserService(db)
     return await service.update_user(user_id, data)
 

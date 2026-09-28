@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
+# pyrefly: ignore [missing-import]
 from src.core.config import settings
 from src.models.platform_services import Job, JobHistory, AuditLog
 from src.repositories.platform_services import JobRepository, JobHistoryRepository

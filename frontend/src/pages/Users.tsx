@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { CurrentUser, Role } from "../types";
-import {Button, Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Dialog, Input, EmptyState} from "../components/ui";
+import {Button, Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Dialog, Input, EmptyState, Select} from "../components/ui";
 import toast from "react-hot-toast";
 import { getErrorMessage } from "../utils/helpers";
 import { useAuth } from "../hooks/useAuth";
@@ -22,6 +22,8 @@ export const Users: React.FC = () => {
   const [employeeCode, setEmployeeCode] = useState("");
   const [password, setPassword] = useState("");
   const [selectedRoles, setSelectedRoles] = useState<number[]>([]);
+  const [departmentName, setDepartmentName] = useState("");
+  const [employeeType, setEmployeeType] = useState("pending assignment");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchUsersAndRoles = async () => {
@@ -64,6 +66,8 @@ export const Users: React.FC = () => {
     setEmployeeCode(user.employee_code || "");
     setPassword("");
     setSelectedRoles(user.roles.map(r => r.role_id));
+    setDepartmentName(user.department_name || "");
+    setEmployeeType(user.employee_type || "pending assignment");
     setIsModalOpen(true);
   };
 
@@ -84,7 +88,9 @@ export const Users: React.FC = () => {
         first_name: firstName,
         last_name: lastName,
         status: "Active",
-        role_ids: selectedRoles
+        role_ids: selectedRoles,
+        department_name: departmentName || null,
+        employee_type: employeeType || "pending assignment"
       };
 
       if (isEditMode && editingUserId) {
@@ -172,6 +178,8 @@ export const Users: React.FC = () => {
                     <th className="p-4">ID</th>
                     <th className="p-4">Full Name</th>
                     <th className="p-4">Email</th>
+                    <th className="p-4">Department</th>
+                    <th className="p-4">Type</th>
                     <th className="p-4">Roles</th>
                     <th className="p-4">Status</th>
                     {hasRole("Admin") && <th className="p-4 text-right">Actions</th>}
@@ -183,6 +191,8 @@ export const Users: React.FC = () => {
                       <td className="p-4 text-xs font-bold text-primary">#{user.user_id}</td>
                       <td className="p-4 font-semibold">{user.full_name}</td>
                       <td className="p-4 text-muted-foreground">{user.email}</td>
+                      <td className="p-4 font-medium">{user.department_name || "N/A"}</td>
+                      <td className="p-4"><Badge variant="outline">{user.employee_type || "N/A"}</Badge></td>
                       <td className="p-4">
                         <div className="flex flex-wrap gap-1">
                           {user.roles.length > 0 ? (
@@ -274,6 +284,38 @@ export const Users: React.FC = () => {
             placeholder="Minimum 8 characters"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+          />
+          <Select
+            label="Department"
+            value={departmentName}
+            onChange={e => setDepartmentName(e.target.value)}
+            options={[
+              { label: "None", value: "" },
+              { label: "CEO", value: "CEO" },
+              { label: "CFO", value: "CFO" },
+              { label: "Admin", value: "Admin" },
+              { label: "Engineering", value: "Engineering" },
+              { label: "Finance", value: "Finance" },
+              { label: "Human Resources", value: "Human Resources" },
+              { label: "IT", value: "IT" },
+              { label: "Operations", value: "Operations" },
+              { label: "Procurement", value: "Procurement" },
+              { label: "Sales & Marketing", value: "Sales & Marketing" },
+              { label: "Administration", value: "Administration" },
+            ]}
+          />
+          <Select
+            label="Employee Type"
+            value={employeeType}
+            onChange={e => setEmployeeType(e.target.value)}
+            options={[
+              { label: "pending assignment", value: "pending assignment" },
+              { label: "Intern", value: "Intern" },
+              { label: "Consultant", value: "Consultant" },
+              { label: "Full-Time", value: "Full-Time" },
+              { label: "Part-Time", value: "Part-Time" },
+              { label: "Contract", value: "Contract" },
+            ]}
           />
           <div className="space-y-2">
             <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">

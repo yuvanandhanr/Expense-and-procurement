@@ -677,6 +677,8 @@ class UserService:
             designation_id=data.designation_id,
             designation=data.designation,
             employment_type=data.employment_type or "Full-Time",
+            department_name=data.department_name,
+            employee_type=data.employee_type or "pending assignment",
             status=data.status or "Active"
         )
         
@@ -736,6 +738,10 @@ class UserService:
             user.employment_type = data.employment_type
         if data.status is not None:
             user.status = data.status
+        if data.department_name is not None:
+            user.department_name = data.department_name
+        if data.employee_type is not None:
+            user.employee_type = data.employee_type
         if data.budget_code_id is not None:
             user.budget_code_id = data.budget_code_id
         if data.manager_id is not None:
