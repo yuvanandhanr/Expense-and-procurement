@@ -29,9 +29,9 @@ export const App: React.FC = () => {
               <AppRoutes />
               {/* Global toast notifications config */}
               <Toaster
-                position="top-right"
+                position="top-center"
                 toastOptions={{
-                  className: "bg-card text-card-foreground border border-border shadow-md rounded-lg font-sans text-sm",
+                  className: "bg-card text-card-foreground border border-border shadow-md rounded-lg text-sm",
                   duration: 4000,
                 }}
               />
