@@ -186,10 +186,10 @@ export const Users: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border text-sm">
-                  {users.map((user) => (
+                  {users.map((user, index) => (
                     <tr key={user.user_id} className="hover:bg-accent/20 transition-colors">
-                      <td className="p-4 text-xs font-bold text-primary">#{user.user_id}</td>
-                      <td className="p-4 font-semibold">{user.full_name}</td>
+                      <td className="p-4 text-xs font-bold text-primary">{index + 1}</td>
+                      <td className="p-4 font-semibold">{`${user.first_name || ""} ${user.last_name || ""}`.trim() || "N/A"}</td>
                       <td className="p-4 text-muted-foreground">{user.email}</td>
                       <td className="p-4 font-medium">{user.department_name || "N/A"}</td>
                       <td className="p-4"><Badge variant="outline">{user.employee_type || "N/A"}</Badge></td>
