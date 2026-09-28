@@ -87,7 +87,11 @@ class ApprovalWorkflow(Base):
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    purchase_requisition = relationship("PurchaseRequisition", back_populates="workflows")
+    purchase_requisition = relationship(
+        "PurchaseRequisition", 
+        back_populates="workflows",
+        primaryjoin="ApprovalWorkflow.pr_id == foreign(PurchaseRequisition.pr_id)"
+    )
     steps: Mapped[List["ApprovalStep"]] = relationship(
         "ApprovalStep", back_populates="workflow", cascade="all, delete-orphan"
     )

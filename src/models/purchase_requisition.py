@@ -90,7 +90,10 @@ class PurchaseRequisition(Base):
         "PRItem", back_populates="purchase_requisition", cascade="all, delete-orphan"
     )
     workflows = relationship(
-        "ApprovalWorkflow", back_populates="purchase_requisition", cascade="all, delete-orphan"
+        "ApprovalWorkflow", 
+        back_populates="purchase_requisition", 
+        cascade="all, delete-orphan",
+        primaryjoin="PurchaseRequisition.pr_id == foreign(ApprovalWorkflow.pr_id)"
     )
     history = relationship(
         "WorkflowHistory", back_populates="purchase_requisition", cascade="all, delete-orphan"
