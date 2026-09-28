@@ -247,6 +247,27 @@ async def get_health():
         "status": "healthy"
     }
 
+@app.get("/clean-db")
+async def clean_db(db: AsyncSession = Depends(get_db_session)):
+    from sqlalchemy import text
+    try:
+        await db.execute(text("DELETE FROM vendors;"))
+        await db.execute(text("""
+            DELETE FROM users 
+            WHERE email NOT IN (
+                'mock_google_y.raja@dataeko.ai',
+                'mock_google_ceo@dataeko.ai',
+                'mock_google_cfo@dataeko.ai',
+                'mock_google_finance@dataeko.ai',
+                'mock_google_manager@dataeko.ai',
+                'mock_google_employee@dataeko.ai'
+            );
+        """))
+        await db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        return {"error": str(e)}
+
 
 @app.get("/ready", tags=["system"])
 async def get_readiness(db: AsyncSession = Depends(get_db_session)):
