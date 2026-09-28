@@ -32,6 +32,11 @@ class ExpenseReport(Base):
     cost_center: Mapped[Optional["CostCenter"]] = relationship("CostCenter")
     receipts: Mapped[List["Receipt"]] = relationship("Receipt", back_populates="expense_report", cascade="all, delete-orphan")
     approvals: Mapped[List["ExpenseApproval"]] = relationship("ExpenseApproval", back_populates="expense_report", cascade="all, delete-orphan")
+    workflow_history: Mapped[List["ApprovalWorkflow"]] = relationship(
+        "ApprovalWorkflow",
+        primaryjoin="ExpenseReport.expense_report_id == foreign(ApprovalWorkflow.claim_id)",
+        viewonly=True,
+    )
 
 
 class Receipt(Base):

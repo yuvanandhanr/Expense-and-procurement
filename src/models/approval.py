@@ -55,7 +55,7 @@ class ApprovalWorkflow(Base):
         BigInteger, ForeignKey("purchase_requisitions.pr_id", ondelete="CASCADE"), nullable=True
     )
     claim_id: Mapped[Optional[int]] = mapped_column(
-        BigInteger, ForeignKey("expense_claims.claim_id", ondelete="CASCADE"), nullable=True
+        BigInteger, ForeignKey("expense_reports.expense_report_id", ondelete="CASCADE"), nullable=True
     )
     po_id: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("purchase_orders.po_id", ondelete="CASCADE"), nullable=True
