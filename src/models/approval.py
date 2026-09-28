@@ -1,7 +1,7 @@
 from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
-from sqlalchemy import BigInteger, Integer, String, Text, Numeric, Boolean, DateTime, ForeignKey
+from sqlalchemy import BigInteger, Integer, String, Text, Numeric, Boolean, DateTime, ForeignKey, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.database.base import Base
 
@@ -54,8 +54,31 @@ class ApprovalWorkflow(Base):
     pr_id: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("purchase_requisitions.pr_id", ondelete="CASCADE"), nullable=True
     )
+    claim_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("expense_claims.claim_id", ondelete="CASCADE"), nullable=True
+    )
+    po_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("purchase_orders.po_id", ondelete="CASCADE"), nullable=True
+    )
+    invoice_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("vendor_invoices.invoice_id", ondelete="CASCADE"), nullable=True
+    )
     status: Mapped[Optional[str]] = mapped_column(
         String(50), default="Under Review"
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            """
+            (
+                (claim_id IS NOT NULL)::int +
+                (pr_id IS NOT NULL)::int +
+                (po_id IS NOT NULL)::int +
+                (invoice_id IS NOT NULL)::int
+            ) = 1
+            """,
+            name="check_exclusive_workflow_ownership"
+        ),
     )
     created_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime, default=datetime.utcnow
