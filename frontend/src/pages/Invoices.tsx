@@ -8,7 +8,7 @@ import toast from "react-hot-toast";
 import { FileText, CheckCircle, XCircle, AlertTriangle, Upload, Eye, Check, X } from "lucide-react";
 
 export const Invoices: React.FC = () => {
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -130,9 +130,11 @@ export const Invoices: React.FC = () => {
           <p className="text-xs text-muted-foreground mt-1">Review vendor billings against POs and GRNs.</p>
         </div>
         <div>
-          <Button onClick={handleOpenUploadModal} className="gap-1.5 shadow-apple-glow">
-            <Upload className="w-4 h-4" /> Upload Invoice
-          </Button>
+          {(hasRole("Admin") || hasRole("Vendor") || hasRole("Vendor Portal")) && (
+            <Button onClick={handleOpenUploadModal} className="gap-1.5 shadow-apple-glow">
+              <Upload className="w-4 h-4" /> Upload Invoice
+            </Button>
+          )}
         </div>
       </div>
 
