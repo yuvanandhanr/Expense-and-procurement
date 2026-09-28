@@ -623,39 +623,16 @@ async def approve_expense(
         except Exception:
             approval = None
             
+    if not approval:
+        raise HTTPException(status_code=403, detail="No matching pending approval step found for your user.")
+            
     if not _can_act_on_pending_report(report, current_user, approval):
         _log_action(current_user, "expense_approval_denied", report_id, level=logging.WARNING)
         raise HTTPException(status_code=403, detail="Not authorized to approve this report")
         
-    if approval:
-        approval.status = "Approved"
-        approval.comments = payload.comments
-        approval.actioned_at = datetime.utcnow()
-    
-    # Mark any pending approval records for this report as approved
-    unassigned_query = select(ExpenseApproval).where(
-        ExpenseApproval.expense_report_id == report_id,
-        ExpenseApproval.status == "Pending"
-    )
-    unassigned_res = await db.execute(unassigned_query)
-    unassigned_list = []
-    try:
-        unassigned_list = unassigned_res.scalars().all()
-    except Exception:
-        try:
-            one = unassigned_res.scalar_one_or_none()
-            if one:
-                unassigned_list = [one]
-        except Exception:
-            pass
-            
-    for unassigned in unassigned_list:
-        if isinstance(unassigned, ExpenseApproval):
-            unassigned.status = "Approved"
-            if not unassigned.approver_id:
-                unassigned.approver_id = current_user.user_id
-            unassigned.comments = payload.comments
-            unassigned.actioned_at = datetime.utcnow()
+    approval.status = "Approved"
+    approval.comments = payload.comments
+    approval.actioned_at = datetime.utcnow()
         
     roles = _roles(current_user)
     if report.status in ["Pending Manager Approval", "Corrected Claim", "Pending Approval"]:
@@ -720,21 +697,17 @@ async def reject_expense(
     )
     result = await db.execute(query)
     approval = result.scalars().first()
+    
+    if not approval:
+        raise HTTPException(status_code=403, detail="No matching pending approval step found for your user.")
+        
     if not _can_act_on_pending_report(report, current_user, approval):
         _log_action(current_user, "expense_rejection_denied", report_id, level=logging.WARNING)
         raise HTTPException(status_code=403, detail="Not authorized to reject this report")
     
-    unassigned_query = select(ExpenseApproval).where(
-        ExpenseApproval.expense_report_id == report_id,
-        ExpenseApproval.status == "Pending"
-    )
-    unassigned_res = await db.execute(unassigned_query)
-    for unassigned in unassigned_res.scalars().all():
-        unassigned.status = "Rejected"
-        if not unassigned.approver_id:
-            unassigned.approver_id = current_user.user_id
-        unassigned.comments = payload.comments
-        unassigned.actioned_at = datetime.utcnow()
+    approval.status = "Rejected"
+    approval.comments = payload.comments
+    approval.actioned_at = datetime.utcnow()
         
     report.status = "Rejected"
     await repo.update_report(report)
@@ -767,21 +740,17 @@ async def return_expense(
     )
     result = await db.execute(query)
     approval = result.scalars().first()
+    
+    if not approval:
+        raise HTTPException(status_code=403, detail="No matching pending approval step found for your user.")
+        
     if not _can_act_on_pending_report(report, current_user, approval):
         _log_action(current_user, "expense_return_denied", report_id, level=logging.WARNING)
         raise HTTPException(status_code=403, detail="Not authorized to return this report")
     
-    unassigned_query = select(ExpenseApproval).where(
-        ExpenseApproval.expense_report_id == report_id,
-        ExpenseApproval.status == "Pending"
-    )
-    unassigned_res = await db.execute(unassigned_query)
-    for unassigned in unassigned_res.scalars().all():
-        unassigned.status = "Returned"
-        if not unassigned.approver_id:
-            unassigned.approver_id = current_user.user_id
-        unassigned.comments = payload.comments
-        unassigned.actioned_at = datetime.utcnow()
+    approval.status = "Returned"
+    approval.comments = payload.comments
+    approval.actioned_at = datetime.utcnow()
         
     report.status = "Returned for Correction"
     await repo.update_report(report)
