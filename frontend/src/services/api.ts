@@ -2,7 +2,10 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import toast from "react-hot-toast";
 
 // Get base API URL (default to relative path mapped by proxy)
-const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
+let API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
+if (API_BASE_URL && API_BASE_URL.startsWith('http') && !API_BASE_URL.endsWith('/api/v1')) {
+  API_BASE_URL = API_BASE_URL.replace(/\/$/, "") + "/api/v1";
+}
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
