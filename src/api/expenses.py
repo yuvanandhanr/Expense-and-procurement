@@ -206,6 +206,12 @@ async def create_expense_report(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
+    if payload.department_name != current_user.department_name or payload.employee_type != current_user.employee_type:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid department or employee type. Please use the values assigned to your employee profile."
+        )
     repo = ExpenseRepository(db)
     new_report = ExpenseReport(
         employee_id=current_user.user_id,

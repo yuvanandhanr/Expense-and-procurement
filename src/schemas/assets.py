@@ -133,6 +133,8 @@ class AssetIncidentCreate(BaseModel):
     incident_type: str
     image_url: Optional[str] = None
     is_draft: Optional[bool] = False
+    department_name: Optional[str] = None
+    employee_type: Optional[str] = None
 
 
 class AssetIncidentUpdate(BaseModel):

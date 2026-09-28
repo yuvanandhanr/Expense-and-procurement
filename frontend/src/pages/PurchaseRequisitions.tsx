@@ -63,6 +63,8 @@ export const PurchaseRequisitions: React.FC = () => {
         title,
         justification: justification,
         department_id: user?.department_id || null,
+        department_name: user?.department_name || null,
+        employee_type: user?.employee_type || null,
         items: [
           {
             category: "Standard",

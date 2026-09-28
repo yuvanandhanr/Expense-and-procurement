@@ -78,6 +78,8 @@ class CurrentUser(BaseModel):
     business_unit: Optional[str] = None
     location: Optional[str] = None
     employment_type: str = "Full-Time"
+    department_name: Optional[str] = None
+    employee_type: str = "pending assignment"
     status: str = "Active"
     is_locked: Optional[bool] = None
     last_login: Optional[datetime] = None
@@ -139,6 +141,8 @@ class UserCreate(BaseModel):
     designation_id: Optional[int] = None
     designation: Optional[str] = None
     employment_type: Optional[str] = "Full-Time"
+    department_name: Optional[str] = None
+    employee_type: Optional[str] = "pending assignment"
     status: Optional[str] = "Active"
     role_ids: Optional[List[int]] = []
 
@@ -157,6 +161,8 @@ class UserUpdate(BaseModel):
     designation_id: Optional[int] = None
     designation: Optional[str] = None
     employment_type: Optional[str] = None
+    department_name: Optional[str] = None
+    employee_type: Optional[str] = None
     status: Optional[str] = None
     is_locked: Optional[bool] = None
     role_ids: Optional[List[int]] = None

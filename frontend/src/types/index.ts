@@ -21,7 +21,9 @@ export interface User {
   email: string;
   phone?: string;
   department_id?: number;
+  department_name?: string;
   designation_id?: number;
+  employee_type?: string;
   status: string;
   roles: Role[];
 }

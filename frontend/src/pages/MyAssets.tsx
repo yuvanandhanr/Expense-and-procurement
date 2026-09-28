@@ -83,7 +83,9 @@ export const MyAssets: React.FC = () => {
         description: incidentDescription,
         incident_type: incidentType,
         image_url: imageUrl || null,
-        is_draft: isDraft
+        is_draft: isDraft,
+        department_name: user?.department_name || null,
+        employee_type: user?.employee_type || null
       });
       toast.success("Incident reported successfully");
       setIsIncidentModalOpen(false);

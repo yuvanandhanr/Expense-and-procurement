@@ -68,6 +68,12 @@ class User(Base):
     employment_type: Mapped[str] = mapped_column(
         String, default="Full-Time", nullable=True, comment="Employment type"
     )
+    department_name: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, comment="Department assignment (string)"
+    )
+    employee_type: Mapped[str] = mapped_column(
+        String, default="pending assignment", nullable=True, comment="Employee type"
+    )
     status: Mapped[str] = mapped_column(
         String, default="Active", nullable=True, comment="User status"
     )

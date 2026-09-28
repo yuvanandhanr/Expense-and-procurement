@@ -42,6 +42,8 @@ class PRBase(BaseModel):
     purchase_type: Optional[str] = Field("Standard", description="IT, Capex, Opex, Standard")
     need_by_date: Optional[datetime] = None
     project_code: Optional[str] = None
+    department_name: Optional[str] = None
+    employee_type: Optional[str] = None
 
 
 class PRCreate(PRBase):

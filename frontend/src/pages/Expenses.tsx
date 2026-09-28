@@ -212,7 +212,9 @@ const Expenses: React.FC = () => {
     const payload: any = {
       purpose: newReport.purpose,
       currency: newReport.currency,
-      justification: newReport.justification
+      justification: newReport.justification,
+      department_name: user?.department_name || null,
+      employee_type: user?.employee_type || null
     };
     if (newReport.department_id) payload.department_id = parseInt(newReport.department_id);
     if (newReport.cost_center_id) payload.cost_center_id = parseInt(newReport.cost_center_id);
