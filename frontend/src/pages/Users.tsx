@@ -142,7 +142,7 @@ export const Users: React.FC = () => {
 
   const toggleRoleSelection = (roleId: number) => {
     setSelectedRoles(prev => 
-      prev.includes(roleId) ? prev.filter(id => id !== roleId) : [...prev, roleId]
+      prev.includes(roleId) ? [] : [roleId]
     );
   };
 
