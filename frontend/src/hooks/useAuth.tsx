@@ -110,7 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     clearTokens();
     toast.success("Logged out successfully.");
-    window.location.href = "/login";
+    window.location.href = "/";
   };
 
   const hasRole = (roleName: string): boolean => {
