@@ -181,29 +181,29 @@ export const Users: React.FC = () => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-border bg-accent/40 text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    <th className="p-4">ID</th>
-                    <th className="p-4">Full Name</th>
-                    <th className="p-4">Email</th>
-                    <th className="p-4">Department</th>
-                    <th className="p-4">Type</th>
-                    <th className="p-4">Roles</th>
-                    <th className="p-4">Status</th>
-                    {hasRole("Admin") && <th className="p-4 text-right">Actions</th>}
+                    <th className="px-3 py-3.5 w-12 text-center">ID</th>
+                    <th className="px-3 py-3.5 w-[20%]">Full Name</th>
+                    <th className="px-3 py-3.5 w-[22%]">Email</th>
+                    <th className="px-3 py-3.5 w-[14%]">Department</th>
+                    <th className="px-3 py-3.5 w-[10%]">Type</th>
+                    <th className="px-3 py-3.5 w-[12%]">Roles</th>
+                    <th className="px-3 py-3.5 w-[10%]">Status</th>
+                    {hasRole("Admin") && <th className="px-3 py-3.5 text-center min-w-[210px]">Actions</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border text-sm">
                   {users.map((user, index) => (
                     <tr key={user.user_id} className="hover:bg-accent/20 transition-colors">
-                      <td className="p-4 text-xs font-bold text-primary">{index + 1}</td>
-                      <td className="p-4 font-semibold">{`${user.first_name || ""} ${user.last_name || ""}`.trim() || "N/A"}</td>
-                      <td className="p-4 text-muted-foreground">{user.email}</td>
-                      <td className="p-4 font-medium">{user.department_name || "N/A"}</td>
-                      <td className="p-4"><Badge variant="outline">{user.employee_type || "N/A"}</Badge></td>
-                      <td className="p-4">
+                      <td className="px-3 py-3 text-xs font-bold text-primary text-center">{index + 1}</td>
+                      <td className="px-3 py-3 font-semibold break-words">{`${user.first_name || ""} ${user.last_name || ""}`.trim() || "N/A"}</td>
+                      <td className="px-3 py-3 text-muted-foreground break-words">{user.email}</td>
+                      <td className="px-3 py-3 font-medium break-words">{user.department_name || "N/A"}</td>
+                      <td className="px-3 py-3"><Badge variant="outline" className="whitespace-nowrap">{user.employee_type || "N/A"}</Badge></td>
+                      <td className="px-3 py-3">
                         <div className="flex flex-wrap gap-1">
                           {user.roles.length > 0 ? (
                             user.roles.map(r => (
-                              <Badge key={r.role_id} variant="neutral" className="text-[10px]">
+                              <Badge key={r.role_id} variant="neutral" className="text-[10px] whitespace-nowrap">
                                 {r.role_name}
                               </Badge>
                             ))
@@ -212,7 +212,7 @@ export const Users: React.FC = () => {
                           )}
                         </div>
                       </td>
-                      <td className="p-4">
+                      <td className="px-3 py-3">
                         {user.status !== "Active" ? (
                           <Badge variant="danger">Inactive</Badge>
                         ) : user.is_locked ? (
@@ -222,7 +222,7 @@ export const Users: React.FC = () => {
                         )}
                       </td>
                       {hasRole("Admin") && (
-                        <td className="p-4 text-right space-x-2 whitespace-nowrap">
+                        <td className="px-3 py-3 text-center space-x-1.5 whitespace-nowrap">
                           <Button 
                             variant="outline" 
                             size="sm" 
