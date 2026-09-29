@@ -6,11 +6,11 @@ test.describe('Expense Workflow & Reimbursement OCR', () => {
     test.setTimeout(120000);
     // 1. Log in as Employee
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Employee', exact: true }).click();
-    await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible({ timeout: 10000 });
+    await page.getByRole('button', { name: 'Rachel Foster' }).click();
+    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible({ timeout: 10000 });
 
     // 2. Navigate to Expenses
-    await page.getByRole('link', { name: 'Employee Reimbursements' }).click();
+    await page.getByRole('link', { name: 'My Reimbursements' }).click();
     await expect(page.getByRole('heading', { name: 'My Reimbursements' })).toBeVisible();
 
     // 3. Create New Reimbursement
@@ -69,11 +69,13 @@ test.describe('Expense Workflow & Reimbursement OCR', () => {
 
     // 8. Log in as Manager
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Manager', exact: true }).click();
-    await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible({ timeout: 10000 });
+    await page.getByRole('button', { name: 'David Kim' }).click();
+    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible({ timeout: 10000 });
 
     // 9. Navigate to Team Approvals or Expenses
-    await page.getByRole('link', { name: 'Team Reimbursements' }).click();
+    await page.getByRole('link', { name: 'Pending Approvals' }).click();
+    
+    await page.getByRole('button', { name: 'Reimbursements' }).click();
     
     // Find the report and approve it
     const approvalRow = page.locator('div.cursor-pointer', { hasText: reportTitle }).first();

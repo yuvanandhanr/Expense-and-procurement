@@ -6,14 +6,14 @@ test.describe('Authentication Flow', () => {
     await page.goto('/');
 
     // Wait for the login page to load
-    await expect(page.getByRole('heading', { name: 'Sign in using Google Workspace' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /ProcureSync/i })).toBeVisible();
 
     // Click the Employee mock login button
-    const employeeLoginBtn = page.getByRole('button', { name: 'Employee', exact: true });
+    const employeeLoginBtn = page.getByRole('button', { name: 'Rachel Foster' });
     await employeeLoginBtn.click();
 
     // Wait for successful redirection to Dashboard
-    await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible({ timeout: 10000 });
 
     // Verify the URL is not /login
     expect(page.url()).not.toContain('/login');
@@ -22,9 +22,9 @@ test.describe('Authentication Flow', () => {
   test('User can log in as Admin', async ({ page }) => {
     await page.goto('/login');
 
-    const adminLoginBtn = page.getByRole('button', { name: 'Admin', exact: true });
+    const adminLoginBtn = page.getByRole('button', { name: 'Alex Rivera' });
     await adminLoginBtn.click();
 
-    await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible({ timeout: 10000 });
   });
 });

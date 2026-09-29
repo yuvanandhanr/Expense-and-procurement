@@ -9,13 +9,13 @@ test.describe('Vendor Lifecycle Workflow', () => {
     await page.goto('/login');
 
     // Click Vendor tab
-    await page.getByText('Vendor Login').click();
+    await page.getByText('Supplier Partner').click();
     
     // Wait for hydration
     await page.waitForTimeout(2000);
     
     // Click the mock button
-    await page.getByRole('button', { name: 'Mock Vendor Access (Test)' }).click();
+    await page.getByRole('button', { name: 'Apex Systems' }).click();
     
     // Vendor Dashboard should be visible
     await expect(page.getByText('Open Requests for Quotation (RFQs)')).toBeVisible({ timeout: 10000 });

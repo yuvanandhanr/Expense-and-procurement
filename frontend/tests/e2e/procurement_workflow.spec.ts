@@ -4,12 +4,12 @@ test.describe('Procurement Workflow', () => {
   test('Employee can create a new purchase requisition', async ({ page }) => {
     // Log in as Employee
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Employee', exact: true }).click();
-    await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible({ timeout: 10000 });
+    await page.getByRole('button', { name: 'Rachel Foster' }).click();
+    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible({ timeout: 10000 });
 
     // Navigate to PRs
-    await page.getByRole('link', { name: 'Purchase Requisitions' }).click();
-    await expect(page.getByRole('heading', { name: 'Purchase Requisitions' })).toBeVisible();
+    await page.getByRole('link', { name: 'My Requisitions' }).click();
+    await expect(page.getByRole('heading', { name: 'My Requisitions' })).toBeVisible();
 
     // Open New PR Modal
     await page.getByRole('button', { name: 'New Requisition' }).click();

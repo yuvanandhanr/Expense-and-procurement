@@ -4,8 +4,8 @@ test.describe('Data Integrity Checks', () => {
   test.beforeEach(async ({ page }) => {
     // Log in as Admin for full access to these modules
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Admin', exact: true }).click();
-    await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible({ timeout: 10000 });
+    await page.getByRole('button', { name: 'Alex Rivera' }).click();
+    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible({ timeout: 10000 });
   });
 
   test('Navigate Global Search and verify propagation without duplicates', async ({ page }) => {

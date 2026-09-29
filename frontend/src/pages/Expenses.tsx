@@ -300,18 +300,20 @@ const Expenses: React.FC = () => {
 
   const subTabCounts: Record<string, number> = {
     All: expenses.length,
-    Draft: expenses.filter((r: any) => r.status === "Draft").length,
+    Drafts: expenses.filter((r: any) => r.status === "Draft").length,
     Submitted: expenses.filter((r: any) => r.status.includes("Pending") || r.status === "Corrected Claim" || r.status === "Payment Requested" || r.status === "Finance Verified").length,
-    Approved: expenses.filter((r: any) => r.status === "Approved").length,
-    Rejected: expenses.filter((r: any) => r.status === "Rejected" || r.status === "Returned for Correction").length,
+    Approved: expenses.filter((r: any) => ["Approved", "Paid", "Closed"].includes(r.status)).length,
+    Rejected: expenses.filter((r: any) => r.status === "Rejected").length,
+    "Return for Correction": expenses.filter((r: any) => r.status === "Returned for Correction").length,
   };
 
   const filteredExpenses = expenses.filter((r: any) => {
     if (statusFilter === "All") return true;
-    if (statusFilter === "Draft") return r.status === "Draft";
+    if (statusFilter === "Drafts") return r.status === "Draft";
     if (statusFilter === "Submitted") return r.status.includes("Pending") || r.status === "Corrected Claim" || r.status === "Payment Requested" || r.status === "Finance Verified";
-    if (statusFilter === "Approved") return r.status === "Approved";
-    if (statusFilter === "Rejected") return r.status === "Rejected" || r.status === "Returned for Correction";
+    if (statusFilter === "Approved") return ["Approved", "Paid", "Closed"].includes(r.status);
+    if (statusFilter === "Rejected") return r.status === "Rejected";
+    if (statusFilter === "Return for Correction") return r.status === "Returned for Correction";
     return r.status === statusFilter;
   });
 
@@ -326,15 +328,15 @@ const Expenses: React.FC = () => {
         </div>
         <div className="flex items-center space-x-4">
           <HeroTimestamp />
-          <Button onClick={() => setIsCreateOpen(true)} className="font-bold text-xs uppercase tracking-wider">
-            New Reimbursement
+          <Button onClick={() => setIsCreateOpen(true)} className="font-bold text-xs uppercase tracking-wider gap-1.5 shadow-apple-glow">
+            <Plus className="w-4 h-4" /> New Reimbursement
           </Button>
         </div>
       </div>
 
       {/* Filters & Controls */}
       <div className="flex items-center space-x-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50">
-        {["All", "Draft", "Submitted", "Approved", "Rejected"].map((status) => (
+        {["All", "Drafts", "Submitted", "Approved", "Rejected", "Return for Correction"].map((status) => (
           <button
             key={status}
             onClick={() => setStatusFilter(status)}
@@ -418,13 +420,13 @@ const Expenses: React.FC = () => {
                         )}
                         <Button 
                           size="sm" 
-                          variant={["Approved", "Rejected", "Returned for Correction"].includes(report.status) ? "view" : "primary"}
+                          variant={["Approved", "Rejected"].includes(report.status) ? "view" : "primary"}
                           onClick={() => setSelectedReportId(report.expense_report_id)}
                           className="gap-1.5"
                         >
                           {(() => {
-                            if (["Approved", "Rejected", "Returned for Correction"].includes(report.status)) return <><Eye className="w-3.5 h-3.5" /> View</>;
-                            if (report.status === "Draft") return "Edit Draft";
+                            if (["Approved", "Rejected"].includes(report.status)) return <><Eye className="w-3.5 h-3.5" /> View</>;
+                            if (report.status === "Draft" || report.status === "Returned for Correction") return "Edit Draft";
                             return "View Details";
                           })()}
                         </Button>
@@ -650,6 +652,13 @@ const Expenses: React.FC = () => {
                 </div>
               )}
 
+              {(report.status.includes('Rejected') || report.status.includes('Returned')) && report.rejection_reason && (
+                <div className="text-sm text-red-700 italic border-l-4 border-red-500 bg-red-50 p-3 mx-2 mt-4 rounded-r-md shadow-sm">
+                  <strong className="block text-xs uppercase tracking-wider mb-1 font-bold">Reason:</strong>
+                  {report.rejection_reason}
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-6 text-sm text-foreground font-medium bg-card p-4 rounded-2xl border border-border shadow-sm mx-2 mt-4">
                 {report.department_id && (
                   <span className="flex items-center gap-2.5">
@@ -731,7 +740,7 @@ const Expenses: React.FC = () => {
                       variant="primary"
                       className="text-sm font-bold h-10 px-6 bg-gradient-to-r from-[#A78BFA] to-[#F472B6] hover:opacity-90 border-0 rounded-md text-white shadow-none"
                       onClick={() => setIsReviewOpen(true)}
-                      disabled={submitReportMutation.isPending || !report.receipts?.length}
+                      disabled={submitReportMutation.isPending}
                     >
                       Review & Submit
                     </Button>

@@ -204,10 +204,9 @@ class OCRService:
                     total_amount = max(valid_vals)
                     confidence = Decimal("60.00")
                         
-            # 2. Extract Date. Prefer the raw OCR pass: preprocessing can
-            # degrade small numerals on thermal receipts.
-            raw_text = pytesseract.image_to_string(raw_image)
-            extracted_date = OCRService._extract_receipt_date(raw_text) or OCRService._extract_receipt_date(text)
+            # 2. Extract Date. 
+            # Optimization: Use the already extracted text to avoid redundant Tesseract passes.
+            extracted_date = OCRService._extract_receipt_date(text)
             if extracted_date:
                 if confidence > 0:
                     confidence += Decimal("10.00")

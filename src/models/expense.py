@@ -38,6 +38,16 @@ class ExpenseReport(Base):
         viewonly=True,
     )
 
+    @property
+    def rejection_reason(self) -> Optional[str]:
+        if "Reject" in self.status or "Return" in self.status:
+            if self.approvals:
+                # Find the most recent rejection comment
+                for approval in sorted(self.approvals, key=lambda a: a.actioned_at or a.created_at, reverse=True):
+                    if approval.status in ("Rejected", "Returned for Correction") and approval.comments:
+                        return approval.comments
+        return None
+
 
 class Receipt(Base):
     __tablename__ = "receipts"

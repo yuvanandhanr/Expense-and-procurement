@@ -8,10 +8,10 @@ test.describe('Procure-to-Pay (P2P) Workflow', () => {
     
     // 1. Employee Login -> Create PR
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Employee', exact: true }).click();
-    await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible({ timeout: 10000 });
+    await page.getByRole('button', { name: 'Rachel Foster' }).click();
+    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible({ timeout: 10000 });
     
-    await page.getByRole('link', { name: 'Purchase Requisitions' }).click();
+    await page.getByRole('link', { name: 'My Requisitions' }).click();
     
     // Open New PR Modal
     await page.getByRole('button', { name: 'New Requisition' }).click();
@@ -31,12 +31,12 @@ test.describe('Procure-to-Pay (P2P) Workflow', () => {
     // 2. Manager Login -> Approve PR
     await page.evaluate(() => localStorage.clear());
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Admin', exact: true }).click();
+    await page.getByRole('button', { name: 'Alex Rivera' }).click();
     
     // Wait for login
-    await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible({ timeout: 10000 });
     
-    await page.getByRole('link', { name: 'Purchase Requisitions' }).click();
+    await page.getByRole('link', { name: 'My Requisitions' }).click();
     
     const prRow = page.locator('tr', { hasText: prTitle }).first();
     await expect(prRow).toBeVisible({ timeout: 15000 });
@@ -61,7 +61,7 @@ test.describe('Procure-to-Pay (P2P) Workflow', () => {
 
     // 3. Admin/Finance -> Convert PR to PO (Admin for this test)
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Admin', exact: true }).click();
+    await page.getByRole('button', { name: 'Alex Rivera' }).click();
     
     // In our system, converting to PO might be automatic on PR approval, or there might be a Purchase Orders page.
     // Let's assume PO is auto-generated or go to POs
@@ -127,7 +127,7 @@ test.describe('Procure-to-Pay (P2P) Workflow', () => {
 
     // 6. Verify Procurement Dashboard aggregates correctly
     await page.getByRole('link', { name: 'Dashboard', exact: true }).click();
-    await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible();
     
     // We expect 3-Way Match discrepancy/match status to be updated, or generally data integrity
     await expect(page.getByText('Pending', { exact: false }).first()).toBeVisible();

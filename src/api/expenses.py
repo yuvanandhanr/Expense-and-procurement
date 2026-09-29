@@ -161,22 +161,9 @@ async def list_expenses(
         ExpenseApproval, ExpenseApproval.expense_report_id == ExpenseReport.expense_report_id
     )
 
-    user_roles = [r.role_name for r in current_user.roles]
-    is_admin = any(r in user_roles for r in ["Admin", "SuperAdmin", "CEO", "CFO"])
-    is_manager = "Manager" in user_roles
-
-    conditions = [
-        ExpenseReport.employee_id == current_user.user_id,
-        (ExpenseApproval.approver_id == current_user.user_id) & (ExpenseReport.status != 'Draft')
-    ]
-
-    if is_manager:
-        manager_cond = (UserModel.manager_id == current_user.user_id) & (ExpenseReport.status != 'Draft')
-        if not is_admin:
-            manager_cond = manager_cond & (~UserModel.roles.any(Role.role_name.in_(["Admin", "CFO", "CEO", "Finance Manager"])))
-        conditions.append(manager_cond)
-
-    stmt = stmt.where(or_(*conditions)).order_by(ExpenseReport.created_at.desc())
+    # Strict isolation: Employees only see their own reimbursements.
+    # Approvals are handled via the /approvals endpoint.
+    stmt = stmt.where(ExpenseReport.employee_id == current_user.user_id).order_by(ExpenseReport.created_at.desc())
     result = await db.execute(stmt)
     
     # Deduplicate in case of multiple approvals
@@ -207,18 +194,18 @@ async def create_expense_report(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
-    if payload.department_name != current_user.department_name or payload.employee_type != current_user.employee_type:
+    if not current_user.department_id:
         from fastapi import HTTPException
         raise HTTPException(
             status_code=400,
-            detail="Invalid department or employee type. Please use the values assigned to your employee profile."
+            detail="You are not assigned to a valid department. Cannot create expense."
         )
     repo = ExpenseRepository(db)
     new_report = ExpenseReport(
         employee_id=current_user.user_id,
         purpose=payload.purpose,
         justification=payload.justification,
-        department_id=payload.department_id,
+        department_id=current_user.department_id,
         cost_center_id=payload.cost_center_id,
         project_code=payload.project_code,
         currency=payload.currency,
@@ -263,7 +250,7 @@ async def upload_receipts(
         result_dup = await db.execute(query_dup)
         if content_hash in batch_hashes or result_dup.scalars().first():
             _log_action(current_user, "receipt_duplicate_detected", report_id, level=logging.WARNING)
-            raise HTTPException(status_code=409, detail="This exact receipt has already been uploaded previously. Duplicate receipts are not allowed.")
+            raise HTTPException(status_code=409, detail="Duplicate receipt detected. This receipt has already been uploaded.")
         batch_hashes.add(content_hash)
         uploads.append((file, content, content_hash))
 
@@ -420,7 +407,13 @@ async def update_expense_report(
     repo = ExpenseRepository(db)
     report = await _get_owned_editable_report(repo, report_id, current_user)
     for field, value in payload.model_dump(exclude_unset=True).items():
+        if field == "department_id":
+            continue
         setattr(report, field, value)
+    
+    if current_user.department_id:
+        report.department_id = current_user.department_id
+
     await repo.update_report(report)
     await db.commit()
     _log_action(current_user, "expense_draft_updated", report_id)
@@ -655,15 +648,39 @@ async def approve_expense(
         )
         db.add(fm_approval)
     elif report.status in ["Pending Finance Manager Approval", "Pending Finance Approval"]:
-        # When Finance Manager approves, check if the requestor is CEO, Admin, or Finance Manager
-        # which means it requires CFO approval
-        # Actually, in initialize_approval_flow, CEO/Admin/Finance Manager goes directly to CFO
-        # So "Pending Finance Approval" is only for Manager/Employee claims, or if CFO routed it to Finance
         report.status = "Payment Requested"
         report.payment_status = "Pending Payment"
+        
+        fm_query = select(User).join(User.roles).where(
+            Role.role_name.in_(["Finance Manager", "Finance", "CFO"]), 
+            User.status == "Active",
+            User.user_id != report.employee_id
+        )
+        fm_result = await db.execute(fm_query)
+        fin_exec = fm_result.scalars().first()
+        if fin_exec:
+            db.add(ExpenseApproval(
+                expense_report_id=report.expense_report_id,
+                approver_id=fin_exec.user_id,
+                status="Pending"
+            ))
     elif report.status == "Pending CFO Approval":
         report.status = "Payment Requested"
         report.payment_status = "Pending Payment"
+        
+        fm_query = select(User).join(User.roles).where(
+            Role.role_name.in_(["Finance Manager", "Finance", "CFO"]), 
+            User.status == "Active",
+            User.user_id != report.employee_id
+        )
+        fm_result = await db.execute(fm_query)
+        fin_exec = fm_result.scalars().first()
+        if fin_exec:
+            db.add(ExpenseApproval(
+                expense_report_id=report.expense_report_id,
+                approver_id=fin_exec.user_id,
+                status="Pending"
+            ))
     else:
         report.status = "Payment Requested"
         report.payment_status = "Pending Payment"
@@ -781,18 +798,20 @@ async def pay_expense(
         _log_action(current_user, "expense_payment_self_denied", report_id, level=logging.WARNING)
         raise HTTPException(status_code=403, detail="Cannot authorize payment for your own claim")
         
-    # Extra validation: Ensure no pending approvals exist for this claim
     pending_approvals_query = select(ExpenseApproval).where(
         ExpenseApproval.expense_report_id == report_id,
         ExpenseApproval.status == "Pending"
     )
     pending_approvals_result = await db.execute(pending_approvals_query)
-    if pending_approvals_result.scalars().first():
-        raise HTTPException(status_code=400, detail="Cannot authorize payment while there are pending approvals.")
+    pending_approval = pending_approvals_result.scalars().first()
         
-    if not _roles(current_user) & {"Finance Manager"}:
+    if not _roles(current_user) & {"Finance Manager", "CFO"}:
         _log_action(current_user, "expense_payment_denied", report_id, level=logging.WARNING)
         raise HTTPException(status_code=403, detail="Not authorized to authorize payment")
+        
+    if pending_approval:
+        pending_approval.status = "Approved"
+        pending_approval.actioned_at = datetime.utcnow()
         
     report.status = "Approved"
     report.payment_status = "Paid"

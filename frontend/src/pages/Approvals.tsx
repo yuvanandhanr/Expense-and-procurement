@@ -7,13 +7,13 @@ import toast from "react-hot-toast";
 import { formatDate, getErrorMessage, isValidText } from "../utils/helpers";
 import { Check, X as XIcon } from "lucide-react";
 
-type TabType = "Requisitions" | "Expenses" | "Asset Incidents" | "Resignations";
+type TabType = "Reimbursements" | "Requisitions" | "Asset Incidents" | "Resignations";
 
 export const Approvals: React.FC = () => {
   const { user } = useAuth();
   const [workflows, setWorkflows] = useState<ApprovalWorkflow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabType>("Requisitions");
+  const [activeTab, setActiveTab] = useState<TabType>("Reimbursements");
   
   // Action state
   const [selectedWorkflow, setSelectedWorkflow] = useState<ApprovalWorkflow | null>(null);
@@ -112,7 +112,7 @@ export const Approvals: React.FC = () => {
           if (amt <= 0) return false;
         }
         if (activeTab === "Requisitions") return wf.entity_type === "PurchaseRequisition";
-        if (activeTab === "Expenses") return wf.entity_type === "ExpenseReport";
+        if (activeTab === "Reimbursements") return wf.entity_type === "ExpenseReport";
         if (activeTab === "Asset Incidents") return wf.entity_type === "AssetIncident";
         if (activeTab === "Resignations") return wf.entity_type === "Resignation";
         return false;
@@ -145,7 +145,7 @@ export const Approvals: React.FC = () => {
 
       {/* Tabs */}
       <div className="flex space-x-2 border-b border-border">
-        {(["Requisitions", "Expenses", "Asset Incidents", "Resignations"] as TabType[]).map((tab) => (
+        {(["Reimbursements", "Requisitions", "Asset Incidents", "Resignations"] as TabType[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -213,15 +213,15 @@ export const Approvals: React.FC = () => {
                   )}
                 </div>
                 
-                {((["Pending", "Under Review", "Reported"].includes(wf.status)) || (wf.status.toLowerCase().includes("pending") && wf.status !== "Approved" && wf.status !== "Pending Fulfillment")) && (
+                {((["Pending", "Under Review", "Reported", "Payment Requested"].includes(wf.status)) || (wf.status.toLowerCase().includes("pending") && wf.status !== "Approved" && wf.status !== "Pending Fulfillment")) && (
                   <div className="flex space-x-2 pt-4 border-t border-border">
                     <Button 
                       variant="success" 
                       className="flex-1 font-bold shadow-apple-sm"
-                      onClick={() => { setSelectedWorkflow(wf); setActionType("approve"); }}
+                      onClick={() => { setSelectedWorkflow(wf); setActionType(wf.status === "Payment Requested" ? "pay" : "approve"); }}
                     >
                       <Check className="w-4 h-4" />
-                      <span>Approve</span>
+                      <span>{wf.status === "Payment Requested" ? "Authorize Payment" : "Approve"}</span>
                     </Button>
                     <Button 
                       variant="warning" 

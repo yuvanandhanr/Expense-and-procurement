@@ -180,6 +180,7 @@ export const PurchaseRequisitions: React.FC = () => {
     }).length,
     Approved: prs.filter((pr) => pr.status === "Approved" || pr.status === "Completed").length,
     Rejected: prs.filter((pr) => pr.status === "Rejected" || pr.status === "Cancelled").length,
+    "Return for Correction": prs.filter((pr) => pr.status === "Returned for Correction").length,
   };
 
   const filteredPrs = prs.filter((pr) => {
@@ -188,6 +189,7 @@ export const PurchaseRequisitions: React.FC = () => {
       const s = pr.status.toLowerCase();
       return s.includes("pending") || s === "submitted" || s === "under review";
     }
+    if (statusFilter === "Return for Correction") return pr.status === "Returned for Correction";
     return pr.status.toLowerCase() === statusFilter.toLowerCase();
   });
 
@@ -208,8 +210,8 @@ export const PurchaseRequisitions: React.FC = () => {
       </div>
 
       {/* Filters & Controls */}
-      <div className="flex items-center space-x-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50">
-        {["All", "Draft", "Submitted", "Approved", "Rejected"].map((status) => (
+      <div className="flex flex-wrap items-center space-x-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50 gap-y-2">
+        {["All", "Draft", "Submitted", "Approved", "Rejected", "Return for Correction"].map((status) => (
           <button
             key={status}
             onClick={() => setStatusFilter(status)}

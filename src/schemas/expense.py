@@ -5,6 +5,7 @@ from decimal import Decimal
 
 # Receipt Schemas
 from src.schemas.auth import RoleSchema
+import string
 
 class EmployeeBasicSchema(BaseModel):
     user_id: int
@@ -58,6 +59,18 @@ class ExpenseReportBase(BaseModel):
     department_name: Optional[str] = None
     employee_type: Optional[str] = None
 
+    @field_validator('purpose', 'justification')
+    @classmethod
+    def validate_meaningful_text(cls, v: str) -> str:
+        text = v.strip()
+        if not text:
+            raise ValueError("Must not be empty or whitespace only")
+        # Ensure it has letters, not just punctuation or digits
+        has_letters = any(c.isalpha() for c in text)
+        if not has_letters:
+            raise ValueError("Must contain meaningful text/letters, not just numbers or punctuation")
+        return text
+
     @field_validator("justification")
     @classmethod
     def justification_must_not_be_blank(cls, value: str) -> str:
@@ -97,6 +110,7 @@ class ExpenseReportResponse(ExpenseReportBase):
     policy_flags: Optional[str]
     payment_status: Optional[str]
     payment_reference: Optional[str]
+    rejection_reason: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     receipts: List[ReceiptResponse] = []

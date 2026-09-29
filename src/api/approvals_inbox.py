@@ -19,6 +19,41 @@ async def get_pending_approvals(
     """
     service = ApprovalService(db)
     pending_workflows = await service.get_pending_approvals_for_user(current_user)
+    # Fetch pending Expenses for the current approver
+    from sqlalchemy import select
+    from src.models.expense import ExpenseReport, ExpenseApproval
+    from src.models.auth import User as UserModel
+    
+    stmt_exp = (
+        select(ExpenseApproval, ExpenseReport, UserModel)
+        .join(ExpenseReport, ExpenseApproval.expense_report_id == ExpenseReport.expense_report_id)
+        .join(UserModel, ExpenseReport.employee_id == UserModel.user_id)
+        .where(
+            ExpenseApproval.status == "Pending",
+            ExpenseApproval.approver_id == current_user.user_id
+        )
+    )
+    result_exp = await db.execute(stmt_exp)
+    for exp_approval, report, reporter in result_exp.all():
+        pending_workflows.append({
+            "workflow_id": exp_approval.approval_id,
+            "entity_type": "ExpenseReport",
+            "entity_id": report.expense_report_id,
+            "current_step_sequence": 1,
+            "workflow_step": report.status,
+            "status": report.status,
+            "created_at": report.created_at,
+            "updated_at": report.updated_at,
+            "requestor_id": report.employee_id,
+            "requestor_name": f"{reporter.first_name} {reporter.last_name}",
+            "title": f"Expense: {report.purpose}",
+            "justification": report.justification,
+            "amount": float(report.total_amount),
+            "past_approvers": [],
+            "pending_approvers": [f"User {exp_approval.approver_id}"],
+            "steps": [],
+            "can_approve": True
+        })
     
     # Also fetch pending Asset Incidents for Admin/Manager
     user_roles = [r.role_name for r in current_user.roles]

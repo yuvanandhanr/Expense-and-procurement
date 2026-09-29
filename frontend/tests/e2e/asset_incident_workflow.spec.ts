@@ -4,8 +4,8 @@ test.describe('Asset Incident Workflow', () => {
   test('Employee can report a damaged asset', async ({ page }) => {
     // Log in as Employee
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Employee', exact: true }).click();
-    await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible({ timeout: 10000 });
+    await page.getByRole('button', { name: 'Rachel Foster' }).click();
+    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible({ timeout: 10000 });
 
     // Navigate to My Assets
     await page.getByRole('link', { name: 'My Assets' }).click();

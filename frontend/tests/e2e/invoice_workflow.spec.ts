@@ -16,8 +16,8 @@ test.describe('Vendor Invoice OCR and Data Integrity Workflow', () => {
     
     // 1. Admin/Finance Login
     await page.goto('/');
-    await page.getByRole('button', { name: 'Admin', exact: true }).click();
-    await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible({ timeout: 10000 });
+    await page.getByRole('button', { name: 'Alex Rivera' }).click();
+    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible({ timeout: 10000 });
     
     // Check initial dashboard invoice count/amount if possible
     
@@ -64,7 +64,7 @@ test.describe('Vendor Invoice OCR and Data Integrity Workflow', () => {
     
     // Verify Dashboard Data Integrity
     await page.getByRole('link', { name: 'Dashboard', exact: true }).click();
-    await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible();
     
     // Ensure the dashboard reflects the updated data (you could check for specific numbers or charts)
     // For now we just ensure no errors and it loads correctly

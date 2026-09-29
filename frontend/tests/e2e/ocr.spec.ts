@@ -16,12 +16,12 @@ test.describe('E2E Data Integrity and OCR Workflows', () => {
     
     // 1. Employee Login
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Employee', exact: true }).click(); 
+    await page.getByRole('button', { name: 'Rachel Foster' }).click(); 
     
-    await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible({ timeout: 10000 });
     
     // 2. Navigate to Expenses
-    await page.getByRole('link', { name: 'Employee Reimbursements' }).click();
+    await page.getByRole('link', { name: 'My Reimbursements' }).click();
     await expect(page.getByRole('heading', { name: /Reimbursements/i })).toBeVisible({ timeout: 10000 });
 
     // 3. Create Expense Report
@@ -78,9 +78,9 @@ test.describe('E2E Data Integrity and OCR Workflows', () => {
     // 2. Admin Login -> Approve Expense
     await page.evaluate(() => localStorage.clear());
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Admin', exact: true }).click();
+    await page.getByRole('button', { name: 'Alex Rivera' }).click();
     
-    await page.getByRole('link', { name: 'Employee Reimbursements' }).click();
+    await page.getByRole('link', { name: 'My Reimbursements' }).click();
     
     // Find the report and approve it
     const approvalRow = page.locator('div.cursor-pointer', { hasText: reportTitle }).first();
@@ -100,12 +100,12 @@ test.describe('E2E Data Integrity and OCR Workflows', () => {
 
     // 1. Employee Login -> Create PR
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Employee', exact: true }).click();
+    await page.getByRole('button', { name: 'Rachel Foster' }).click();
     
     const uniqueId = Date.now();
     const prTitle = `P2P OCR Test PR ${uniqueId}`;
 
-    await page.getByRole('link', { name: 'Purchase Requisitions' }).click();
+    await page.getByRole('link', { name: 'My Requisitions' }).click();
     await page.getByRole('button', { name: 'New Requisition' }).click();
     await page.getByLabel('Requisition Title').fill(prTitle);
     await page.getByLabel('Estimated Cost (USD)').fill('1500');
@@ -119,9 +119,9 @@ test.describe('E2E Data Integrity and OCR Workflows', () => {
     // 2. Manager Login -> Approve PR
     await page.evaluate(() => localStorage.clear());
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Admin', exact: true }).click(); // Use Admin to bypass strict hierarchy checks in tests
+    await page.getByRole('button', { name: 'Alex Rivera' }).click(); // Use Admin to bypass strict hierarchy checks in tests
     
-    await page.getByRole('link', { name: 'Purchase Requisitions' }).click();
+    await page.getByRole('link', { name: 'My Requisitions' }).click();
     
     // The description isn't shown in the table, just the title. Find the row with our unique PR Title and click Review/View
     const prRow = page.getByRole('row', { name: prTitle }).first();
@@ -151,7 +151,7 @@ test.describe('E2E Data Integrity and OCR Workflows', () => {
     // 3. Admin/Finance -> Convert to PO
     await page.evaluate(() => localStorage.clear());
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Admin', exact: true }).click();
+    await page.getByRole('button', { name: 'Alex Rivera' }).click();
     
     await page.getByRole('link', { name: 'Purchase Orders' }).click();
     // Assuming PRs auto-generate POs upon final approval or there is a manual step.
@@ -214,7 +214,7 @@ test.describe('E2E Data Integrity and OCR Workflows', () => {
     test.setTimeout(180000);
     // 1. Admin Login
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Admin', exact: true }).click();
+    await page.getByRole('button', { name: 'Alex Rivera' }).click();
     
     // 2. Navigate through Dashboards
     await page.getByRole('link', { name: 'Financial Analytics' }).click();

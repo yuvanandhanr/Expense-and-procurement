@@ -260,44 +260,7 @@ export const Login: React.FC = () => {
                 {/* Google SDK render container */}
                 <div id="google-signin-btn" className="w-full flex justify-center min-h-[44px]"></div>
 
-                {/* Custom Google Workspace Email Drawer */}
-                {!showEmailInput ? (
-                  <div className="text-center">
-                    <button
-                      type="button"
-                      onClick={() => setShowEmailInput(true)}
-                      className="text-[11px] text-primary font-semibold hover:underline"
-                    >
-                      Or enter Google Workspace email (@dataeko.ai)
-                    </button>
-                  </div>
-                ) : (
-                  <form onSubmit={handleCustomGoogleEmailSubmit} className="space-y-2 p-3 bg-muted/40 rounded-2xl border border-border/60 animate-fade-in">
-                    <div className="flex gap-2">
-                      <Input
-                        type="email"
-                        placeholder="yourname@dataeko.ai"
-                        value={employeeEmail}
-                        onChange={(e) => setEmployeeEmail(e.target.value)}
-                        className="text-xs flex-1"
-                        autoFocus
-                      />
-                      <Button type="submit" size="sm" disabled={isSubmitting}>
-                        Login
-                      </Button>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] text-muted-foreground px-1">
-                      <span>Must be registered corporate domain</span>
-                      <button
-                        type="button"
-                        onClick={() => setShowEmailInput(false)}
-                        className="text-muted-foreground hover:text-foreground underline"
-                      >
-                        Hide
-                      </button>
-                    </div>
-                  </form>
-                )}
+
 
                 <div className="relative flex py-1 items-center">
                   <div className="flex-grow border-t border-border/60"></div>
