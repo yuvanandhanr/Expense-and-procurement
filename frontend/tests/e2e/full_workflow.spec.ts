@@ -14,7 +14,7 @@ test.describe('Procure-to-Pay (P2P) Workflow', () => {
     await page.getByRole('link', { name: 'My Requisitions' }).click();
     
     // Open New PR Modal
-    await page.getByRole('button', { name: 'New Requisition' }).click();
+    await page.getByRole('button', { name: 'New Requisition', exact: true }).click();
     const uniqueId = Date.now();
     const prTitle = `Q3 Office Server Upgrades ${uniqueId}`;
     await page.getByLabel('Requisition Title').fill(prTitle);

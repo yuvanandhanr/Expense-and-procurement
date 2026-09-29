@@ -13,7 +13,7 @@ test.describe('Data Integrity Checks', () => {
 
     // Perform a search for an entity created in previous tests
     // Assuming 'Office Server' is part of PR or Expense titles
-    await page.getByPlaceholder('Quick search...').fill('Office Server');
+    await page.getByPlaceholder('Search anything (⌘K)...').fill('Office Server');
     await page.keyboard.press('Enter');
         
         // Ensure some results appear and there's no visible error
@@ -29,7 +29,7 @@ test.describe('Data Integrity Checks', () => {
   });
 
   test('System Health check', async ({ page }) => {
-    await page.goto('/monitoring');
+    await page.goto('/#/monitoring');
     await expect(page.getByRole('heading', { name: 'System Performance & Health' })).toBeVisible();
 
     // Verify key metrics are visible
@@ -42,7 +42,7 @@ test.describe('Data Integrity Checks', () => {
   });
 
   test('Analytics and Reporting integrity', async ({ page }) => {
-    await page.goto('/analytics');
+    await page.goto('/#/analytics');
     
     // Verify dashboard renders without crashing
     const canvasElements = page.locator('canvas');

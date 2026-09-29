@@ -26,7 +26,7 @@ test.describe('Employee Offboarding Workflow', () => {
       await expect(page.getByText(/Offboarding initiated for/)).toBeVisible({ timeout: 10000 });
 
       // Navigate to Approvals to verify tasks exist
-      await page.getByRole('link', { name: 'Approvals' }).click();
+      await page.getByRole('link', { name: 'Pending Approvals' }).click();
       await page.getByRole('button', { name: 'Resignations' }).click();
       
       // We expect some tasks to be generated for offboarding

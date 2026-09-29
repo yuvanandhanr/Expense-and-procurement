@@ -106,7 +106,7 @@ test.describe('E2E Data Integrity and OCR Workflows', () => {
     const prTitle = `P2P OCR Test PR ${uniqueId}`;
 
     await page.getByRole('link', { name: 'My Requisitions' }).click();
-    await page.getByRole('button', { name: 'New Requisition' }).click();
+    await page.getByRole('button', { name: 'New Requisition', exact: true }).click();
     await page.getByLabel('Requisition Title').fill(prTitle);
     await page.getByLabel('Estimated Cost (USD)').fill('1500');
     await page.getByPlaceholder('Provide context for approval').fill('Testing Vendor Invoice and GRN OCR');
@@ -222,7 +222,7 @@ test.describe('E2E Data Integrity and OCR Workflows', () => {
     
     // Use Global Search to find recent data (Searching for PR since PRs are indexed, unlike Expenses)
     // We will search for 'P2P OCR Test PR' to match all of them, or just use the prefix
-    await page.getByPlaceholder('Quick search...').fill('P2P OCR Test PR');
+    await page.getByPlaceholder('Search anything (⌘K)...').fill('P2P OCR Test PR');
     await page.keyboard.press('Enter');
     
     // Ensure data propagated correctly by waiting for it to appear

@@ -12,7 +12,7 @@ test.describe('Procurement Workflow', () => {
     await expect(page.getByRole('heading', { name: 'My Requisitions' })).toBeVisible();
 
     // Open New PR Modal
-    await page.getByRole('button', { name: 'New Requisition' }).click();
+    await page.getByRole('button', { name: 'New Requisition', exact: true }).click();
     
     // Fill form
     await page.getByLabel('Requisition Title').fill('MacBook Pro M3 Replacement');
