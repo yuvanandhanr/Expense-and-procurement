@@ -179,12 +179,12 @@ async def select_vendor(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
-    # Vendor Selection Approval is restricted to Finance Manager, CFO, Procurement Manager, or Admin
+    # Vendor Selection Approval is restricted to Admin, Finance Manager, or Procurement Manager (CFO/CEO are strictly read-only)
     user_roles = [role.role_name for role in current_user.roles]
-    if not any(role in ("Admin", "Procurement Manager", "Finance Manager", "Finance", "CFO") for role in user_roles):
+    if not any(role in ("Admin", "SuperAdmin", "Procurement Manager", "Finance Manager", "Finance") for role in user_roles):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only finance, CFO, procurement managers, or administrators are permitted to approve vendor selections"
+            detail="Only Finance Manager, Procurement Manager, or Administrators are permitted to select vendors"
         )
     service = RFQService(db)
     return await service.select_vendor(

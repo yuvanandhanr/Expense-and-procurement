@@ -48,7 +48,7 @@ async def list_quotations(
     service = RFQService(db)
     user_roles = [role.role_name for role in current_user.roles]
     
-    if any(role in ("Admin", "Procurement Officer", "Procurement Manager", "Finance Manager", "Finance", "CFO", "Manager") for role in user_roles):
+    if any(role in ("Admin", "SuperAdmin", "Procurement Officer", "Procurement Manager", "Finance Manager", "Finance", "CFO", "CEO", "Manager") for role in user_roles):
         return await service.quote_repo.list_all()
     elif "Vendor Portal" in user_roles:
         from sqlalchemy import select

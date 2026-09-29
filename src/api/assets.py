@@ -81,7 +81,7 @@ async def get_assets(
     current_user: User = Depends(get_current_user)
 ):
     user_roles = [r.role_name for r in current_user.roles]
-    allowed = {"Admin", "CFO", "Finance Manager", "CEO"}
+    allowed = {"Admin", "SuperAdmin", "CFO", "Finance Manager", "CEO"}
     if not allowed.intersection(user_roles):
         raise HTTPException(status_code=403, detail="Not authorized to view all assets")
 
@@ -121,9 +121,9 @@ async def create_asset(
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
-    # Verify Admin
+    # Verify Admin / SuperAdmin
     user_roles = [r.role_name for r in current_user.roles]
-    if "Admin" not in user_roles:
+    if not any(r in ("Admin", "SuperAdmin") for r in user_roles):
         raise HTTPException(status_code=403, detail="Only Admins can create assets manually")
 
     new_asset = Asset(
@@ -174,9 +174,9 @@ async def transfer_asset(
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
-    # Verify Admin
+    # Verify Admin / SuperAdmin
     user_roles = [r.role_name for r in current_user.roles]
-    if "Admin" not in user_roles:
+    if not any(r in ("Admin", "SuperAdmin") for r in user_roles):
         raise HTTPException(status_code=403, detail="Only Admins can transfer assets")
 
     # Fetch Asset
@@ -233,7 +233,7 @@ async def update_asset(
     current_user: User = Depends(get_current_user)
 ):
     user_roles = [r.role_name for r in current_user.roles]
-    if "Admin" not in user_roles:
+    if not any(r in ("Admin", "SuperAdmin") for r in user_roles):
         raise HTTPException(status_code=403, detail="Only Admins can update assets")
 
     stmt = select(Asset).where(Asset.asset_id == asset_id)
