@@ -89,8 +89,7 @@ class ApprovalWorkflow(Base):
 
     purchase_requisition = relationship(
         "PurchaseRequisition", 
-        back_populates="workflows",
-        primaryjoin="ApprovalWorkflow.pr_id == foreign(PurchaseRequisition.pr_id)"
+        back_populates="workflows"
     )
     steps: Mapped[List["ApprovalStep"]] = relationship(
         "ApprovalStep", back_populates="workflow", cascade="all, delete-orphan"
