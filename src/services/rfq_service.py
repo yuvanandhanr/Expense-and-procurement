@@ -27,12 +27,12 @@ class RFQService:
         self.pr_repo = PRRepository(db)
 
     def generate_rfq_number(self) -> str:
-        date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+        date_str = datetime.utcnow().strftime("%Y%m%d")
         rand_str = uuid.uuid4().hex[:6].upper()
         return f"RFQ-{date_str}-{rand_str}"
 
     def generate_quotation_number(self) -> str:
-        date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+        date_str = datetime.utcnow().strftime("%Y%m%d")
         rand_str = uuid.uuid4().hex[:6].upper()
         return f"QT-{date_str}-{rand_str}"
 
@@ -45,7 +45,7 @@ class RFQService:
             status="Draft",
             submission_deadline=data.submission_deadline,
             created_by=user_id,
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.utcnow()
         )
         rfq = await self.rfq_repo.create(rfq)
 
@@ -75,7 +75,7 @@ class RFQService:
         for k, v in update_dict.items():
             setattr(rfq, k, v)
         
-        rfq.updated_at = datetime.now(timezone.utc)
+        rfq.updated_at = datetime.utcnow()
         await self.rfq_repo.update(rfq)
         return rfq
 
@@ -85,7 +85,7 @@ class RFQService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="RFQ not found")
 
         rfq.status = "Published"
-        rfq.updated_at = datetime.now(timezone.utc)
+        rfq.updated_at = datetime.utcnow()
         await self.rfq_repo.update(rfq)
         return rfq
 
@@ -108,7 +108,7 @@ class RFQService:
         invite = RFQVendor(
             rfq_id=rfq_id,
             vendor_id=vendor_id,
-            invited_at=datetime.now(timezone.utc)
+            invited_at=datetime.utcnow()
         )
         return await self.rfq_vendor_repo.create(invite)
 
@@ -171,7 +171,7 @@ class RFQService:
             technical_score=data.technical_score or Decimal("0.00"),
             commercial_score=data.commercial_score or Decimal("0.00"),
             status="Submitted",
-            submitted_at=datetime.now(timezone.utc)
+            submitted_at=datetime.utcnow()
         )
         quote = await self.quote_repo.create(quote)
 
@@ -210,13 +210,13 @@ class RFQService:
                 rfq_id=rfq_id,
                 winner_technical_quotation_id=winner_tech.quotation_id,
                 winner_commercial_quotation_id=winner_comm.quotation_id,
-                actioned_at=datetime.now(timezone.utc)
+                actioned_at=datetime.utcnow()
             )
             comp = await self.comparison_repo.create(comp)
         else:
             comp.winner_technical_quotation_id = winner_tech.quotation_id
             comp.winner_commercial_quotation_id = winner_comm.quotation_id
-            comp.actioned_at = datetime.now(timezone.utc)
+            comp.actioned_at = datetime.utcnow()
             await self.comparison_repo.update(comp)
 
         return await self.comparison_repo.get_by_id(comp.comparison_id)
@@ -235,13 +235,13 @@ class RFQService:
         comp.final_selected_quotation_id = selected_quotation_id
         comp.selection_reason = reason
         comp.approved_by = user_id
-        comp.actioned_at = datetime.now(timezone.utc)
+        comp.actioned_at = datetime.utcnow()
         await self.comparison_repo.update(comp)
 
         # Update RFQ status to Closed
         rfq = await self.rfq_repo.get_by_id(rfq_id)
         rfq.status = "Closed"
-        rfq.closing_date = datetime.now(timezone.utc)
+        rfq.closing_date = datetime.utcnow()
         await self.rfq_repo.update(rfq)
 
         # Update quotation statuses

@@ -47,7 +47,7 @@ class ContractService:
             end_date=data.end_date,
             renewal_date=data.renewal_date,
             expiry_reminder_date=data.expiry_reminder_date,
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.utcnow()
         )
         contract = await self.contract_repo.create(contract)
 
@@ -94,7 +94,7 @@ class ContractService:
         for k, v in update_dict.items():
             setattr(contract, k, v)
         
-        contract.updated_at = datetime.now(timezone.utc)
+        contract.updated_at = datetime.utcnow()
         await self.contract_repo.update(contract)
         return contract
 

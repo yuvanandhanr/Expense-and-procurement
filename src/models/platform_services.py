@@ -14,8 +14,8 @@ class NotificationTemplate(Base):
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     subject: Mapped[str] = mapped_column(String(255), nullable=False)
     body_template: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())
 
 
 class Notification(Base):
@@ -29,7 +29,7 @@ class Notification(Base):
     message: Mapped[str] = mapped_column(Text, nullable=False)
     notification_type: Mapped[str] = mapped_column(String(50), nullable=False) # e.g. "Email", "In-App"
     status: Mapped[str] = mapped_column(String(50), default="Unread", nullable=False) # Unread, Read, Archived
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
     read_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     user = relationship("User", foreign_keys=[user_id])
@@ -45,8 +45,8 @@ class NotificationPreference(Base):
     email_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     in_app_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     categories: Mapped[Optional[str]] = mapped_column(Text, nullable=True) # comma-separated list of enabled types/categories
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())
 
     user = relationship("User", foreign_keys=[user_id])
 
@@ -57,7 +57,7 @@ class AuditLog(Base):
     audit_log_id: Mapped[int] = mapped_column(
         "log_id", BigInteger, primary_key=True, autoincrement=True
     )
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.utcnow(), nullable=False)
     user_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
     user_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     ip_address: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
@@ -76,7 +76,7 @@ class ActivityLog(Base):
     activity_log_id: Mapped[int] = mapped_column(
         BigInteger, primary_key=True, autoincrement=True
     )
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.utcnow(), nullable=False)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     activity_type: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
@@ -99,7 +99,7 @@ class Report(Base):
     file_path: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     file_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True) # PDF, Excel, CSV
     status: Mapped[str] = mapped_column(String(50), default="Pending", nullable=False) # Pending, Processing, Completed, Failed
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     creator = relationship("User", foreign_keys=[created_by])
@@ -120,7 +120,7 @@ class ScheduledReport(Base):
     next_run: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     creator = relationship("User", foreign_keys=[created_by])
 
@@ -148,7 +148,7 @@ class SavedFilter(Base):
     module: Mapped[str] = mapped_column(String(100), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     filter_query: Mapped[str] = mapped_column(Text, nullable=False) # JSON query parameters
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     user = relationship("User", foreign_keys=[user_id])
 
@@ -164,8 +164,8 @@ class SearchIndex(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     meta_data: Mapped[Optional[str]] = mapped_column(Text, nullable=True) # JSON context
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())
 
 
 class Attachment(Base):
@@ -182,7 +182,7 @@ class Attachment(Base):
     file_type: Mapped[str] = mapped_column(String(100), nullable=False)
     file_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
     uploaded_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     uploader = relationship("User", foreign_keys=[uploaded_by])
     versions = relationship("AttachmentVersion", back_populates="attachment", cascade="all, delete-orphan")
@@ -200,7 +200,7 @@ class AttachmentVersion(Base):
     file_path: Mapped[str] = mapped_column(String(1024), nullable=False)
     file_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
     uploaded_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     attachment = relationship("Attachment", back_populates="versions")
     uploader = relationship("User", foreign_keys=[uploaded_by])
@@ -218,7 +218,7 @@ class Job(Base):
     status: Mapped[str] = mapped_column(String(50), default="Idle", nullable=False) # Idle, Running, Paused
     last_run: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     next_run: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
 
 class JobHistory(Base):
@@ -228,7 +228,7 @@ class JobHistory(Base):
         BigInteger, primary_key=True, autoincrement=True
     )
     job_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("jobs.job_id", ondelete="CASCADE"), nullable=False)
-    run_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    run_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.utcnow(), nullable=False)
     duration_seconds: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     status: Mapped[str] = mapped_column(String(50), nullable=False) # Success, Failed
     logs: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -246,7 +246,7 @@ class SystemHealth(Base):
     component: Mapped[str] = mapped_column(String(100), nullable=False) # Database, Storage, Cache, Queue, Scheduler
     status: Mapped[str] = mapped_column(String(50), nullable=False) # Healthy, Degraded, Unhealthy
     details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    checked_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    checked_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.utcnow(), nullable=False)
 
 
 class SystemMetric(Base):
@@ -257,7 +257,7 @@ class SystemMetric(Base):
     )
     metric_name: Mapped[str] = mapped_column(String(100), nullable=False) # CPU, Memory, APIResponseTime, etc.
     metric_value: Mapped[float] = mapped_column(Float, nullable=False)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.utcnow(), nullable=False)
     labels: Mapped[Optional[str]] = mapped_column(Text, nullable=True) # JSON strings for key-values
 
 
@@ -271,8 +271,8 @@ class SystemSetting(Base):
     value: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     category: Mapped[str] = mapped_column(String(100), default="General", nullable=False)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())
 
 
 class EmailTemplate(Base):
@@ -284,8 +284,8 @@ class EmailTemplate(Base):
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False) # Welcome, PasswordReset, etc.
     subject: Mapped[str] = mapped_column(String(255), nullable=False)
     body_template: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())
 
 
 class EmailQueue(Base):
@@ -300,7 +300,7 @@ class EmailQueue(Base):
     status: Mapped[str] = mapped_column(String(50), default="Pending", nullable=False) # Pending, Sent, Failed
     retry_count: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
     sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
@@ -313,5 +313,5 @@ class CacheMetadata(Base):
     key: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())

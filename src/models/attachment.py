@@ -30,7 +30,7 @@ class PRAttachment(Base):
         BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime, default=lambda: datetime.utcnow()
     )
 
     purchase_requisition = relationship("PurchaseRequisition", back_populates="attachments")

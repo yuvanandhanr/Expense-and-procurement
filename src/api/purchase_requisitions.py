@@ -1,6 +1,7 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+# pyrefly: ignore [missing-import]
 from src.database.dependency import get_db_session
 from src.auth.dependencies import get_current_user, PermissionChecker
 from src.models.auth import User
@@ -83,11 +84,6 @@ async def create_pr(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
-    if data.department_name != current_user.department_name or data.employee_type != current_user.employee_type:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid department or employee type. Please use the values assigned to your employee profile."
-        )
     service = PRService(db)
     return await service.create_pr(data, current_user.user_id)
 

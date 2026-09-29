@@ -125,7 +125,7 @@ async def test_grn_auto_asset_assignment_to_requestor(
         grn_number="GRN-TEST-123",
         po_id=1,
         status="Completed",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.utcnow(),
         items=[]
     )
     mock_grn_repo.create.return_value = grn
@@ -210,7 +210,7 @@ async def test_grn_physical_inspection_fail(
     mock_inspection_repo.get_by_id.return_value = inspection
 
     grn = GoodsReceipt(
-        grn_id=1, grn_number="GRN-TEST-123", po_id=1, status="Rejected", created_at=datetime.now(timezone.utc), items=[]
+        grn_id=1, grn_number="GRN-TEST-123", po_id=1, status="Rejected", created_at=datetime.utcnow(), items=[]
     )
     mock_grn_repo.create.return_value = grn
     mock_grn_repo.get_by_id.return_value = grn
@@ -290,8 +290,8 @@ async def test_dept_manager_approve(
         justification="Test",
         pr_number="PR-001",
         total_estimated_amount=Decimal("100.00"),
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc)
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
     )
     mock_pr_repo.get_by_id.return_value = pr
     mock_pr_repo.update = AsyncMock()
@@ -369,8 +369,8 @@ async def test_dept_manager_reject(
         justification="Test",
         pr_number="PR-001",
         total_estimated_amount=Decimal("100.00"),
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc)
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
     )
     mock_pr_repo.get_by_id.return_value = pr
     mock_pr_repo.update = AsyncMock()
@@ -435,8 +435,8 @@ async def test_finance_manager_reject(
         justification="Test",
         pr_number="PR-001",
         total_estimated_amount=Decimal("100.00"),
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc)
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
     )
     mock_pr_repo.get_by_id.return_value = pr
     mock_pr_repo.update = AsyncMock()

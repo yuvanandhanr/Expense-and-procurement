@@ -18,7 +18,7 @@ class PaymentRequest(Base):
     currency: Mapped[Optional[str]] = mapped_column(String(10), default="USD")
     status: Mapped[Optional[str]] = mapped_column(String(50), default="Pending") # Pending, Hold, Approved, Paid, Rejected
     payment_readiness_passed: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     # Relationships
     invoice: Mapped[Optional["VendorInvoice"]] = relationship("VendorInvoice")
@@ -35,7 +35,7 @@ class PaymentApproval(Base):
     approver_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
     status: Mapped[str] = mapped_column(String(50), nullable=False) # Approved, Rejected, Hold
     comments: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    actioned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    actioned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     # Relationships
     payment_request: Mapped["PaymentRequest"] = relationship("PaymentRequest", back_populates="approvals")

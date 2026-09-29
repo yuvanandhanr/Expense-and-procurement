@@ -25,7 +25,7 @@ class POService:
         self.rate_contract_repo = RateContractRepository(db)
 
     def generate_po_number(self) -> str:
-        date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+        date_str = datetime.utcnow().strftime("%Y%m%d")
         rand_str = uuid.uuid4().hex[:6].upper()
         return f"PO-{date_str}-{rand_str}"
 
@@ -101,7 +101,7 @@ class POService:
             delivery_date=data.delivery_date,
             status="Draft",
             created_by=user_id,
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.utcnow()
         )
         po = await self.po_repo.create(po)
 
@@ -128,7 +128,7 @@ class POService:
         for k, v in update_dict.items():
             setattr(po, k, v)
 
-        po.updated_at = datetime.now(timezone.utc)
+        po.updated_at = datetime.utcnow()
         await self.po_repo.update(po)
         return po
 
@@ -146,7 +146,7 @@ class POService:
             role_id=role_id,
             status="Approved",
             comments=comments or "Approved",
-            actioned_at=datetime.now(timezone.utc)
+            actioned_at=datetime.utcnow()
         )
         await self.po_approval_repo.create(approval)
 

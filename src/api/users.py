@@ -180,7 +180,7 @@ async def lock_user(
     service = UserService(db)
     user = await service.get_user(user_id)
     user.is_locked = True
-    user.locked_until = datetime.now(timezone.utc) + timedelta(days=365)
+    user.locked_until = datetime.utcnow() + timedelta(days=365)
     await service.user_repo.update(user)
     return user
 
@@ -224,7 +224,7 @@ async def reset_user_sessions(
     session_update = (
         update(LoginSession)
         .where(LoginSession.user_id == user_id, LoginSession.status == "Active")
-        .values(status="Revoked", logout_time=datetime.now(timezone.utc))
+        .values(status="Revoked", logout_time=datetime.utcnow())
     )
     await db.execute(session_update)
     
@@ -232,7 +232,7 @@ async def reset_user_sessions(
     token_update = (
         update(RefreshToken)
         .where(RefreshToken.user_id == user_id, RefreshToken.is_expired == False)
-        .values(is_expired=True, revoked_at=datetime.now(timezone.utc))
+        .values(is_expired=True, revoked_at=datetime.utcnow())
     )
     await db.execute(token_update)
     

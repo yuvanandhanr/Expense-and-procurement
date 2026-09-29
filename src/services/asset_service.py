@@ -28,7 +28,7 @@ class AssetService:
         
         for i in range(quantity):
             # Generate a generic asset tag if not provided
-            asset_tag = f"AST-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{i}"
+            asset_tag = f"AST-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{i}"
             sn = sn_list[i] if i < len(sn_list) else None
 
             status = "Assigned" if requestor_id else "In Stock"

@@ -114,13 +114,13 @@ class MonitoringService:
                 component=comp,
                 status=detail["status"],
                 details=detail.get("details", ""),
-                checked_at=datetime.now(timezone.utc)
+                checked_at=datetime.utcnow()
             )
             await self.health_repo.create(health)
 
         return {
             "status": overall_status,
-            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "checked_at": datetime.utcnow().isoformat(),
             "components": results
         }
 
@@ -144,7 +144,7 @@ class MonitoringService:
             m = SystemMetric(
                 metric_name=name,
                 metric_value=value,
-                timestamp=datetime.now(timezone.utc)
+                timestamp=datetime.utcnow()
             )
             await self.metric_repo.create(m)
 

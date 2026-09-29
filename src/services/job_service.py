@@ -52,7 +52,7 @@ class JobService:
                     job_type=jtype,
                     frequency=freq,
                     status="Idle",
-                    created_at=datetime.now(timezone.utc)
+                    created_at=datetime.utcnow()
                 )
                 await self.job_repo.create(job)
 
@@ -67,7 +67,7 @@ class JobService:
 
         logger.info(f"Starting execution of job: '{job.name}' ({job_type})")
         job.status = "Running"
-        job.last_run = datetime.now(timezone.utc)
+        job.last_run = datetime.utcnow()
         await self.job_repo.update(job)
 
         start_time = time.time()
@@ -118,7 +118,7 @@ class JobService:
 
             elif job_type == "ArchiveOldLogs":
                 # Cleanup logs older than retention policy
-                retention_date = datetime.now(timezone.utc) - timedelta(days=settings.AUDIT_LOG_RETENTION_DAYS)
+                retention_date = datetime.utcnow() - timedelta(days=settings.AUDIT_LOG_RETENTION_DAYS)
                 query = delete(AuditLog).where(AuditLog.timestamp < retention_date)
                 res = await self.db.execute(query)
                 logs.append(f"Archived/Cleaned logs older than {settings.AUDIT_LOG_RETENTION_DAYS} days.")
@@ -126,7 +126,7 @@ class JobService:
 
             elif job_type == "CleanupTemporaryFiles":
                 # Remove temporary reports in report directory
-                temp_retention = datetime.now(timezone.utc) - timedelta(days=settings.TEMP_FILE_RETENTION_DAYS)
+                temp_retention = datetime.utcnow() - timedelta(days=settings.TEMP_FILE_RETENTION_DAYS)
                 report_dir = "reports"
                 files_removed = 0
                 if os.path.exists(report_dir):
@@ -158,13 +158,13 @@ class JobService:
             delta = timedelta(days=1)
         elif job.frequency == "Weekly":
             delta = timedelta(weeks=1)
-        job.next_run = datetime.now(timezone.utc) + delta
+        job.next_run = datetime.utcnow() + delta
         await self.job_repo.update(job)
 
         # Log to job history
         history = JobHistory(
             job_id=job.job_id,
-            run_at=datetime.now(timezone.utc),
+            run_at=datetime.utcnow(),
             duration_seconds=duration,
             status="Success" if success else "Failed",
             logs="\n".join(logs),
@@ -201,7 +201,7 @@ async def run_scheduler_loop(db_session_factory) -> None:
                 job_service = JobService(db)
                 for job in jobs:
                     # Execute if next run is due or has never been executed
-                    if not job.next_run or job.next_run <= datetime.now(timezone.utc):
+                    if not job.next_run or job.next_run <= datetime.utcnow():
                         if job.status != "Running":
                             await job_service.execute_job(job.job_type)
                             await db.commit()

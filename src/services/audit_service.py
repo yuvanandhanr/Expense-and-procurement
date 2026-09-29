@@ -43,7 +43,7 @@ class AuditService:
             new_str = json.dumps(new_value) if isinstance(new_value, (dict, list)) else str(new_value)
 
         audit = AuditLog(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.utcnow(),
             user_id=user_id,
             user_email=user_email,
             ip_address=ip_address,
@@ -70,7 +70,7 @@ class AuditService:
         Logs a user-facing operational activity for timeline feeds.
         """
         activity = ActivityLog(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.utcnow(),
             user_id=user_id,
             activity_type=activity_type,
             description=description,

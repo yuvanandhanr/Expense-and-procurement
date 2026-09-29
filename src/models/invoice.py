@@ -25,8 +25,8 @@ class VendorInvoice(Base):
     employee_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
     cause: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     asset_serial_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     __table_args__ = (
         UniqueConstraint("vendor_id", "invoice_number", name="unique_vendor_invoice"),
@@ -71,7 +71,7 @@ class InvoiceDocument(Base):
     invoice_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("vendor_invoices.invoice_id", ondelete="CASCADE"))
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     file_path: Mapped[str] = mapped_column(String(512), nullable=False)
-    uploaded_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    uploaded_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     # Relationship
     invoice: Mapped["VendorInvoice"] = relationship("VendorInvoice", back_populates="documents")
@@ -85,7 +85,7 @@ class InvoiceApproval(Base):
     approver_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
     status: Mapped[str] = mapped_column(String(50), nullable=False) # Approved, Rejected
     comments: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    actioned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    actioned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     # Relationships
     invoice: Mapped["VendorInvoice"] = relationship("VendorInvoice", back_populates="approvals")

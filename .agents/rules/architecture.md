@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Expense & Procurement Project Architecture Guidelines
 
 ## 1. Database

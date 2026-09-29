@@ -52,7 +52,7 @@ async def upload_attachment(
         file_type=ext,
         file_size=data.file_size,
         uploaded_by=current_user.user_id,
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.utcnow()
     )
     return await repo.create(attachment)
 

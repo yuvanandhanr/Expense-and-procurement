@@ -33,8 +33,8 @@ class Asset(Base):
     location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     cost: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     status: Mapped[Optional[str]] = mapped_column(String(50), default="Available") # Available, Assigned, Under Maintenance, Disposed, Returned, Lost
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     # Relationships
     category: Mapped[Optional["AssetCategory"]] = relationship("AssetCategory")
@@ -73,7 +73,7 @@ class AssetHistory(Base):
     asset_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("assets.asset_id", ondelete="CASCADE"))
     action_type: Mapped[str] = mapped_column(String(100), nullable=False) # Registration, Assignment, Transfer, Return, Maintenance, Disposal
     action_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
-    action_date: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    action_date: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
     details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Relationships
@@ -89,7 +89,7 @@ class AssetDocument(Base):
     document_type: Mapped[str] = mapped_column(String(100), nullable=False) # Invoice, Warranty, Certificate, Manual
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     file_path: Mapped[str] = mapped_column(String(512), nullable=False)
-    uploaded_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    uploaded_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     # Relationship
     asset: Mapped["Asset"] = relationship("Asset", back_populates="documents")
@@ -118,8 +118,8 @@ class AssetIncident(Base):
     admin_comments: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
     linked_pr_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("purchase_requisitions.pr_id", ondelete="SET NULL"), nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())
 
     # Relationships
     asset: Mapped["Asset"] = relationship("Asset", back_populates="incidents")

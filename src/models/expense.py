@@ -23,8 +23,8 @@ class ExpenseReport(Base):
     policy_flags: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     payment_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     payment_reference: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.utcnow())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())
 
     # Relationships
     employee: Mapped["User"] = relationship("User", foreign_keys=[employee_id])
@@ -61,7 +61,7 @@ class Receipt(Base):
     content_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     ocr_confidence: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True) # 0.00 to 100.00
     ocr_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     # Relationship
     expense_report: Mapped["ExpenseReport"] = relationship("ExpenseReport", back_populates="receipts")
@@ -75,7 +75,7 @@ class ExpenseApproval(Base):
     approver_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
     status: Mapped[str] = mapped_column(String(50), nullable=False) # Pending, Approved, Rejected
     comments: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    actioned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    actioned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     # Relationships
     expense_report: Mapped["ExpenseReport"] = relationship("ExpenseReport", back_populates="approvals")

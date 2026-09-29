@@ -36,7 +36,7 @@ async def create_comment(
         content=data.content,
         parent_comment_id=data.parent_comment_id,
         is_internal=data.is_internal,
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.utcnow()
     )
     return await repo.create(comment)
 

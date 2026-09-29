@@ -22,7 +22,7 @@ class VendorQuotation(Base):
     technical_score: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
     commercial_score: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
     status: Mapped[Optional[str]] = mapped_column(String(50), default="Submitted")
-    submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     # Relationships
     rfq: Mapped["RequestForQuotation"] = relationship("RequestForQuotation", back_populates="quotations")
@@ -57,7 +57,7 @@ class QuotationComparison(Base):
     final_selected_quotation_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("vendor_quotations.quotation_id", ondelete="SET NULL"), nullable=True)
     selection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     approved_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
-    actioned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    actioned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     # Relationships
     rfq: Mapped["RequestForQuotation"] = relationship("RequestForQuotation")

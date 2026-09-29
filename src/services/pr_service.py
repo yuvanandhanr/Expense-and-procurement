@@ -27,7 +27,7 @@ class PRService:
         """
         Generates a unique purchase requisition identifier, e.g. PR-20260803-A2E4BF
         """
-        date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+        date_str = datetime.utcnow().strftime("%Y%m%d")
         rand_str = uuid.uuid4().hex[:6].upper()
         return f"PR-{date_str}-{rand_str}"
 
@@ -66,7 +66,7 @@ class PRService:
             requestor_id=requestor_id,
             status="Draft",
             total_estimated_amount=total_cost,
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.utcnow()
         )
 
         pr = await self.pr_repo.create(pr)
@@ -84,7 +84,7 @@ class PRService:
             from_status=None,
             to_status="Draft",
             comments="Purchase Requisition draft created",
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.utcnow()
         )
         await self.history_repo.create(w_hist)
 
@@ -135,7 +135,7 @@ class PRService:
                 await self.item_repo.create(item)
             pr.total_estimated_amount = total_cost
 
-        pr.updated_at = datetime.now(timezone.utc)
+        pr.updated_at = datetime.utcnow()
         await self.pr_repo.update(pr)
 
         return await self.pr_repo.get_by_id(pr_id)
@@ -206,7 +206,7 @@ class PRService:
             from_status=old_status,
             to_status="Cancelled",
             comments="Purchase Requisition cancelled by user",
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.utcnow()
         )
         await self.history_repo.create(w_hist)
 
@@ -241,7 +241,7 @@ class PRService:
             requestor_id=user_id,
             status="Draft",
             total_estimated_amount=pr.total_estimated_amount,
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.utcnow()
         )
 
         cloned_pr = await self.pr_repo.create(cloned_pr)
@@ -268,7 +268,7 @@ class PRService:
             from_status=None,
             to_status="Draft",
             comments=f"Cloned from rejected PR ID {pr_id}",
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.utcnow()
         )
         await self.history_repo.create(w_hist)
 

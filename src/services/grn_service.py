@@ -24,7 +24,7 @@ class GRNService:
         self.asset_service = AssetService(db)
 
     def generate_grn_number(self) -> str:
-        date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+        date_str = datetime.utcnow().strftime("%Y%m%d")
         rand_str = uuid.uuid4().hex[:6].upper()
         return f"GRN-{date_str}-{rand_str}"
 
@@ -51,9 +51,9 @@ class GRNService:
             inspection_id=data.inspection_id,
             warehouse=data.warehouse or "Main Warehouse",
             received_by=user_id,
-            received_date=datetime.now(timezone.utc),
+            received_date=datetime.utcnow(),
             notes=data.notes,
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.utcnow()
         )
 
         if is_cloud_sub:

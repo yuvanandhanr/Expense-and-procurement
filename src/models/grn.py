@@ -16,10 +16,10 @@ class GoodsReceipt(Base):
     inspection_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("inspection_reports.inspection_id", ondelete="SET NULL"), nullable=True)
     warehouse: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     received_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
-    received_date: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    received_date: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
     status: Mapped[Optional[str]] = mapped_column(String(50), default="Pending") # Pending, Partial, Completed, Rejected
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     # Relationships
     po: Mapped[Optional["PurchaseOrder"]] = relationship("PurchaseOrder")

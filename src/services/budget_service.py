@@ -62,7 +62,7 @@ class BudgetService:
             budget_code_id=budget_code.budget_code_id,
             reserved_amount=amount,
             status="Reserved",
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.utcnow()
         )
         return await self.reservation_repo.create(reservation)
 
@@ -76,7 +76,7 @@ class BudgetService:
                 continue
 
             res.status = "Released"
-            res.released_at = datetime.now(timezone.utc)
+            res.released_at = datetime.utcnow()
             await self.reservation_repo.update(res)
 
             # Return funds to available budget

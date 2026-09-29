@@ -11,7 +11,7 @@ class ProcurementClosure(Base):
     closure_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     po_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("purchase_orders.po_id", ondelete="CASCADE"), unique=True)
     closed_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
-    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
     po_completed: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
     grn_completed: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
     invoice_approved: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)

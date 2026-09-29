@@ -141,7 +141,7 @@ class AttachmentService:
             target_attachment.file_path = file_path
             target_attachment.file_size = len(content)
             target_attachment.uploaded_by = uploaded_by
-            target_attachment.created_at = datetime.now(timezone.utc)
+            target_attachment.created_at = datetime.utcnow()
             await self.attachment_repo.update(target_attachment)
             logger.info(f"Version {next_version_num} uploaded successfully for attachment ID {target_attachment.attachment_id}")
             return target_attachment
@@ -161,7 +161,7 @@ class AttachmentService:
                 file_type=os.path.splitext(sanitized)[1].lower(),
                 file_size=len(content),
                 uploaded_by=uploaded_by,
-                created_at=datetime.now(timezone.utc)
+                created_at=datetime.utcnow()
             )
             await self.attachment_repo.create(attachment)
             logger.info(f"New attachment uploaded and registered under ID {attachment.attachment_id}")

@@ -30,7 +30,7 @@ class SettingService:
             setting.value = value
             if description is not None:
                 setting.description = description
-            setting.updated_at = datetime.now(timezone.utc)
+            setting.updated_at = datetime.utcnow()
             await self.setting_repo.update(setting)
             logger.info(f"Updated system setting: '{key}' = '{value}'")
         else:
@@ -39,8 +39,8 @@ class SettingService:
                 value=value,
                 description=description,
                 category=category,
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc)
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
             )
             await self.setting_repo.create(setting)
             logger.info(f"Created system setting: '{key}' = '{value}'")

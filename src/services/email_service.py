@@ -28,8 +28,8 @@ class EmailService:
                 name=name,
                 subject=subject,
                 body_template=body_template,
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc)
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
             )
             await self.template_repo.create(template)
         return template
@@ -71,7 +71,7 @@ class EmailService:
             body=body,
             status="Pending",
             retry_count=0,
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.utcnow()
         )
         await self.queue_repo.create(email)
         return email
@@ -86,7 +86,7 @@ class EmailService:
             if "mock" in settings.SMTP_HOST or "placeholder" in settings.SMTP_HOST or not settings.SMTP_HOST:
                 logger.info(f"[SMTP CONSOLE MOCK] Email sent successfully to {email.recipient}.\nSubject: {email.subject}\nBody:\n{email.body}")
                 email.status = "Sent"
-                email.sent_at = datetime.now(timezone.utc)
+                email.sent_at = datetime.utcnow()
                 await self.queue_repo.update(email)
                 return True
 
@@ -104,7 +104,7 @@ class EmailService:
                 server.send_message(msg)
 
             email.status = "Sent"
-            email.sent_at = datetime.now(timezone.utc)
+            email.sent_at = datetime.utcnow()
             await self.queue_repo.update(email)
             return True
         except Exception as e:

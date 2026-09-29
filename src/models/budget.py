@@ -31,10 +31,10 @@ class BudgetAllocation(Base):
         String(20), default="Active"
     )
     created_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime, default=lambda: datetime.utcnow()
     )
     updated_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow()
     )
 
     budget_code = relationship("BudgetCode")
@@ -59,7 +59,7 @@ class BudgetReservation(Base):
         String(50), default="Reserved"
     )
     created_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime, default=lambda: datetime.utcnow()
     )
     released_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime, nullable=True

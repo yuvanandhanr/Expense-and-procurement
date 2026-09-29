@@ -48,7 +48,7 @@ class SearchService:
             index_entry.title = title
             index_entry.content = content
             index_entry.meta_data = meta_str
-            index_entry.updated_at = datetime.now(timezone.utc)
+            index_entry.updated_at = datetime.utcnow()
             await self.search_repo.update(index_entry)
             logger.info(f"Updated index entry for '{entity_type}:{entity_id}'")
         else:
@@ -58,8 +58,8 @@ class SearchService:
                 title=title,
                 content=content,
                 meta_data=meta_str,
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc)
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
             )
             await self.search_repo.create(index_entry)
             logger.info(f"Created new index entry for '{entity_type}:{entity_id}'")

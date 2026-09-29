@@ -83,7 +83,7 @@ class ReportService:
         else:
             # General fallback data if not specific
             headers = ["Report Name", "Generated At", "Status"]
-            rows = [[report_type, datetime.now(timezone.utc).isoformat(), "Active"]]
+            rows = [[report_type, datetime.utcnow().isoformat(), "Active"]]
 
         return headers, rows
 
@@ -97,14 +97,14 @@ class ReportService:
             file_type=file_type,
             created_by=created_by,
             status="Processing",
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.utcnow()
         )
         await self.report_repo.create(report)
 
         try:
             headers, rows = await self.get_report_data(report_type)
             file_type_upper = file_type.upper()
-            filename = f"report_{report.report_id}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}.{file_type.lower()}"
+            filename = f"report_{report.report_id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.{file_type.lower()}"
             file_path = os.path.join(self.report_dir, filename)
 
             if file_type_upper == "CSV":
@@ -127,7 +127,7 @@ class ReportService:
                 # We can write a formatted report header and data table into a text/pdf layout
                 with open(file_path, "w", encoding="utf-8") as f:
                     f.write(f"--- ENTERPRISE PLATFORM REPORT: {name} ---\n")
-                    f.write(f"Report Type: {report_type} | Generated At: {datetime.now(timezone.utc).isoformat()}\n")
+                    f.write(f"Report Type: {report_type} | Generated At: {datetime.utcnow().isoformat()}\n")
                     f.write("=" * 80 + "\n")
                     f.write("\t".join(headers) + "\n")
                     f.write("-" * 80 + "\n")
@@ -140,7 +140,7 @@ class ReportService:
 
             report.file_path = file_path
             report.status = "Completed"
-            report.completed_at = datetime.now(timezone.utc)
+            report.completed_at = datetime.utcnow()
             await self.report_repo.update(report)
             logger.info(f"Report ID {report.report_id} generated successfully at '{file_path}'")
 
@@ -162,7 +162,7 @@ class ReportService:
         for sched in schedules:
             # Check if it is time to run based on frequency
             # (In a real system, we compare next_run. For mock, we execute if next_run is None or past)
-            if sched.next_run and sched.next_run > datetime.now(timezone.utc):
+            if sched.next_run and sched.next_run > datetime.utcnow():
                 continue
 
             logger.info(f"Running scheduled report: '{sched.name}' Frequency: '{sched.frequency}'")
@@ -187,14 +187,14 @@ class ReportService:
                     )
 
                 # Update schedule run timestamps
-                sched.last_run = datetime.now(timezone.utc)
+                sched.last_run = datetime.utcnow()
                 # Update next run timestamp based on frequency
                 delta = timedelta(days=1)
                 if sched.frequency.upper() == "WEEKLY":
                     delta = timedelta(weeks=1)
                 elif sched.frequency.upper() == "MONTHLY":
                     delta = timedelta(days=30)
-                sched.next_run = datetime.now(timezone.utc) + delta
+                sched.next_run = datetime.utcnow() + delta
 
                 await self.sched_repo.update(sched)
                 count += 1

@@ -17,8 +17,8 @@ class RequestForQuotation(Base):
     submission_deadline: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     closing_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     # Relationships
     pr: Mapped[Optional["PurchaseRequisition"]] = relationship("PurchaseRequisition", lazy="selectin")
@@ -64,7 +64,7 @@ class RFQVendor(Base):
     rfq_vendor_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     rfq_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("request_for_quotations.rfq_id", ondelete="CASCADE"))
     vendor_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("vendors.vendor_id", ondelete="CASCADE"))
-    invited_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    invited_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     # Relationships
     rfq: Mapped["RequestForQuotation"] = relationship("RequestForQuotation", back_populates="rfq_vendors")

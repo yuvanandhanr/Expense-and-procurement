@@ -25,8 +25,8 @@ class PurchaseOrder(Base):
     delivery_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     status: Mapped[Optional[str]] = mapped_column(String(50), default="Draft")
     created_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     # Relationships
     vendor: Mapped["Vendor"] = relationship("Vendor")

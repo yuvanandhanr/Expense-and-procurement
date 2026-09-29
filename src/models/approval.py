@@ -34,10 +34,10 @@ class ApprovalMatrix(Base):
         BigInteger, ForeignKey("roles.role_id", ondelete="CASCADE"), nullable=False
     )
     created_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime, default=lambda: datetime.utcnow()
     )
     updated_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow()
     )
 
     department = relationship("Department")
@@ -81,10 +81,10 @@ class ApprovalWorkflow(Base):
         ),
     )
     created_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime, default=lambda: datetime.utcnow()
     )
     updated_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow()
     )
 
     purchase_requisition = relationship(
@@ -154,7 +154,7 @@ class WorkflowHistory(Base):
         Text, nullable=True
     )
     created_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime, default=lambda: datetime.utcnow()
     )
 
     purchase_requisition = relationship("PurchaseRequisition", back_populates="history")
@@ -180,7 +180,7 @@ class ApprovalHistory(Base):
         Text, nullable=True
     )
     created_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime, default=lambda: datetime.utcnow()
     )
 
     step = relationship("ApprovalStep", back_populates="history_records")
@@ -209,7 +209,7 @@ class ApprovalComment(Base):
         Boolean, default=False
     )
     created_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime, default=lambda: datetime.utcnow()
     )
 
     purchase_requisition = relationship("PurchaseRequisition", back_populates="comments")

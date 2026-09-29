@@ -19,8 +19,8 @@ class Delivery(Base):
     delivery_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     carrier: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     tracking_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     # Relationships
     po: Mapped["PurchaseOrder"] = relationship("PurchaseOrder")
