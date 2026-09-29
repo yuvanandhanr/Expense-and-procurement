@@ -142,23 +142,44 @@ export const Approvals: React.FC = () => {
     });
   };
 
+  const isSubmittedStatus = (status: string) => {
+    if (!status) return false;
+    return status.includes("Pending") || status === "Corrected Claim" || status === "Payment Requested" || status === "Approved for Payment" || status === "Finance Verified" || status === "Submitted" || status === "Under Review" || status === "Reported";
+  };
+
+  const isApprovedStatus = (status: string) => {
+    if (!status) return false;
+    if (status === "Approved for Payment") return false;
+    return ["Approved", "Paid", "Closed", "Completed", "Active", "Success", "Verified"].includes(status) || status.includes("Approved") || status.includes("Resolved");
+  };
+
   const getFilteredWorkflows = () => {
     return getWorkflowsForTab()
       .filter((r: any) => {
         if (statusFilter === "All") return true;
-        if (statusFilter === "Submitted") return r.status.includes("Pending") || r.status === "Corrected Claim" || r.status === "Payment Requested" || r.status === "Finance Verified" || r.status === "Submitted" || r.status === "Under Review" || r.status === "Reported";
-        if (statusFilter === "Approved") return ["Approved", "Paid", "Closed", "Completed", "Active", "Success", "Verified"].includes(r.status) || r.status.includes("Approved") || r.status.includes("Resolved");
+        if (statusFilter === "Submitted") return isSubmittedStatus(r.status);
+        if (statusFilter === "Approved") return isApprovedStatus(r.status);
         if (statusFilter === "Rejected") return ["Rejected", "Cancelled", "Inactive", "Failed", "Error"].includes(r.status) || r.status.includes("Rejected");
         if (statusFilter === "Return for Correction") return r.status === "Returned for Correction" || r.status === "Returned";
         return r.status === statusFilter;
       })
       .sort((a: any, b: any) => {
+        // Priority 1: Actionable by current user
+        if (a.can_approve && !b.can_approve) return -1;
+        if (!a.can_approve && b.can_approve) return 1;
+
+        // Priority 2: "Payment Requested" or "Approved for Payment"
+        const isPaymentPendingA = a.status === "Payment Requested" || a.status === "Approved for Payment";
+        const isPaymentPendingB = b.status === "Payment Requested" || b.status === "Approved for Payment";
+        if (isPaymentPendingA && !isPaymentPendingB) return -1;
+        if (!isPaymentPendingA && isPaymentPendingB) return 1;
+
         const sA = (a.status || "").toLowerCase();
         const sB = (b.status || "").toLowerCase();
         const isPendingA = sA.includes("pending") || sA.includes("review");
         const isPendingB = sB.includes("pending") || sB.includes("review");
         
-        // Priority: pending approval workflows come first
+        // Priority 3: pending approval workflows come first
         if (isPendingA && !isPendingB) return -1;
         if (!isPendingA && isPendingB) return 1;
         
@@ -172,8 +193,8 @@ export const Approvals: React.FC = () => {
   const currentTabWorkflows = getWorkflowsForTab();
   const subTabCounts: Record<string, number> = {
     All: currentTabWorkflows.length,
-    Submitted: currentTabWorkflows.filter((r: any) => r.status.includes("Pending") || r.status === "Corrected Claim" || r.status === "Payment Requested" || r.status === "Finance Verified" || r.status === "Submitted" || r.status === "Under Review" || r.status === "Reported").length,
-    Approved: currentTabWorkflows.filter((r: any) => ["Approved", "Paid", "Closed", "Completed", "Active", "Success", "Verified"].includes(r.status) || r.status.includes("Approved") || r.status.includes("Resolved")).length,
+    Submitted: currentTabWorkflows.filter((r: any) => isSubmittedStatus(r.status)).length,
+    Approved: currentTabWorkflows.filter((r: any) => isApprovedStatus(r.status)).length,
     Rejected: currentTabWorkflows.filter((r: any) => ["Rejected", "Cancelled", "Inactive", "Failed", "Error"].includes(r.status) || r.status.includes("Rejected")).length,
     "Return for Correction": currentTabWorkflows.filter((r: any) => r.status === "Returned for Correction" || r.status === "Returned").length,
   };
