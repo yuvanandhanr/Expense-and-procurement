@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime
+from datetime import timezone, datetime
 from typing import List, Dict, Any, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,7 +48,7 @@ class SearchService:
             index_entry.title = title
             index_entry.content = content
             index_entry.meta_data = meta_str
-            index_entry.updated_at = datetime.utcnow()
+            index_entry.updated_at = datetime.now(timezone.utc)
             await self.search_repo.update(index_entry)
             logger.info(f"Updated index entry for '{entity_type}:{entity_id}'")
         else:
@@ -58,8 +58,8 @@ class SearchService:
                 title=title,
                 content=content,
                 meta_data=meta_str,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
             )
             await self.search_repo.create(index_entry)
             logger.info(f"Created new index entry for '{entity_type}:{entity_id}'")

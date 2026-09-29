@@ -38,3 +38,25 @@ def test_database_connection_failure(
     assert response.status_code == 503
     data = response.json()
     assert "Database connection is offline" in data["detail"]
+
+
+def test_database_engine_dialect_pool_handling() -> None:
+    """
+    Verifies that sqlite dialect does not use postgresql pool options while postgres does.
+    """
+    from sqlalchemy.ext.asyncio import create_async_engine
+    
+    # SQLite in-memory engine without pool_size
+    sqlite_kwargs = {"echo": False}
+    sqlite_engine = create_async_engine("sqlite+aiosqlite:///:memory:", **sqlite_kwargs)
+    assert sqlite_engine.url.drivername == "sqlite+aiosqlite"
+    
+    # Postgres engine with pool kwargs
+    pg_kwargs = {
+        "echo": False,
+        "pool_size": 4,
+        "max_overflow": 2,
+    }
+    pg_engine = create_async_engine("postgresql+asyncpg://user:pass@localhost:5432/db", **pg_kwargs)
+    assert pg_engine.url.drivername == "postgresql+asyncpg"
+

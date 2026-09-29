@@ -1,5 +1,5 @@
 from typing import Optional, List
-from datetime import datetime
+from datetime import timezone, datetime
 from decimal import Decimal
 from sqlalchemy import BigInteger, String, Text, Numeric, Boolean, DateTime, ForeignKey
 from sqlalchemy.schema import FetchedValue
@@ -74,10 +74,10 @@ class PurchaseRequisition(Base):
         Numeric(15, 2), nullable=False, default=0.00, comment="Sum of estimated item costs"
     )
     created_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=datetime.utcnow, comment="PR creation timestamp"
+        DateTime, default=lambda: datetime.now(timezone.utc), comment="PR creation timestamp"
     )
     updated_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment="PR modification timestamp"
+        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), comment="PR modification timestamp"
     )
 
     # Relationships

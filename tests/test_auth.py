@@ -1,6 +1,6 @@
 import uuid
 import hashlib
-from datetime import datetime, timedelta
+from datetime import timezone, datetime, timedelta
 from unittest.mock import MagicMock, AsyncMock, patch
 import jwt
 import pytest
@@ -27,38 +27,38 @@ def mock_user(test_hashed_password) -> User:
         permission_id=1,
         permission_name="users.view",
         module_name="users",
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     permission_create = Permission(
         permission_id=2,
         permission_name="users.create",
         module_name="users",
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     permission_update = Permission(
         permission_id=3,
         permission_name="users.update",
         module_name="users",
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     permission_delete = Permission(
         permission_id=4,
         permission_name="users.delete",
         module_name="users",
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     permission_settings = Permission(
         permission_id=5,
         permission_name="admin.settings",
         module_name="admin",
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     
     role_admin = Role(
         role_id=1,
         role_name="Admin",
         status=True,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     role_admin.permissions = [permission_view, permission_create, permission_update, permission_delete, permission_settings]
 
@@ -74,8 +74,8 @@ def mock_user(test_hashed_password) -> User:
         status="Active",
         failed_login_attempts=0,
         is_locked=False,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc)
     )
     user.roles = [role_admin]
     return user
@@ -97,7 +97,7 @@ def mock_session() -> LoginSession:
         session_id=10,
         user_id=1,
         status="Active",
-        login_time=datetime.utcnow()
+        login_time=datetime.now(timezone.utc)
     )
 
 
@@ -332,7 +332,7 @@ async def test_refresh_token_success(
         token_id=1,
         user_id=1,
         token="old_refresh_token",
-        expires_at=datetime.utcnow() + timedelta(days=2),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=2),
         is_expired=False
     )
     mock_get_rt.return_value = mock_rt
@@ -445,8 +445,8 @@ async def test_create_department(
         department_id=1,
         department_name="Engineering",
         department_code="ENG",
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc)
     )
     mock_dept_create.return_value = mock_dept
 
@@ -470,8 +470,8 @@ async def test_list_departments(
             department_id=1,
             department_name="Engineering",
             department_code="ENG",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
         )
     ]
 
@@ -497,8 +497,8 @@ async def test_create_cost_center(
         cost_center_id=1,
         cost_center_name="Cloud Hosting",
         budget_limit=50000.0,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc)
     )
     mock_cc_create.return_value = mock_cc
 
@@ -528,8 +528,8 @@ async def test_create_budget_code(
         annual_budget=120000.0,
         available_budget=120000.0,
         fiscal_year="FY2026",
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc)
     )
     mock_bc_create.return_value = mock_bc
 
@@ -562,7 +562,7 @@ async def test_create_role(
         role_id=2,
         role_name="CFO",
         status=True,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     mock_role_create.return_value = mock_role
 
@@ -590,7 +590,7 @@ async def test_create_permission(
         permission_id=3,
         permission_name="invoice.approve",
         module_name="invoices",
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     mock_perm_create.return_value = mock_perm
 
@@ -617,8 +617,8 @@ async def test_get_settings(
         currency="USD",
         timezone="UTC",
         session_timeout_minutes=30,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc)
     )
 
     response = await async_client.get("/api/v1/settings")

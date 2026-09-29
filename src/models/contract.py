@@ -1,5 +1,5 @@
 from typing import Optional, List
-from datetime import datetime, date
+from datetime import timezone, datetime, date
 from decimal import Decimal
 from sqlalchemy import BigInteger, String, Text, Numeric, Boolean, DateTime, ForeignKey, Date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -19,8 +19,8 @@ class Contract(Base):
     end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     renewal_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     expiry_reminder_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     vendor: Mapped["Vendor"] = relationship("Vendor")
@@ -37,7 +37,7 @@ class ContractDocument(Base):
     contract_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("contracts.contract_id", ondelete="CASCADE"))
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     file_path: Mapped[str] = mapped_column(String(512), nullable=False)
-    uploaded_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    uploaded_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationship
     contract: Mapped["Contract"] = relationship("Contract", back_populates="documents")

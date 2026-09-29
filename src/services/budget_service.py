@@ -1,6 +1,6 @@
 from typing import Optional
 from decimal import Decimal
-from datetime import datetime
+from datetime import timezone, datetime
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -62,7 +62,7 @@ class BudgetService:
             budget_code_id=budget_code.budget_code_id,
             reserved_amount=amount,
             status="Reserved",
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         return await self.reservation_repo.create(reservation)
 
@@ -76,7 +76,7 @@ class BudgetService:
                 continue
 
             res.status = "Released"
-            res.released_at = datetime.utcnow()
+            res.released_at = datetime.now(timezone.utc)
             await self.reservation_repo.update(res)
 
             # Return funds to available budget

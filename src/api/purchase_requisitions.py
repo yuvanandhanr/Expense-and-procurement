@@ -30,6 +30,10 @@ async def check_pr_access(pr, current_user: User, db: AsyncSession) -> None:
         
     user_roles = [role.role_name for role in current_user.roles]
     
+    # Admin and Executives (CEO, CFO) have organization-wide oversight for non-drafts
+    if any(r in user_roles for r in ["Admin", "SuperAdmin", "CEO", "CFO"]):
+        return
+
     if "Manager" in user_roles:
         if getattr(pr.requestor, "manager_id", None) == current_user.user_id:
             return

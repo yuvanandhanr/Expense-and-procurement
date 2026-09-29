@@ -1,5 +1,5 @@
 from typing import List, Optional
-from datetime import datetime
+from datetime import timezone, datetime
 from decimal import Decimal
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -192,7 +192,7 @@ class ApprovalService:
         workflow = ApprovalWorkflow(
             pr_id=pr.pr_id,
             status="Under Review",
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         workflow = await self.workflow_repo.create(workflow)
 
@@ -220,7 +220,7 @@ class ApprovalService:
             from_status="Draft",
             to_status=pr.status,
             comments="Purchase Requisition submitted for approval",
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         await self.workflow_history_repo.create(w_hist)
 
@@ -518,7 +518,7 @@ class ApprovalService:
         # Update active step
         active_step.status = "Approved"
         active_step.approver_id = user_id
-        active_step.actioned_at = datetime.utcnow()
+        active_step.actioned_at = datetime.now(timezone.utc)
         await self.step_repo.update(active_step)
 
         # Log approval history
@@ -527,7 +527,7 @@ class ApprovalService:
             action="Approve",
             performed_by=user_id,
             comments=comments or "Approved",
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         await self.approval_history_repo.create(app_hist)
 
@@ -549,7 +549,7 @@ class ApprovalService:
                 from_status=old_status,
                 to_status=pr.status,
                 comments=f"Step approved. Routing to level {next_step.step_number}",
-                created_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc)
             )
             await self.workflow_history_repo.create(w_hist)
             
@@ -582,7 +582,7 @@ class ApprovalService:
                 from_status=old_status,
                 to_status="Approved",
                 comments="PR approved successfully by final authority",
-                created_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc)
             )
             await self.workflow_history_repo.create(w_hist)
             
@@ -611,7 +611,7 @@ class ApprovalService:
                 title=f"RFQ for PR: {pr.title}",
                 description=pr.justification,
                 pr_id=pr.pr_id,
-                submission_deadline=datetime.utcnow() + timedelta(days=7),
+                submission_deadline=datetime.now(timezone.utc) + timedelta(days=7),
                 invited_vendor_ids=list(active_vendor_ids)[:3],
                 items=rfq_items
             )
@@ -633,7 +633,7 @@ class ApprovalService:
         # Reject step
         active_step.status = "Rejected"
         active_step.approver_id = user_id
-        active_step.actioned_at = datetime.utcnow()
+        active_step.actioned_at = datetime.now(timezone.utc)
         await self.step_repo.update(active_step)
 
         # Reject workflow
@@ -655,7 +655,7 @@ class ApprovalService:
             action="Reject",
             performed_by=user_id,
             comments=comments,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         await self.approval_history_repo.create(app_hist)
 
@@ -667,7 +667,7 @@ class ApprovalService:
             from_status=old_status,
             to_status="Rejected",
             comments=comments,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         await self.workflow_history_repo.create(w_hist)
         
@@ -691,7 +691,7 @@ class ApprovalService:
         # Return step
         active_step.status = "Returned"
         active_step.approver_id = user_id
-        active_step.actioned_at = datetime.utcnow()
+        active_step.actioned_at = datetime.now(timezone.utc)
         await self.step_repo.update(active_step)
 
         # Return workflow
@@ -713,7 +713,7 @@ class ApprovalService:
             action="Return",
             performed_by=user_id,
             comments=comments,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         await self.approval_history_repo.create(app_hist)
 
@@ -725,7 +725,7 @@ class ApprovalService:
             from_status=old_status,
             to_status="Returned for Modification",
             comments=comments,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         await self.workflow_history_repo.create(w_hist)
 
@@ -753,7 +753,7 @@ class ApprovalService:
             action="Delegate",
             performed_by=user_id,
             comments=comments or f"Delegated to user {delegate_to_user_id}",
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         await self.approval_history_repo.create(app_hist)
 
@@ -763,7 +763,7 @@ class ApprovalService:
             action="Delegated",
             performed_by=user_id,
             comments=comments or f"Delegated step {active_step.step_number} to user {delegate_to_user_id}",
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         await self.workflow_history_repo.create(w_hist)
 
@@ -783,7 +783,7 @@ class ApprovalService:
             action="Escalate",
             performed_by=user_id,
             comments=comments or "Escalated step to Administrator",
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         await self.approval_history_repo.create(app_hist)
 
@@ -793,7 +793,7 @@ class ApprovalService:
             action="Escalated",
             performed_by=user_id,
             comments=comments or f"Escalated step {active_step.step_number} to Admin",
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         await self.workflow_history_repo.create(w_hist)
 
@@ -831,7 +831,7 @@ class ApprovalService:
             from_status=old_status,
             to_status="Cancelled",
             comments=comments,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         await self.workflow_history_repo.create(w_hist)
         

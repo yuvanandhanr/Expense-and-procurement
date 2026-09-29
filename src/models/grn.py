@@ -1,5 +1,5 @@
 from typing import Optional, List
-from datetime import datetime
+from datetime import timezone, datetime
 from sqlalchemy import BigInteger, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.database.base import Base
@@ -16,10 +16,10 @@ class GoodsReceipt(Base):
     inspection_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("inspection_reports.inspection_id", ondelete="SET NULL"), nullable=True)
     warehouse: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     received_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
-    received_date: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    received_date: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     status: Mapped[Optional[str]] = mapped_column(String(50), default="Pending") # Pending, Partial, Completed, Rejected
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     po: Mapped[Optional["PurchaseOrder"]] = relationship("PurchaseOrder")

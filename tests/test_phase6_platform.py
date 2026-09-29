@@ -1,6 +1,6 @@
 import io
 import pytest
-from datetime import datetime
+from datetime import timezone, datetime
 from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi import status
 from fastapi.testclient import TestClient
@@ -132,7 +132,7 @@ def test_generate_report_success(client: TestClient, override_db: AsyncMock, moc
             file_path="reports/test.csv",
             file_type="CSV",
             status="Completed",
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
 
         response = client.post(
@@ -163,7 +163,7 @@ def test_list_notifications(client: TestClient, override_db: AsyncMock, mock_emp
                 message="PR-123 is Approved",
                 notification_type="In-App",
                 status="Unread",
-                created_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc)
             )
         ]
 
@@ -187,7 +187,7 @@ def test_get_audit_logs_rbac_success(client: TestClient, override_db: AsyncMock,
         mock_logs.return_value = [
             AuditLog(
                 audit_log_id=1,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 user_email="ceo@example.com",
                 action="Login",
                 module="auth"

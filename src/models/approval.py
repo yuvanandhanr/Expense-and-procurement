@@ -1,5 +1,5 @@
 from typing import Optional, List
-from datetime import datetime
+from datetime import timezone, datetime
 from decimal import Decimal
 from sqlalchemy import BigInteger, Integer, String, Text, Numeric, Boolean, DateTime, ForeignKey, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -34,10 +34,10 @@ class ApprovalMatrix(Base):
         BigInteger, ForeignKey("roles.role_id", ondelete="CASCADE"), nullable=False
     )
     created_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=datetime.utcnow
+        DateTime, default=lambda: datetime.now(timezone.utc)
     )
     updated_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
     )
 
     department = relationship("Department")
@@ -71,20 +71,20 @@ class ApprovalWorkflow(Base):
         CheckConstraint(
             """
             (
-                (claim_id IS NOT NULL)::int +
-                (pr_id IS NOT NULL)::int +
-                (po_id IS NOT NULL)::int +
-                (invoice_id IS NOT NULL)::int
+                (CASE WHEN claim_id IS NOT NULL THEN 1 ELSE 0 END) +
+                (CASE WHEN pr_id IS NOT NULL THEN 1 ELSE 0 END) +
+                (CASE WHEN po_id IS NOT NULL THEN 1 ELSE 0 END) +
+                (CASE WHEN invoice_id IS NOT NULL THEN 1 ELSE 0 END)
             ) = 1
             """,
             name="check_exclusive_workflow_ownership"
         ),
     )
     created_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=datetime.utcnow
+        DateTime, default=lambda: datetime.now(timezone.utc)
     )
     updated_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
     )
 
     purchase_requisition = relationship(
@@ -154,7 +154,7 @@ class WorkflowHistory(Base):
         Text, nullable=True
     )
     created_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=datetime.utcnow
+        DateTime, default=lambda: datetime.now(timezone.utc)
     )
 
     purchase_requisition = relationship("PurchaseRequisition", back_populates="history")
@@ -180,7 +180,7 @@ class ApprovalHistory(Base):
         Text, nullable=True
     )
     created_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=datetime.utcnow
+        DateTime, default=lambda: datetime.now(timezone.utc)
     )
 
     step = relationship("ApprovalStep", back_populates="history_records")
@@ -209,7 +209,7 @@ class ApprovalComment(Base):
         Boolean, default=False
     )
     created_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=datetime.utcnow
+        DateTime, default=lambda: datetime.now(timezone.utc)
     )
 
     purchase_requisition = relationship("PurchaseRequisition", back_populates="comments")

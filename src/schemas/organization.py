@@ -1,6 +1,7 @@
-from datetime import date, datetime
+from datetime import timezone, date, datetime
 from typing import List, Optional
-from pydantic import BaseModel, ConfigDict, Field, FieldValidationInfo, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
+
 
 
 class DepartmentBase(BaseModel):

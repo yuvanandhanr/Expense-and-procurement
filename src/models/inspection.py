@@ -1,5 +1,5 @@
 from typing import Optional, List
-from datetime import datetime
+from datetime import timezone, datetime
 from sqlalchemy import BigInteger, String, Text, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.database.base import Base
@@ -11,13 +11,13 @@ class InspectionReport(Base):
     inspection_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     delivery_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("deliveries.delivery_id", ondelete="CASCADE"))
     inspected_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
-    inspection_date: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    inspection_date: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     outcome: Mapped[str] = mapped_column(String(50), nullable=False) # Accepted, Accepted with Remarks, Rejected, Partial Acceptance, Replacement Requested
     inspection_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     damage_check_passed: Mapped[Optional[bool]] = mapped_column(Boolean, default=True)
     specification_check_passed: Mapped[Optional[bool]] = mapped_column(Boolean, default=True)
     quantity_verified: Mapped[Optional[bool]] = mapped_column(Boolean, default=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     delivery: Mapped["Delivery"] = relationship("Delivery")

@@ -1,7 +1,7 @@
 import logging
 import secrets
 import uuid
-from datetime import datetime, timedelta
+from datetime import timezone, datetime, timedelta
 from typing import List, Optional
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
@@ -193,7 +193,7 @@ class AuthenticationService:
             logger.info(f"Auto-created employee user with 'Pending Assignment' role for: {email}")
         else:
             # Subsequent login: Update profile
-            user.last_login = datetime.utcnow()
+            user.last_login = datetime.now(timezone.utc)
             user.avatar_url = picture
             if first_name:
                 user.first_name = first_name
@@ -213,7 +213,7 @@ class AuthenticationService:
             )
 
         if user.is_locked:
-            if user.locked_until and user.locked_until > datetime.utcnow():
+            if user.locked_until and user.locked_until > datetime.now(timezone.utc):
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Employee account is locked."
@@ -245,7 +245,7 @@ class AuthenticationService:
         refresh_token = RefreshToken(
             user_id=user.user_id,
             token=refresh_token_str,
-            expires_at=datetime.utcnow() + timedelta(days=7)
+            expires_at=datetime.now(timezone.utc) + timedelta(days=7)
         )
         await self.token_repo.create(refresh_token)
 
@@ -429,7 +429,7 @@ class AuthenticationService:
                 self.db.add(vendor_user)
                 await self.db.flush()
 
-            user.last_login = datetime.utcnow()
+            user.last_login = datetime.now(timezone.utc)
             await self.user_repo.update(user)
 
         # Check account status
@@ -461,7 +461,7 @@ class AuthenticationService:
         refresh_token = RefreshToken(
             user_id=user.user_id,
             token=refresh_token_str,
-            expires_at=datetime.utcnow() + timedelta(days=7)
+            expires_at=datetime.now(timezone.utc) + timedelta(days=7)
         )
         await self.token_repo.create(refresh_token)
 
@@ -483,7 +483,7 @@ class AuthenticationService:
 
     def create_access_token(self, data: dict, expires_delta: timedelta) -> str:
         to_encode = data.copy()
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
         to_encode.update({"exp": expire})
         encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET, algorithm="HS256")
         return encoded_jwt
@@ -530,7 +530,7 @@ class AuthenticationService:
         session = await self.session_repo.get_active_session_by_token(token)
         if session:
             session.status = "Revoked"
-            session.logout_time = datetime.utcnow()
+            session.logout_time = datetime.now(timezone.utc)
             await self.session_repo.update(session)
 
             # Revoke related refresh tokens
@@ -538,12 +538,12 @@ class AuthenticationService:
             result = await self.db.execute(query)
             for rt in result.scalars().all():
                 rt.is_expired = True
-                rt.revoked_at = datetime.utcnow()
+                rt.revoked_at = datetime.now(timezone.utc)
                 await self.token_repo.update(rt)
 
     async def refresh(self, refresh_token_str: str) -> TokenResponse:
         rt = await self.token_repo.get_by_token(refresh_token_str)
-        if not rt or rt.expires_at < datetime.utcnow():
+        if not rt or rt.expires_at < datetime.now(timezone.utc):
             if rt:
                 rt.is_expired = True
                 await self.token_repo.update(rt)
@@ -562,7 +562,7 @@ class AuthenticationService:
 
         # Revoke old refresh token
         rt.is_expired = True
-        rt.revoked_at = datetime.utcnow()
+        rt.revoked_at = datetime.now(timezone.utc)
         await self.token_repo.update(rt)
 
         # Generate new pair
@@ -576,7 +576,7 @@ class AuthenticationService:
         new_rt = RefreshToken(
             user_id=user.user_id,
             token=new_refresh_token_str,
-            expires_at=datetime.utcnow() + timedelta(days=7)
+            expires_at=datetime.now(timezone.utc) + timedelta(days=7)
         )
         await self.token_repo.create(new_rt)
 

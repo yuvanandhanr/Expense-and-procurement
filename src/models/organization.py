@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import timezone, date, datetime
 from typing import List, Optional
 from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Numeric, String, Text, func
 from sqlalchemy import JSON

@@ -9,7 +9,12 @@ async def test_expense_approval_wildcard_removal(db_session, setup_test_users):
     user_id = setup_test_users["manager"].user_id
     
     # 1. Create ExpenseReport
-    report = ExpenseReport(employee_id=setup_test_users["employee"].user_id, status="Pending Manager Approval")
+    report = ExpenseReport(
+        employee_id=setup_test_users["employee"].user_id,
+        purpose="Test Purpose",
+        justification="Test Justification",
+        status="Pending Manager Approval"
+    )
     db_session.add(report)
     await db_session.commit()
     await db_session.refresh(report)

@@ -1,6 +1,6 @@
 import jwt
 import pytest
-from datetime import datetime, date, timedelta
+from datetime import timezone, datetime, date, timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi import status
@@ -98,8 +98,8 @@ def mock_vendor() -> Vendor:
         phone="555-1234",
         status="Active",
         blacklist_status=False,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
         contacts=[],
         documents=[],
         categories=[],
@@ -165,7 +165,7 @@ async def test_upload_compliance_documents(
         document_type="NDA",
         file_name="nda.pdf",
         file_path="/uploads/nda.pdf",
-        uploaded_at=datetime.utcnow()
+        uploaded_at=datetime.now(timezone.utc)
     )
     mock_doc_create.return_value = mock_doc
 
@@ -301,7 +301,7 @@ async def test_quotation_comparison(
         rfq_id=1,
         winner_technical_quotation_id=2, # Higher technical score (95 vs 80)
         winner_commercial_quotation_id=2, # Lower total cost (1000 vs 1200)
-        actioned_at=datetime.utcnow()
+        actioned_at=datetime.now(timezone.utc)
     )
     mock_comp_create.return_value = comp
     mock_comp_get_id.return_value = comp
@@ -346,8 +346,8 @@ async def test_po_skip_rfq_for_low_value(
         discount_amount=Decimal("0.00"),
         grand_total=Decimal("800.00"), 
         status="Draft",
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
         items=[]
     )
     mock_po_create.return_value = po
@@ -398,8 +398,8 @@ async def test_create_subscription_contract(
         status="Active",
         start_date=date.today(),
         end_date=date.today() + timedelta(days=365),
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc)
     )
     mock_contract_create.return_value = contract
     mock_get_id.return_value = contract

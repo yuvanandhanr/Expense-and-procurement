@@ -1,5 +1,5 @@
 from typing import Optional, List
-from datetime import datetime
+from datetime import timezone, datetime
 from decimal import Decimal
 from sqlalchemy import BigInteger, String, Text, Numeric, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -29,8 +29,8 @@ class Vendor(Base):
     payment_terms: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     delivery_terms: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     bank_details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     contacts: Mapped[List["VendorContact"]] = relationship("VendorContact", back_populates="vendor", cascade="all, delete-orphan")
@@ -49,7 +49,7 @@ class VendorContact(Base):
     role: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationship
     vendor: Mapped["Vendor"] = relationship("Vendor", back_populates="contacts")
@@ -63,7 +63,7 @@ class VendorDocument(Base):
     document_type: Mapped[str] = mapped_column(String(100), nullable=False)
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     file_path: Mapped[str] = mapped_column(String(512), nullable=False)
-    uploaded_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    uploaded_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationship
     vendor: Mapped["Vendor"] = relationship("Vendor", back_populates="documents")
@@ -75,7 +75,7 @@ class VendorCategory(Base):
     category_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     vendor_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("vendors.vendor_id", ondelete="CASCADE"))
     category_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationship
     vendor: Mapped["Vendor"] = relationship("Vendor", back_populates="categories")
@@ -93,7 +93,7 @@ class VendorPerformance(Base):
     purchase_volume: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=0.00)
     avg_lead_time_days: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=0.00)
     rating: Mapped[Decimal] = mapped_column(Numeric(3, 2), default=5.00)
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationship
     vendor: Mapped["Vendor"] = relationship("Vendor", back_populates="performance")
@@ -106,7 +106,7 @@ class VendorBlacklist(Base):
     vendor_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("vendors.vendor_id", ondelete="CASCADE"))
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     blacklisted_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     vendor: Mapped["Vendor"] = relationship("Vendor", back_populates="blacklist_records")

@@ -1,5 +1,5 @@
 from typing import Optional
-from datetime import datetime
+from datetime import timezone, datetime
 from decimal import Decimal
 from sqlalchemy import BigInteger, String, Numeric, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -31,10 +31,10 @@ class BudgetAllocation(Base):
         String(20), default="Active"
     )
     created_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=datetime.utcnow
+        DateTime, default=lambda: datetime.now(timezone.utc)
     )
     updated_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
     )
 
     budget_code = relationship("BudgetCode")
@@ -59,7 +59,7 @@ class BudgetReservation(Base):
         String(50), default="Reserved"
     )
     created_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=datetime.utcnow
+        DateTime, default=lambda: datetime.now(timezone.utc)
     )
     released_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime, nullable=True

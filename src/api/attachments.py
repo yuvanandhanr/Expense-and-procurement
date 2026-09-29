@@ -1,5 +1,5 @@
 from typing import List
-from datetime import datetime
+from datetime import timezone, datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.dependency import get_db_session
@@ -52,7 +52,7 @@ async def upload_attachment(
         file_type=ext,
         file_size=data.file_size,
         uploaded_by=current_user.user_id,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     return await repo.create(attachment)
 

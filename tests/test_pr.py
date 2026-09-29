@@ -1,6 +1,6 @@
 import jwt
 import pytest
-from datetime import datetime, timedelta
+from datetime import timezone, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi import status
@@ -148,8 +148,8 @@ def mock_pr() -> PurchaseRequisition:
         requestor_id=1,
         status="Draft",
         total_estimated_amount=Decimal("4000.00"),
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
         items=[item]
     )
 
@@ -433,7 +433,7 @@ async def test_create_comment(
 ):
     mock_get_pr.return_value = mock_pr
     mock_comment = ApprovalComment(
-        comment_id=1, pr_id=1, user_id=1, content="This is a test comment", is_internal=False, created_at=datetime.utcnow()
+        comment_id=1, pr_id=1, user_id=1, content="This is a test comment", is_internal=False, created_at=datetime.now(timezone.utc)
     )
     mock_comment_create.return_value = mock_comment
 
@@ -458,7 +458,7 @@ async def test_create_attachment(
 ):
     mock_get_pr.return_value = mock_pr
     mock_attachment = PRAttachment(
-        attachment_id=1, pr_id=1, file_name="specs.pdf", file_path="/uploads/specs.pdf", file_type="pdf", file_size=1024, uploaded_by=1, created_at=datetime.utcnow()
+        attachment_id=1, pr_id=1, file_name="specs.pdf", file_path="/uploads/specs.pdf", file_type="pdf", file_size=1024, uploaded_by=1, created_at=datetime.now(timezone.utc)
     )
     mock_attach_create.return_value = mock_attachment
 

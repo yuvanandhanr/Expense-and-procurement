@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from typing import List
-from datetime import datetime
+from datetime import timezone, datetime
 
 from src.database.dependency import get_db_session
 from src.auth.dependencies import get_current_user, RoleChecker
@@ -73,7 +73,7 @@ async def trigger_offboarding(
 
         # Unassign the asset instantly
         assignment.status = "Returned"
-        assignment.return_date = datetime.utcnow().date()
+        assignment.return_date = datetime.now(timezone.utc).date()
         
         # Mark the asset itself as Available
         if assignment.asset:
@@ -121,7 +121,7 @@ async def clear_offboarding_task(
     if data.action == "Reject" and task.task_type == "Manager Approval":
         task.status = "Rejected"
         task.cleared_by = current_user.user_id
-        task.cleared_at = datetime.utcnow()
+        task.cleared_at = datetime.now(timezone.utc)
         if data.notes:
             task.notes = f"{task.notes}\nRejected notes: {data.notes}"
         await session.commit()
@@ -131,7 +131,7 @@ async def clear_offboarding_task(
     if data.action == "Pending Dues" and task.task_type == "Financial Clearance":
         task.status = "Blocked"
         task.cleared_by = current_user.user_id
-        task.cleared_at = datetime.utcnow()
+        task.cleared_at = datetime.now(timezone.utc)
         if data.notes:
             task.notes = f"{task.notes}\nBlocked due to pending dues: {data.notes}"
         await session.commit()
@@ -140,7 +140,7 @@ async def clear_offboarding_task(
         
     task.status = "Cleared"
     task.cleared_by = current_user.user_id
-    task.cleared_at = datetime.utcnow()
+    task.cleared_at = datetime.now(timezone.utc)
     if data.notes:
         task.notes = f"{task.notes}\nClearance notes: {data.notes}"
 

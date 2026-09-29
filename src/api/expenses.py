@@ -8,12 +8,13 @@ import uuid
 import hashlib
 import logging
 from decimal import Decimal
-from datetime import datetime
+from datetime import timezone, datetime
 from sqlalchemy.exc import IntegrityError
 
 from src.database.dependency import get_db_session
 from src.schemas.expense import ExpenseReportCreate, ExpenseReportUpdate, ExpenseReportResponse, ReceiptResponse, ReceiptUpdate
 from src.repositories.expense import ExpenseRepository
+# pyrefly: ignore [missing-import]
 from src.models.expense import ExpenseReport, Receipt
 from src.services.ocr import OCRService
 from src.api.auth import get_current_user
@@ -48,7 +49,7 @@ def _log_action(user: User, action: str, record_id: int | str, *, level: int = l
     logger.log(
         level,
         "expense_action timestamp=%s user_id=%s action=%s record_id=%s",
-        datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        datetime.now(timezone.utc).isoformat(timespec="seconds") + "Z",
         user.user_id,
         action,
         record_id,
@@ -632,7 +633,7 @@ async def approve_expense(
         
     approval.status = "Approved"
     approval.comments = payload.comments
-    approval.actioned_at = datetime.utcnow()
+    approval.actioned_at = datetime.now(timezone.utc)
         
     roles = _roles(current_user)
     if report.status in ["Pending Manager Approval", "Corrected Claim", "Pending Approval"]:
@@ -707,7 +708,7 @@ async def reject_expense(
     
     approval.status = "Rejected"
     approval.comments = payload.comments
-    approval.actioned_at = datetime.utcnow()
+    approval.actioned_at = datetime.now(timezone.utc)
         
     report.status = "Rejected"
     await repo.update_report(report)
@@ -750,7 +751,7 @@ async def return_expense(
     
     approval.status = "Returned"
     approval.comments = payload.comments
-    approval.actioned_at = datetime.utcnow()
+    approval.actioned_at = datetime.now(timezone.utc)
         
     report.status = "Returned for Correction"
     await repo.update_report(report)
