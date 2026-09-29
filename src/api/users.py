@@ -86,6 +86,13 @@ async def create_user(
     """
     Creates a new user account locally.
     """
+    is_admin = any(role.role_name == "Admin" for role in current_user.roles)
+    if not is_admin:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=403, 
+            detail="Only Admins can add users."
+        )
     service = UserService(db)
     return await service.create_user(data)
 
@@ -108,15 +115,13 @@ async def update_user(
     """
     Updates an existing user's profile details or role assignments.
     """
-    if data.department_name is not None or data.employee_type is not None or data.role_ids is not None:
-        is_admin = any(role.role_name == "Admin" for role in current_user.roles)
-        if not is_admin:
-            from fastapi import HTTPException
-            raise HTTPException(
-                status_code=403, 
-                detail="Only Admins can assign department, employee type, or roles."
-            )
-            
+    is_admin = any(role.role_name == "Admin" for role in current_user.roles)
+    if not is_admin:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=403, 
+            detail="Only Admins can edit or manage users."
+        )
     if data.department_name is not None and data.department_name != "":
         from sqlalchemy import select
         from src.models.organization import Department
@@ -161,6 +166,13 @@ async def delete_user(
     """
     Soft-deletes (deactivates) a user account.
     """
+    is_admin = any(role.role_name == "Admin" for role in current_user.roles)
+    if not is_admin:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=403, 
+            detail="Only Admins can delete users."
+        )
     service = UserService(db)
     await service.delete_user(user_id)
 
@@ -172,16 +184,26 @@ async def delete_user(
 )
 async def lock_user(
     user_id: int,
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Locks an employee account manually.
     """
+    is_admin = any(role.role_name == "Admin" for role in current_user.roles)
+    if not is_admin:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=403, 
+            detail="Only Admins can lock users."
+        )
     service = UserService(db)
     user = await service.get_user(user_id)
     user.is_locked = True
-    user.locked_until = datetime.utcnow() + timedelta(days=365)
+    user.locked_until = datetime.now(timezone.utc) + timedelta(days=365)
     await service.user_repo.update(user)
+    await db.commit()
+    await db.refresh(user)
     return user
 
 
@@ -192,17 +214,27 @@ async def lock_user(
 )
 async def unlock_user(
     user_id: int,
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Unlocks an employee account manually.
     """
+    is_admin = any(role.role_name == "Admin" for role in current_user.roles)
+    if not is_admin:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=403, 
+            detail="Only Admins can unlock users."
+        )
     service = UserService(db)
     user = await service.get_user(user_id)
     user.is_locked = False
     user.failed_login_attempts = 0
     user.locked_until = None
     await service.user_repo.update(user)
+    await db.commit()
+    await db.refresh(user)
     return user
 
 

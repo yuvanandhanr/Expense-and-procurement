@@ -47,10 +47,39 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   const navigate = useNavigate();
   
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState(256);
+  const isResizing = useRef(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  const startResizing = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizing.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.addEventListener("mousemove", resizeSidebar);
+    document.addEventListener("mouseup", stopResizing);
+  };
+
+  const resizeSidebar = (e: MouseEvent) => {
+    if (isResizing.current) {
+      const newWidth = Math.max(64, Math.min(e.clientX, 400));
+      setSidebarWidth(newWidth);
+      if (newWidth < 120) {
+        setIsSidebarOpen(false);
+      } else {
+        setIsSidebarOpen(true);
+      }
+    }
+  };
+
+  const stopResizing = () => {
+    isResizing.current = false;
+    document.body.style.cursor = 'default';
+    document.removeEventListener("mousemove", resizeSidebar);
+    document.removeEventListener("mouseup", stopResizing);
+  };
   
   // Search and dropdown state
   const [searchQuery, setSearchQuery] = useState("");
@@ -372,22 +401,39 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     <div className="min-h-screen bg-background flex text-foreground transition-colors duration-300 antialiased">
       {/* Sidebar - Apple Glass Desktop */}
       <aside
-        className="hidden md:flex flex-col border-r border-border/70 bg-card/75 backdrop-blur-2xl transition-all duration-300 w-64 shadow-apple-sm z-20"
+        className="hidden md:flex flex-col border-r border-border/70 bg-card/75 backdrop-blur-2xl transition-all duration-300 shadow-apple-sm z-20 relative"
+        style={{ width: sidebarWidth + "px" }}
       >
+        {/* Resize Handle */}
+        <div 
+          className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/50 transition-colors z-50"
+          onMouseDown={startResizing}
+        />
+        
         {/* Apple Sidebar Header & Logo */}
-        <div className="h-16 flex items-center justify-between px-3 border-b border-border/60 relative z-50">
-          <div className="flex items-center space-x-3 overflow-hidden">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#0071E3] to-[#0077ED] flex items-center justify-center text-white font-extrabold text-sm shadow-apple-sm shadow-primary/20">
+        <div className="h-16 flex items-center justify-between px-3 border-b border-border/60 relative z-40 overflow-hidden shrink-0">
+          <div className="flex items-center space-x-3 overflow-hidden cursor-pointer" onClick={() => {
+            if (isSidebarOpen) {
+              setSidebarWidth(64);
+              setIsSidebarOpen(false);
+            } else {
+              setSidebarWidth(256);
+              setIsSidebarOpen(true);
+            }
+          }}>
+            <div className="w-8 h-8 rounded-xl shrink-0 bg-gradient-to-tr from-[#0071E3] to-[#0077ED] flex items-center justify-center text-white font-extrabold text-sm shadow-apple-sm shadow-primary/20 hover:scale-105 transition-transform">
               ✦
             </div>
-            <div className="flex flex-col">
-              <span className="font-extrabold text-sm tracking-tight text-foreground leading-none">
-                ProcureSync
-              </span>
-              <span className="text-[10px] font-semibold text-muted-foreground tracking-wider uppercase mt-1">
-                Enterprise Suite
-              </span>
-            </div>
+            {isSidebarOpen && (
+              <div className="flex flex-col min-w-[120px]">
+                <span className="font-extrabold text-sm tracking-tight text-foreground leading-none truncate">
+                  ProcureSync
+                </span>
+                <span className="text-[10px] font-semibold text-muted-foreground tracking-wider uppercase mt-1 truncate">
+                  Enterprise Suite
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Notification Center */}
@@ -502,16 +548,21 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         </div>
 
         {/* Navigation Items */}
-        <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-6">
+        <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-6 overflow-x-hidden">
           {sidebarItems.map((group, groupIdx) => {
             const visibleItems = group.items.filter(item => item.show);
             if (visibleItems.length === 0) return null;
 
             return (
               <div key={groupIdx} className="space-y-1">
-                <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-3 mb-1.5 opacity-70">
-                  {group.title}
-                </span>
+                {isSidebarOpen && (
+                  <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-3 mb-1.5 opacity-70 truncate">
+                    {group.title}
+                  </span>
+                )}
+                {!isSidebarOpen && (
+                  <div className="h-4" /> // spacing when collapsed
+                )}
                 <div className="space-y-0.5">
                   {visibleItems.map((item, itemIdx) => {
                     const isActive = location.pathname === item.path;
@@ -520,18 +571,19 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
                       <Link
                         key={itemIdx}
                         to={item.path}
-                        className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 group ${
+                        title={!isSidebarOpen ? item.label : undefined}
+                        className={`flex items-center justify-between ${isSidebarOpen ? 'px-3' : 'justify-center px-0'} py-2 rounded-xl text-xs font-semibold transition-all duration-200 group ${
                           isActive
                             ? "bg-[#0071E3] text-white shadow-apple-sm shadow-primary/25"
                             : "text-muted-foreground hover:bg-muted/60 hover:text-foreground active:scale-[0.98]"
                         }`}
                       >
-                        <div className="flex items-center space-x-2.5">
+                        <div className={`flex items-center ${isSidebarOpen ? 'space-x-2.5' : ''}`}>
                           <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 group-hover:scale-105 ${isActive ? "text-white" : "text-muted-foreground group-hover:text-foreground"}`} />
-                          <span>{item.label}</span>
+                          {isSidebarOpen && <span className="truncate">{item.label}</span>}
                         </div>
-                        {isActive && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-white/90 shadow-sm mr-0.5" />
+                        {isActive && isSidebarOpen && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-white/90 shadow-sm mr-0.5 shrink-0" />
                         )}
                       </Link>
                     );

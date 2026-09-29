@@ -5,6 +5,7 @@ import {Button, Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Dialo
 import toast from "react-hot-toast";
 import { getErrorMessage } from "../utils/helpers";
 import { useAuth } from "../hooks/useAuth";
+import { Plus } from "lucide-react";
 
 export const Users: React.FC = () => {
   const { hasRole } = useAuth();
@@ -157,8 +158,8 @@ export const Users: React.FC = () => {
           <p className="text-xs text-muted-foreground mt-1">Manage system users, assign roles, and control access.</p>
         </div>
         {hasRole("Admin") && (
-          <Button onClick={openCreateModal} className="font-bold text-xs uppercase tracking-wider">
-            Add New User
+          <Button onClick={openCreateModal} className="font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-apple-glow">
+            <Plus className="w-4 h-4" /> Add New User
           </Button>
         )}
       </div>
