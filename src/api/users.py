@@ -200,7 +200,7 @@ async def lock_user(
     service = UserService(db)
     user = await service.get_user(user_id)
     user.is_locked = True
-    user.locked_until = datetime.now(timezone.utc) + timedelta(days=365)
+    user.locked_until = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=365)
     await service.user_repo.update(user)
     await db.commit()
     await db.refresh(user)
