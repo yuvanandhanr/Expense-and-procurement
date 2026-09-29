@@ -33,6 +33,18 @@ async def seed():
                 role = Role(role_name=role_name, status=True)
                 session.add(role)
                 await session.flush()
+                
+            from src.models.auth import Permission
+            if role_name in ["Manager", "Finance Manager", "CFO", "CEO"]:
+                result_perm = await session.execute(select(Permission).where(Permission.permission_name == "users.view"))
+                perm = result_perm.scalar_one_or_none()
+                if not perm:
+                    perm = Permission(permission_name="users.view", description="View users")
+                    session.add(perm)
+                    await session.flush()
+                has_perm = any(p.permission_name == "users.view" for p in role.permissions)
+                if not has_perm:
+                    role.permissions.append(perm)
             
             # Use raw email to save in DB since the auth_service maps it
             # wait, mock_google_cfo@dataeko.ai will be parsed as cfo@dataeko.ai in verify_google_id_token

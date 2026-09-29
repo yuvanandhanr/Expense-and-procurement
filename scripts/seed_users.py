@@ -38,6 +38,19 @@ async def seed_users():
                 role = Role(role_name=role_name, status=True)
                 session.add(role)
                 await session.flush()
+            
+            # Ensure users.view permission for executives
+            if role_name in ["Manager", "Finance Manager", "CFO", "CEO"]:
+                result_perm = await session.execute(select(Permission).where(Permission.permission_name == "users.view"))
+                perm = result_perm.scalar_one_or_none()
+                if not perm:
+                    perm = Permission(permission_name="users.view", description="View users")
+                    session.add(perm)
+                    await session.flush()
+                has_perm = any(p.permission_name == "users.view" for p in role.permissions)
+                if not has_perm:
+                    role.permissions.append(perm)
+                    
             roles.append(role)
             
         # Create real users first
