@@ -15,6 +15,11 @@ export const Approvals: React.FC = () => {
   const [workflows, setWorkflows] = useState<ApprovalWorkflow[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("Reimbursements");
+  const [statusFilter, setStatusFilter] = useState("All");
+
+  useEffect(() => {
+    setStatusFilter("All");
+  }, [activeTab]);
   
   // Action state
   const [selectedWorkflow, setSelectedWorkflow] = useState<ApprovalWorkflow | null>(null);
@@ -121,19 +126,31 @@ export const Approvals: React.FC = () => {
     }
   };
 
+  const getWorkflowsForTab = () => {
+    return workflows.filter((wf: any) => {
+      // Exclude 0.00 items from approval inbox
+      const amt = Number(wf.amount || wf.total_amount || wf.estimated_cost || 0);
+      if (wf.entity_type === "ExpenseReport" || wf.entity_type === "PurchaseRequisition" || wf.entity_type === "VendorInvoice") {
+        if (amt <= 0) return false;
+      }
+      if (wf.status === "Draft") return false; // Exclude drafts from Approvals Inbox
+      if (activeTab === "Requisitions") return wf.entity_type === "PurchaseRequisition";
+      if (activeTab === "Reimbursements") return wf.entity_type === "ExpenseReport";
+      if (activeTab === "Asset Incidents") return wf.entity_type === "AssetIncident";
+      if (activeTab === "Resignations") return wf.entity_type === "Resignation";
+      return false;
+    });
+  };
+
   const getFilteredWorkflows = () => {
-    return workflows
-      .filter((wf: any) => {
-        // Exclude 0.00 items from approval inbox
-        const amt = Number(wf.amount || wf.total_amount || wf.estimated_cost || 0);
-        if (wf.entity_type === "ExpenseReport" || wf.entity_type === "PurchaseRequisition" || wf.entity_type === "VendorInvoice") {
-          if (amt <= 0) return false;
-        }
-        if (activeTab === "Requisitions") return wf.entity_type === "PurchaseRequisition";
-        if (activeTab === "Reimbursements") return wf.entity_type === "ExpenseReport";
-        if (activeTab === "Asset Incidents") return wf.entity_type === "AssetIncident";
-        if (activeTab === "Resignations") return wf.entity_type === "Resignation";
-        return false;
+    return getWorkflowsForTab()
+      .filter((r: any) => {
+        if (statusFilter === "All") return true;
+        if (statusFilter === "Submitted") return r.status.includes("Pending") || r.status === "Corrected Claim" || r.status === "Payment Requested" || r.status === "Finance Verified" || r.status === "Submitted" || r.status === "Under Review" || r.status === "Reported";
+        if (statusFilter === "Approved") return ["Approved", "Paid", "Closed", "Completed", "Active", "Success", "Verified"].includes(r.status) || r.status.includes("Approved") || r.status.includes("Resolved");
+        if (statusFilter === "Rejected") return ["Rejected", "Cancelled", "Inactive", "Failed", "Error"].includes(r.status) || r.status.includes("Rejected");
+        if (statusFilter === "Return for Correction") return r.status === "Returned for Correction" || r.status === "Returned";
+        return r.status === statusFilter;
       })
       .sort((a: any, b: any) => {
         const sA = (a.status || "").toLowerCase();
@@ -150,6 +167,15 @@ export const Approvals: React.FC = () => {
         const timeB = new Date(b.created_at || b.submission_date || b.date || 0).getTime();
         return timeB - timeA;
       });
+  };
+
+  const currentTabWorkflows = getWorkflowsForTab();
+  const subTabCounts: Record<string, number> = {
+    All: currentTabWorkflows.length,
+    Submitted: currentTabWorkflows.filter((r: any) => r.status.includes("Pending") || r.status === "Corrected Claim" || r.status === "Payment Requested" || r.status === "Finance Verified" || r.status === "Submitted" || r.status === "Under Review" || r.status === "Reported").length,
+    Approved: currentTabWorkflows.filter((r: any) => ["Approved", "Paid", "Closed", "Completed", "Active", "Success", "Verified"].includes(r.status) || r.status.includes("Approved") || r.status.includes("Resolved")).length,
+    Rejected: currentTabWorkflows.filter((r: any) => ["Rejected", "Cancelled", "Inactive", "Failed", "Error"].includes(r.status) || r.status.includes("Rejected")).length,
+    "Return for Correction": currentTabWorkflows.filter((r: any) => r.status === "Returned for Correction" || r.status === "Returned").length,
   };
 
   const filteredWorkflows = getFilteredWorkflows();
@@ -174,6 +200,28 @@ export const Approvals: React.FC = () => {
             }`}
           >
             {tab}
+          </button>
+        ))}
+      </div>
+
+      {/* Filters & Controls */}
+      <div className="flex items-center space-x-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50">
+        {["All", "Submitted", "Approved", "Rejected", "Return for Correction"].map((status) => (
+          <button
+            key={status}
+            onClick={() => setStatusFilter(status)}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
+              statusFilter === status
+                ? "bg-primary text-primary-foreground shadow-sm font-bold"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+            }`}
+          >
+            <span>{status}</span>
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+              statusFilter === status ? "bg-primary-foreground/20 text-primary-foreground font-bold" : "bg-muted text-muted-foreground"
+            }`}>
+              {subTabCounts[status] || 0}
+            </span>
           </button>
         ))}
       </div>
