@@ -2,7 +2,7 @@ import os
 import time
 import logging
 import random
-from datetime import datetime
+from datetime import timezone, datetime
 from typing import Dict, Any, List
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -114,13 +114,13 @@ class MonitoringService:
                 component=comp,
                 status=detail["status"],
                 details=detail.get("details", ""),
-                checked_at=datetime.utcnow()
+                checked_at=datetime.now(timezone.utc)
             )
             await self.health_repo.create(health)
 
         return {
             "status": overall_status,
-            "checked_at": datetime.utcnow().isoformat(),
+            "checked_at": datetime.now(timezone.utc).isoformat(),
             "components": results
         }
 
@@ -144,7 +144,7 @@ class MonitoringService:
             m = SystemMetric(
                 metric_name=name,
                 metric_value=value,
-                timestamp=datetime.utcnow()
+                timestamp=datetime.now(timezone.utc)
             )
             await self.metric_repo.create(m)
 

@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import timezone, datetime, timedelta
 from typing import Dict, Any, List, Optional
 from sqlalchemy import select, func, desc
 from sqlalchemy.orm import selectinload
@@ -37,7 +37,7 @@ class DashboardService:
         # Base dashboard widgets - computed live in real-time
         data = {
             "role": role,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "widgets": {}
         }
 
@@ -348,7 +348,7 @@ class DashboardService:
             return []
 
     async def _get_expiring_contracts_count(self) -> int:
-        thirty_days_later = datetime.utcnow() + timedelta(days=30)
+        thirty_days_later = datetime.now(timezone.utc) + timedelta(days=30)
         query = select(func.count(Contract.contract_id)).where(
             Contract.end_date <= thirty_days_later,
             Contract.status == "Active"
@@ -390,7 +390,7 @@ class DashboardService:
         return {row[0]: row[1] for row in result.all()}
 
     async def _get_expiring_amc_count(self) -> int:
-        thirty_days_later = datetime.utcnow() + timedelta(days=30)
+        thirty_days_later = datetime.now(timezone.utc) + timedelta(days=30)
         query = select(func.count(Contract.contract_id)).where(
             Contract.contract_type == "AMC",
             Contract.end_date <= thirty_days_later,

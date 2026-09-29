@@ -97,8 +97,17 @@ class PRRepository(BaseRepository[PurchaseRequisition]):
         
         conditions = [self.model.requestor_id == user.user_id]
         
-        # If manager, can see direct reports
         user_role_names = [r.role_name for r in user.roles]
+        
+        # Admin / Executive full non-draft visibility
+        if any(r in user_role_names for r in ["Admin", "SuperAdmin", "CEO", "CFO"]):
+            conditions.append(self.model.status != "Draft")
+            
+        # Procurement visibility for approved / in-progress PRs
+        if "Procurement" in user_role_names:
+            conditions.append(self.model.status.in_(["Approved", "Assigned to Procurement", "Procurement In Progress", "Completed"]))
+
+        # If manager, can see direct reports
         if "Manager" in user_role_names:
             manager_cond = (UserModel.manager_id == user.user_id) & (self.model.status != "Draft")
             if not any(r in user_role_names for r in ["Admin", "SuperAdmin", "CEO", "CFO"]):

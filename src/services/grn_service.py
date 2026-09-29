@@ -1,6 +1,6 @@
 import uuid
 from typing import List, Optional
-from datetime import datetime
+from datetime import timezone, datetime
 from decimal import Decimal
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,7 +24,7 @@ class GRNService:
         self.asset_service = AssetService(db)
 
     def generate_grn_number(self) -> str:
-        date_str = datetime.utcnow().strftime("%Y%m%d")
+        date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
         rand_str = uuid.uuid4().hex[:6].upper()
         return f"GRN-{date_str}-{rand_str}"
 
@@ -51,9 +51,9 @@ class GRNService:
             inspection_id=data.inspection_id,
             warehouse=data.warehouse or "Main Warehouse",
             received_by=user_id,
-            received_date=datetime.utcnow(),
+            received_date=datetime.now(timezone.utc),
             notes=data.notes,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
 
         if is_cloud_sub:

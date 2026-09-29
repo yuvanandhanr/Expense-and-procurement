@@ -1,5 +1,5 @@
 from typing import List
-from datetime import datetime
+from datetime import timezone, datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.dependency import get_db_session
@@ -36,7 +36,7 @@ async def create_comment(
         content=data.content,
         parent_comment_id=data.parent_comment_id,
         is_internal=data.is_internal,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     return await repo.create(comment)
 

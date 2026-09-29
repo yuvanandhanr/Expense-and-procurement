@@ -1,5 +1,5 @@
 from typing import Optional
-from datetime import datetime
+from datetime import timezone, datetime
 from decimal import Decimal
 from sqlalchemy import BigInteger, String, Boolean, Numeric, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -21,7 +21,7 @@ class ThreeWayMatching(Base):
     total_amount_match_passed: Mapped[bool] = mapped_column(Boolean, nullable=False)
     variance_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0.00"))
     match_result: Mapped[str] = mapped_column(String(50), nullable=False) # Matched, Matched with Variance, Mismatch, Rejected, Manual Review Required
-    inspected_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    inspected_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     invoice: Mapped["VendorInvoice"] = relationship("VendorInvoice")

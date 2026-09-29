@@ -1,5 +1,5 @@
 from typing import List, Optional
-from datetime import datetime
+from datetime import timezone, datetime
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.delivery import Delivery, DeliveryItem
@@ -38,8 +38,8 @@ class DeliveryService:
             carrier=data.carrier,
             tracking_number=data.tracking_number,
             status="Pending",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
         )
         delivery = await self.delivery_repo.create(delivery)
 
@@ -66,7 +66,7 @@ class DeliveryService:
         update_dict = data.model_dump(exclude_unset=True)
         for k, v in update_dict.items():
             setattr(delivery, k, v)
-        delivery.updated_at = datetime.utcnow()
+        delivery.updated_at = datetime.now(timezone.utc)
         await self.delivery_repo.update(delivery)
 
         # Reconcile PO status based on delivery status

@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import timezone, datetime
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.platform_services import Notification, NotificationPreference, NotificationTemplate
@@ -32,8 +32,8 @@ class NotificationService:
                 name=name,
                 subject=subject,
                 body_template=body_template,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
             )
             await self.template_repo.create(template)
         return template
@@ -60,8 +60,8 @@ class NotificationService:
                 email_enabled=True,
                 in_app_enabled=True,
                 categories="all",
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
             )
             await self.pref_repo.create(pref)
         return pref
@@ -107,7 +107,7 @@ class NotificationService:
                 message=message,
                 notification_type="In-App",
                 status="Unread",
-                created_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc)
             )
             await self.notification_repo.create(notification)
             logger.info(f"Created In-App notification for user {user_id}: '{title}'")
@@ -130,7 +130,7 @@ class NotificationService:
         if not notification or notification.user_id != user_id:
             return False
         notification.status = "Read"
-        notification.read_at = datetime.utcnow()
+        notification.read_at = datetime.now(timezone.utc)
         await self.notification_repo.update(notification)
         return True
 
@@ -148,7 +148,7 @@ class NotificationService:
         for n in notifications:
             if n.status == "Unread":
                 n.status = "Read"
-                n.read_at = datetime.utcnow()
+                n.read_at = datetime.now(timezone.utc)
                 await self.notification_repo.update(n)
                 count += 1
         return count

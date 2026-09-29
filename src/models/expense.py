@@ -1,5 +1,5 @@
 from typing import Optional, List
-from datetime import datetime, date
+from datetime import timezone, datetime, date
 from decimal import Decimal
 from sqlalchemy import BigInteger, String, Numeric, DateTime, Date, ForeignKey, Text, JSON, Boolean, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -23,8 +23,8 @@ class ExpenseReport(Base):
     policy_flags: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     payment_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     payment_reference: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
     employee: Mapped["User"] = relationship("User", foreign_keys=[employee_id])
@@ -61,7 +61,7 @@ class Receipt(Base):
     content_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     ocr_confidence: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True) # 0.00 to 100.00
     ocr_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationship
     expense_report: Mapped["ExpenseReport"] = relationship("ExpenseReport", back_populates="receipts")
@@ -75,7 +75,7 @@ class ExpenseApproval(Base):
     approver_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
     status: Mapped[str] = mapped_column(String(50), nullable=False) # Pending, Approved, Rejected
     comments: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    actioned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    actioned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     expense_report: Mapped["ExpenseReport"] = relationship("ExpenseReport", back_populates="approvals")

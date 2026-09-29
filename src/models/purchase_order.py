@@ -1,5 +1,5 @@
 from typing import Optional, List
-from datetime import datetime
+from datetime import timezone, datetime
 from decimal import Decimal
 from sqlalchemy import BigInteger, String, Text, Numeric, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -25,8 +25,8 @@ class PurchaseOrder(Base):
     delivery_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     status: Mapped[Optional[str]] = mapped_column(String(50), default="Draft")
     created_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     vendor: Mapped["Vendor"] = relationship("Vendor")

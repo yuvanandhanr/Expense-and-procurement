@@ -1,5 +1,5 @@
 from typing import List, Optional
-from datetime import datetime
+from datetime import timezone, datetime
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.inspection import InspectionReport, InspectionItem
@@ -24,13 +24,13 @@ class InspectionService:
         report = InspectionReport(
             delivery_id=data.delivery_id,
             inspected_by=user_id,
-            inspection_date=datetime.utcnow(),
+            inspection_date=datetime.now(timezone.utc),
             outcome=data.outcome,
             inspection_notes=data.inspection_notes,
             damage_check_passed=data.damage_check_passed if data.damage_check_passed is not None else True,
             specification_check_passed=data.specification_check_passed if data.specification_check_passed is not None else True,
             quantity_verified=data.quantity_verified if data.quantity_verified is not None else True,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         report = await self.inspection_repo.create(report)
 

@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import timezone, datetime
 from typing import List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,7 +30,7 @@ class SettingService:
             setting.value = value
             if description is not None:
                 setting.description = description
-            setting.updated_at = datetime.utcnow()
+            setting.updated_at = datetime.now(timezone.utc)
             await self.setting_repo.update(setting)
             logger.info(f"Updated system setting: '{key}' = '{value}'")
         else:
@@ -39,8 +39,8 @@ class SettingService:
                 value=value,
                 description=description,
                 category=category,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
             )
             await self.setting_repo.create(setting)
             logger.info(f"Created system setting: '{key}' = '{value}'")

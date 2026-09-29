@@ -1,5 +1,5 @@
 from typing import List, Optional
-from datetime import datetime
+from datetime import timezone, datetime
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.vendor import (
@@ -81,7 +81,7 @@ class VendorService:
         for k, v in update_dict.items():
             setattr(vendor, k, v)
         
-        vendor.updated_at = datetime.utcnow()
+        vendor.updated_at = datetime.now(timezone.utc)
         await self.vendor_repo.update(vendor)
         return vendor
 
@@ -95,7 +95,7 @@ class VendorService:
             document_type=doc_type,
             file_name=file_name,
             file_path=file_path,
-            uploaded_at=datetime.utcnow()
+            uploaded_at=datetime.now(timezone.utc)
         )
         return await self.doc_repo.create(doc)
 
@@ -126,7 +126,7 @@ class VendorService:
             vendor_id=vendor_id,
             reason=reason,
             blacklisted_by=user_id,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         await self.blacklist_repo.create(blacklist_rec)
 

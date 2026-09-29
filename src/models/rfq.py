@@ -1,5 +1,5 @@
 from typing import Optional, List
-from datetime import datetime
+from datetime import timezone, datetime
 from sqlalchemy import BigInteger, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.database.base import Base
@@ -17,8 +17,8 @@ class RequestForQuotation(Base):
     submission_deadline: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     closing_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     pr: Mapped[Optional["PurchaseRequisition"]] = relationship("PurchaseRequisition", lazy="selectin")
@@ -64,7 +64,7 @@ class RFQVendor(Base):
     rfq_vendor_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     rfq_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("request_for_quotations.rfq_id", ondelete="CASCADE"))
     vendor_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("vendors.vendor_id", ondelete="CASCADE"))
-    invited_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    invited_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     rfq: Mapped["RequestForQuotation"] = relationship("RequestForQuotation", back_populates="rfq_vendors")

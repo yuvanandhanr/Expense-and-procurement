@@ -62,11 +62,11 @@ async def create_scheduled_report(
         format=data.format,
         is_active=True,
         created_by=current_user.user_id,
-        created_at=datetime.utcnow() if hasattr(datetime, "utcnow") else None # fallback
+        created_at=datetime.now(timezone.utc) if hasattr(datetime, "utcnow") else None # fallback
     )
     # Import datetime here just in case
-    from datetime import datetime
-    scheduled.created_at = datetime.utcnow()
+    from datetime import timezone, datetime
+    scheduled.created_at = datetime.now(timezone.utc)
     
     await repo.create(scheduled)
     return scheduled

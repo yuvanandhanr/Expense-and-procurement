@@ -1,7 +1,7 @@
 import pytest
 from httpx import AsyncClient
 from fastapi import status
-from datetime import datetime, date
+from datetime import timezone, datetime, date
 
 from src.models.auth import User, Role
 from src.models.assets import Asset, AssetAssignment, AssetHistory
@@ -65,7 +65,7 @@ async def test_offboarding_trigger(
     def mock_add(obj):
         obj.task_id = 99 if obj.task_type == "Retrieve Asset" else 100
         obj.status = "Pending"
-        obj.created_at = datetime.utcnow()
+        obj.created_at = datetime.now(timezone.utc)
     
     mock_session.add = mocker.MagicMock(side_effect=mock_add)
     
@@ -103,7 +103,7 @@ async def test_offboarding_clear_and_finalize(
         task_type="Retrieve Asset",
         status="Pending",
         notes="Please retrieve",
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     
     asset = Asset(
@@ -179,7 +179,7 @@ async def test_offboarding_manager_reject(
         task_type="Manager Approval",
         status="Pending",
         notes="Approve offboarding",
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
 
     def mock_get(model, id):
@@ -232,7 +232,7 @@ async def test_offboarding_asset_damaged(
         task_type="Retrieve Asset",
         status="Pending",
         notes="Please retrieve",
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     asset = Asset(asset_id=100, status="Assigned")
     assignment = AssetAssignment(
@@ -251,6 +251,7 @@ async def test_offboarding_asset_damaged(
         return None
         
     mock_session.get.side_effect = mock_get
+    mock_session.add = mocker.MagicMock()
     mock_result = mocker.MagicMock()
     mock_result.scalar_one_or_none.return_value = assignment
     mock_session.execute.return_value = mock_result
@@ -292,7 +293,7 @@ async def test_offboarding_financial_pending_dues(
         task_type="Financial Clearance",
         status="Pending",
         notes="Clear dues",
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
 
     def mock_get(model, id):

@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime
+from datetime import timezone, datetime
 from typing import Optional, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.platform_services import AuditLog, ActivityLog
@@ -43,7 +43,7 @@ class AuditService:
             new_str = json.dumps(new_value) if isinstance(new_value, (dict, list)) else str(new_value)
 
         audit = AuditLog(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             user_id=user_id,
             user_email=user_email,
             ip_address=ip_address,
@@ -70,7 +70,7 @@ class AuditService:
         Logs a user-facing operational activity for timeline feeds.
         """
         activity = ActivityLog(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             user_id=user_id,
             activity_type=activity_type,
             description=description,

@@ -17,7 +17,9 @@ def make_pr(amount: float, requestor_id: int):
 
 @pytest.fixture
 def mock_db():
-    return AsyncMock()
+    db = AsyncMock()
+    db.add = MagicMock()
+    return db
 
 @pytest.fixture
 def service(mock_db):

@@ -1,5 +1,5 @@
 from typing import Optional
-from datetime import datetime
+from datetime import timezone, datetime
 from sqlalchemy import BigInteger, String, Integer, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.database.base import Base
@@ -30,7 +30,7 @@ class PRAttachment(Base):
         BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=datetime.utcnow
+        DateTime, default=lambda: datetime.now(timezone.utc)
     )
 
     purchase_requisition = relationship("PurchaseRequisition", back_populates="attachments")
