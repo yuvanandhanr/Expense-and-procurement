@@ -122,9 +122,11 @@ export const Users: React.FC = () => {
   const handleToggleLock = async (user: CurrentUser) => {
     try {
       if (user.is_locked) {
+        if (!confirm(`Are you sure you want to unlock ${user.email}?`)) return;
         await api.post(`/users/${user.user_id}/unlock`);
         toast.success(`User ${user.email} unlocked successfully.`);
       } else {
+        if (!confirm(`Are you sure you want to lock ${user.email}?`)) return;
         await api.post(`/users/${user.user_id}/lock`);
         toast.success(`User ${user.email} locked successfully.`);
       }
