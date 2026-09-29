@@ -118,11 +118,10 @@ async def update_user(
             )
             
     if data.department_name is not None and data.department_name != "":
-        allowed_depts = [
-            "CEO", "CFO", "Admin", "Engineering", "Finance", 
-            "Human Resources", "IT", "Operations", "Procurement", 
-            "Sales & Marketing", "Administration"
-        ]
+        from sqlalchemy import select
+        from src.models.organization import Department
+        res = await db.execute(select(Department.department_name))
+        allowed_depts = [r[0] for r in res.all()]
         if data.department_name not in allowed_depts:
             from fastapi import HTTPException
             raise HTTPException(status_code=400, detail="Invalid department name.")

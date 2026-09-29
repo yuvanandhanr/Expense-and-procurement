@@ -25,16 +25,19 @@ export const Users: React.FC = () => {
   const [departmentName, setDepartmentName] = useState("");
   const [employeeType, setEmployeeType] = useState("pending assignment");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [departments, setDepartments] = useState<any[]>([]);
 
   const fetchUsersAndRoles = async () => {
     setLoading(true);
     try {
-      const [usersRes, rolesRes] = await Promise.all([
+      const [usersRes, rolesRes, deptsRes] = await Promise.all([
         api.get("/users"),
-        api.get("/roles")
+        api.get("/roles"),
+        api.get("/departments")
       ]);
       setUsers(usersRes.data);
       setRoles(rolesRes.data);
+      setDepartments(deptsRes.data);
     } catch (err) {
       console.error("Failed to load users or roles:", err);
       toast.error("Failed to load user data");
@@ -291,17 +294,7 @@ export const Users: React.FC = () => {
             onChange={e => setDepartmentName(e.target.value)}
             options={[
               { label: "None", value: "" },
-              { label: "CEO", value: "CEO" },
-              { label: "CFO", value: "CFO" },
-              { label: "Admin", value: "Admin" },
-              { label: "Engineering", value: "Engineering" },
-              { label: "Finance", value: "Finance" },
-              { label: "Human Resources", value: "Human Resources" },
-              { label: "IT", value: "IT" },
-              { label: "Operations", value: "Operations" },
-              { label: "Procurement", value: "Procurement" },
-              { label: "Sales & Marketing", value: "Sales & Marketing" },
-              { label: "Administration", value: "Administration" },
+              ...departments.map((d: any) => ({ label: d.department_name, value: d.department_name }))
             ]}
           />
           <Select
