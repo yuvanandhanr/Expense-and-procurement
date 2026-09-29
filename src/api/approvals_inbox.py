@@ -19,41 +19,53 @@ async def get_pending_approvals(
     """
     service = ApprovalService(db)
     pending_workflows = await service.get_pending_approvals_for_user(current_user)
-    # Fetch pending Expenses for the current approver
+    # Fetch all accessible Expenses for the current user (excluding their own, which are in My Reimbursements)
     from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
     from src.models.expense import ExpenseReport, ExpenseApproval
     from src.models.auth import User as UserModel
+    from src.api.expenses import _can_access_report
     
-    stmt_exp = (
-        select(ExpenseApproval, ExpenseReport, UserModel)
-        .join(ExpenseReport, ExpenseApproval.expense_report_id == ExpenseReport.expense_report_id)
-        .join(UserModel, ExpenseReport.employee_id == UserModel.user_id)
-        .where(
-            ExpenseApproval.status == "Pending",
-            ExpenseApproval.approver_id == current_user.user_id
+    stmt_exp_all = (
+        select(ExpenseReport)
+        .options(
+            selectinload(ExpenseReport.approvals),
+            selectinload(ExpenseReport.employee).selectinload(UserModel.roles)
         )
+        .where(ExpenseReport.employee_id != current_user.user_id)
+        .order_by(ExpenseReport.created_at.desc())
     )
-    result_exp = await db.execute(stmt_exp)
-    for exp_approval, report, reporter in result_exp.all():
-        pending_workflows.append({
-            "workflow_id": exp_approval.approval_id,
-            "entity_type": "ExpenseReport",
-            "entity_id": report.expense_report_id,
-            "current_step_sequence": 1,
-            "workflow_step": report.status,
-            "status": report.status,
-            "created_at": report.created_at,
-            "updated_at": report.updated_at,
-            "requestor_id": report.employee_id,
-            "requestor_name": f"{reporter.first_name} {reporter.last_name}",
-            "title": f"Expense: {report.purpose}",
-            "justification": report.justification,
-            "amount": float(report.total_amount),
-            "past_approvers": [],
-            "pending_approvers": [f"User {exp_approval.approver_id}"],
-            "steps": [],
-            "can_approve": True
-        })
+    result_exp_all = await db.execute(stmt_exp_all)
+    user_roles_set = {r.role_name for r in current_user.roles}
+    
+    for report in result_exp_all.scalars().unique().all():
+        if _can_access_report(report, current_user):
+            can_approve = False
+            pending_app = next((a for a in report.approvals if a.status == "Pending"), None)
+            if pending_app and pending_app.approver_id == current_user.user_id:
+                can_approve = True
+            elif report.status in ["Payment Requested", "Approved for Payment"] and bool(user_roles_set & {"Finance Manager", "CFO"}):
+                can_approve = True
+                
+            pending_workflows.append({
+                "workflow_id": pending_app.approval_id if pending_app else report.expense_report_id,
+                "entity_type": "ExpenseReport",
+                "entity_id": report.expense_report_id,
+                "current_step_sequence": 1,
+                "workflow_step": report.status,
+                "status": report.status,
+                "created_at": report.created_at,
+                "updated_at": report.updated_at,
+                "requestor_id": report.employee_id,
+                "requestor_name": f"{report.employee.first_name} {report.employee.last_name}",
+                "title": f"Expense: {report.purpose}",
+                "justification": report.justification,
+                "amount": float(report.total_amount) if report.total_amount else 0.0,
+                "past_approvers": [],
+                "pending_approvers": [f"User {pending_app.approver_id}"] if pending_app else [],
+                "steps": [],
+                "can_approve": can_approve
+            })
     
     # Also fetch pending Asset Incidents for Admin/Manager
     user_roles = [r.role_name for r in current_user.roles]

@@ -5,7 +5,8 @@ import { Button, Card, CardHeader, CardTitle, CardContent, Badge, StatusBadge, S
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
 import { formatDate, getErrorMessage, isValidText } from "../utils/helpers";
-import { Check, X as XIcon } from "lucide-react";
+import { Check, X as XIcon, Eye } from "lucide-react";
+import { ReimbursementDetailModal } from "../components/expenses/ReimbursementDetailModal";
 
 type TabType = "Reimbursements" | "Requisitions" | "Asset Incidents" | "Resignations";
 
@@ -26,6 +27,23 @@ export const Approvals: React.FC = () => {
   const [adminComments, setAdminComments] = useState("");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
+  const [selectedReportDetails, setSelectedReportDetails] = useState<any>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+
+  const handleViewDetails = async (reportId: number) => {
+    setSelectedReportId(reportId);
+    setLoadingDetails(true);
+    try {
+      const res = await api.get(`/expenses/${reportId}`);
+      setSelectedReportDetails(res.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
 
   const fetchWorkflows = async () => {
     setLoading(true);
@@ -160,7 +178,7 @@ export const Approvals: React.FC = () => {
         ))}
       </div>
 
-      {/* Cards Grid */}
+      {/* Table/Cards View */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Skeleton className="h-40 w-full rounded-lg" />
@@ -173,6 +191,55 @@ export const Approvals: React.FC = () => {
              <EmptyState title={`No pending ${activeTab.toLowerCase()}.`} description="You're all caught up!" />
           </CardContent>
         </Card>
+      ) : activeTab === "Reimbursements" ? (
+        <div className="overflow-x-auto rounded-xl border border-border shadow-sm">
+          <table className="w-full text-left text-sm text-foreground">
+            <thead className="bg-muted text-muted-foreground uppercase text-xs font-bold tracking-wider">
+              <tr>
+                <th className="p-4">Report ID</th>
+                <th className="p-4">Purpose</th>
+                <th className="p-4">Total Amount</th>
+                <th className="p-4">Status</th>
+                <th className="p-4">Date Created</th>
+                <th className="p-4">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border bg-card">
+              {filteredWorkflows.map((wf) => (
+                <tr key={wf.workflow_id} className="hover:bg-muted/50 transition-colors">
+                  <td className="p-4 font-semibold">EXP-{wf.entity_id}</td>
+                  <td className="p-4 font-medium max-w-[200px] truncate" title={wf.title}>{wf.title?.replace('Expense: ', '')}</td>
+                  <td className="p-4 font-bold tracking-tight">${Number(wf.amount || 0).toFixed(2)}</td>
+                  <td className="p-4">
+                    <StatusBadge status={wf.status} />
+                  </td>
+                  <td className="p-4 text-xs text-muted-foreground">{new Date(wf.created_at || Date.now()).toLocaleDateString()}</td>
+                  <td className="p-4 flex items-center gap-2">
+                    {wf.can_approve ? (
+                      <Button 
+                        size="sm" 
+                        variant="primary"
+                        onClick={() => handleViewDetails(wf.entity_id)}
+                        className="gap-1.5 bg-[#0f172a] text-white hover:bg-slate-800"
+                      >
+                        Need Approval
+                      </Button>
+                    ) : (
+                      <Button 
+                        size="sm" 
+                        variant="view"
+                        onClick={() => handleViewDetails(wf.entity_id)}
+                        className="gap-1.5"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> View
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredWorkflows.map(wf => (
@@ -357,6 +424,31 @@ export const Approvals: React.FC = () => {
           </div>
         </div>
       </Dialog>
+      
+      {/* Reimbursement Detail Modal */}
+      {selectedReportId && (
+        <ReimbursementDetailModal
+          isOpen={!!selectedReportId}
+          onClose={() => {
+             setSelectedReportId(null);
+             setSelectedReportDetails(null);
+             fetchWorkflows();
+          }}
+          receiptDetails={selectedReportDetails}
+          loading={loadingDetails}
+          isPendingForUser={filteredWorkflows.find(w => w.entity_id === selectedReportId)?.can_approve || false}
+          onAction={async (action) => {
+             const wf = filteredWorkflows.find(w => w.entity_id === selectedReportId);
+             if (wf) {
+               setSelectedWorkflow(wf);
+               setActionType(action === "approve" ? (wf.status === "Payment Requested" ? "pay" : "approve") : action);
+               // Close this details modal so they can see the comment modal
+               setSelectedReportId(null);
+               setSelectedReportDetails(null);
+             }
+          }}
+        />
+      )}
     </div>
   );
 };
