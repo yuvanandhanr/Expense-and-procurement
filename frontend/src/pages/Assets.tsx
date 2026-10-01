@@ -4,7 +4,39 @@ import { Asset, User } from "../types";
 import { Card, CardContent, Badge, Skeleton, Button, Dialog, EmptyState, Input, Select } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
-import { ArrowRightLeft, Filter, Plus, Search, Edit2, Layers, CheckCircle2, AlertCircle, Package } from "lucide-react";
+import { ArrowRightLeft, Filter, Plus, Search, Edit2, Layers, CheckCircle2, AlertCircle, Package, ChevronLeft, ChevronRight } from "lucide-react";
+
+const ScrollableRow = ({ children, className = "" }: { children: React.ReactNode, className?: string }) => {
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const scroll = (offset: number) => {
+    if (scrollRef.current) scrollRef.current.scrollBy({ left: offset, behavior: 'smooth' });
+  };
+  
+  return (
+    <div className={`relative group flex items-center w-full ${className}`}>
+      <button 
+        onClick={() => scroll(-300)} 
+        className="absolute left-0 z-10 p-1 m-1 bg-background/95 backdrop-blur-sm border border-border shadow-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted focus:outline-none"
+      >
+        <ChevronLeft className="w-4 h-4 text-foreground"/>
+      </button>
+      
+      <div 
+        ref={scrollRef} 
+        className="flex items-center gap-1.5 bg-muted/40 p-1.5 rounded-xl w-full border border-border/50 overflow-x-auto flex-nowrap scrollbar-hide scroll-smooth"
+      >
+        {children}
+      </div>
+      
+      <button 
+        onClick={() => scroll(300)} 
+        className="absolute right-0 z-10 p-1 m-1 bg-background/95 backdrop-blur-sm border border-border shadow-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted focus:outline-none"
+      >
+        <ChevronRight className="w-4 h-4 text-foreground"/>
+      </button>
+    </div>
+  );
+};
 
 export const Assets: React.FC = () => {
   const { user } = useAuth();
@@ -236,10 +268,10 @@ export const Assets: React.FC = () => {
     }
   });
 
-  const counts = {
-    "All Assets": categoryFilteredAssets.length,
+  const statusCounts = {
+    "All": categoryFilteredAssets.length,
+    "Available": categoryFilteredAssets.filter(isUnassignedAsset).length,
     "Assigned": categoryFilteredAssets.filter(isAssignedAsset).length,
-    "Unassigned": categoryFilteredAssets.filter(isUnassignedAsset).length,
     "Out of Service": categoryFilteredAssets.filter(isOutOfServiceAsset).length,
   };
 
@@ -260,7 +292,7 @@ export const Assets: React.FC = () => {
 
     let matchesStatus = true;
     if (statusFilter === "Assigned") matchesStatus = isAssignedAsset(a);
-    else if (statusFilter === "Unassigned") matchesStatus = isUnassignedAsset(a);
+    else if (statusFilter === "Available") matchesStatus = isUnassignedAsset(a);
     else if (statusFilter === "Out of Service") matchesStatus = isOutOfServiceAsset(a);
     
     return matchesSearch && matchesCategory && matchesStatus;
@@ -284,15 +316,15 @@ export const Assets: React.FC = () => {
       </div>
 
       
-      {/* Filters (Categories) */}
-      <div className="space-y-4">
+      {/* Filters (Categories & Status) */}
+      <div className="space-y-3">
         {/* Main Category Filters */}
-        <div className="flex flex-wrap items-center gap-2 bg-muted/40 p-1.5 rounded-xl w-full border border-border/50">
+        <ScrollableRow>
           {MAIN_CATEGORIES.map((cat) => (
             <button
               key={cat}
               onClick={() => handleMainCategoryChange(cat)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 shrink-0 ${
                 activeMainCategory === cat
                   ? "bg-primary text-primary-foreground shadow-sm font-bold"
                   : "text-muted-foreground hover:text-foreground hover:bg-background/50"
@@ -308,40 +340,66 @@ export const Assets: React.FC = () => {
               </span>
             </button>
           ))}
-        </div>
+        </ScrollableRow>
 
-        {/* Sub Category Filters */}
-        {activeMainCategory !== "All" && SUB_CATEGORIES[activeMainCategory] && (
-          <div className="flex flex-wrap items-center gap-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50">
-            {SUB_CATEGORIES[activeMainCategory].map((subCat) => (
+        <div className="flex flex-col xl:flex-row gap-3">
+          {/* Sub Category Filters */}
+          {activeMainCategory !== "All" && SUB_CATEGORIES[activeMainCategory] && (
+            <ScrollableRow className="flex-1 min-w-0">
+              {SUB_CATEGORIES[activeMainCategory].map((subCat) => (
+                <button
+                  key={subCat}
+                  onClick={() => setActiveSubCategory(subCat)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 shrink-0 ${
+                    activeSubCategory === subCat
+                      ? "bg-primary text-primary-foreground shadow-sm font-bold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                  }`}
+                >
+                  <span>{subCat}</span>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+                    activeSubCategory === subCat
+                      ? "bg-primary-foreground/20 text-primary-foreground font-bold"
+                      : "bg-muted text-muted-foreground"
+                  }`}>
+                    {getSubCategoryCount(subCat, activeMainCategory)}
+                  </span>
+                </button>
+              ))}
+            </ScrollableRow>
+          )}
+
+          {/* Asset Status Filters */}
+          <div className="flex items-center gap-1.5 bg-muted/40 p-1.5 rounded-xl w-full xl:w-fit border border-border/50 overflow-x-auto flex-nowrap scrollbar-hide shrink-0">
+            {["All", "Available", "Assigned", "Out of Service"].map((status) => (
               <button
-                key={subCat}
-                onClick={() => setActiveSubCategory(subCat)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
-                  activeSubCategory === subCat
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 shrink-0 ${
+                  statusFilter === status
                     ? "bg-primary text-primary-foreground shadow-sm font-bold"
                     : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                 }`}
               >
-                <span>{subCat}</span>
+                <span>{status}</span>
                 <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-                  activeSubCategory === subCat
+                  statusFilter === status
                     ? "bg-primary-foreground/20 text-primary-foreground font-bold"
                     : "bg-muted text-muted-foreground"
                 }`}>
-                  {getSubCategoryCount(subCat, activeMainCategory)}
+                  {statusCounts[status as keyof typeof statusCounts]}
                 </span>
               </button>
             ))}
           </div>
-        )}
+        </div>
       </div>
 
       <div className="flex-1 space-y-4">
           <Card>
             <CardContent className="p-0">
               {/* Filters Bar */}
-              <div className="p-4 border-b border-border bg-accent/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="p-4 border-b border-border bg-accent/10 flex items-center justify-between">
                 <div className="relative max-w-sm w-full">
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input 
@@ -351,15 +409,6 @@ export const Assets: React.FC = () => {
                     onChange={e => setSearchTerm(e.target.value)}
                     className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-border bg-background focus:ring-2 focus:ring-violet outline-none"
                   />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Filter className="w-4 h-4 text-muted-foreground" />
-                  <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-40 text-sm">
-                    <option value="All">All Statuses</option>
-                    <option value="Assigned">Assigned</option>
-                    <option value="Unassigned">Unassigned</option>
-                    <option value="Out of Service">Out of Service</option>
-                  </Select>
                 </div>
               </div>
 
