@@ -400,7 +400,7 @@ export const Assets: React.FC = () => {
             <CardContent className="p-0">
               {/* Filters Bar */}
               <div className="p-4 border-b border-border bg-accent/10 flex items-center justify-between">
-                <div className="relative max-w-sm w-full">
+                <div className="relative max-w-[260px] w-full">
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input 
                     type="text" 
