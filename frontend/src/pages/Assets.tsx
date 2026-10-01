@@ -532,7 +532,7 @@ export const Assets: React.FC = () => {
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium mb-1">Cost ($)</label>
+            <label className="block text-sm font-medium mb-1">Cost (₹)</label>
             <Input type="number" value={newAsset.cost} onChange={e => setNewAsset({ ...newAsset, cost: e.target.value })} placeholder="0.00" />
           </div>
           <div>

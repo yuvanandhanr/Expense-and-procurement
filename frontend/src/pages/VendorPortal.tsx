@@ -239,9 +239,9 @@ export const VendorPortal: React.FC = () => {
                     <tr className="border-b border-border bg-accent/40 text-[10px] font-bold text-muted-foreground uppercase">
                       <th className="p-3">Item Name</th>
                       <th className="p-3">Qty</th>
-                      <th className="p-3">Unit Price ($)</th>
-                      <th className="p-3">Tax ($)</th>
-                      <th className="p-3">Total ($)</th>
+                      <th className="p-3">Unit Price (₹)</th>
+                      <th className="p-3">Tax (₹)</th>
+                      <th className="p-3">Total (₹)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -287,7 +287,7 @@ export const VendorPortal: React.FC = () => {
                             />
                           </td>
                           <td className="p-3 font-bold text-primary text-xs">
-                            ${lineTotal.toFixed(2)}
+                            ₹{lineTotal.toFixed(2)}
                           </td>
                         </tr>
                       );
@@ -295,7 +295,7 @@ export const VendorPortal: React.FC = () => {
                   </tbody>
                 </table>
                 <div className="p-3 bg-muted/20 flex justify-end font-bold text-sm">
-                  Grand Total: $<span className="text-primary ml-1">
+                  Grand Total: ₹<span className="text-primary ml-1">
                     {selectedRfq.items.reduce((acc: number, item: any) => {
                       const pricing = itemPrices[item.rfq_item_id] || { unit_price: "0", tax_amount: "0" };
                       return acc + (parseFloat(pricing.unit_price || "0") * item.quantity) + parseFloat(pricing.tax_amount || "0");

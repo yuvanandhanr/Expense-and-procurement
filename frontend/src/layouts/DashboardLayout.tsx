@@ -348,7 +348,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       {
         title: "Overview",
         items: [
-          { label: isExecOrAdmin || isCTO ? "Executive Dashboard" : "Dashboard", path: "/", icon: LayoutDashboard, show: true },
+          { label: "Dashboard", path: "/", icon: LayoutDashboard, show: true },
         ],
       },
       {

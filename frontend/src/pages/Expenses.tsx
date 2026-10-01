@@ -22,7 +22,7 @@ const Expenses: React.FC = () => {
     department_id: "",
     cost_center_id: "",
     project_code: "",
-    currency: "USD",
+    currency: "INR",
     justification: ""
   });
 
@@ -75,7 +75,7 @@ const Expenses: React.FC = () => {
     onSuccess: (data) => {
       toast.success("Expense report created!");
       setIsCreateOpen(false);
-      setNewReport({ purpose: "", submission_date: new Date().toISOString().slice(0, 10), department_id: "", cost_center_id: "", project_code: "", currency: "USD", justification: "" });
+      setNewReport({ purpose: "", submission_date: new Date().toISOString().slice(0, 10), department_id: "", cost_center_id: "", project_code: "", currency: "INR", justification: "" });
       setSelectedReportId(data.expense_report_id);
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
     },
@@ -232,7 +232,7 @@ const Expenses: React.FC = () => {
           setSelectedReportId(reportId);
         }
         setIsCreateOpen(false);
-        setNewReport({ purpose: "", submission_date: new Date().toISOString().slice(0, 10), department_id: "", cost_center_id: "", project_code: "", currency: "USD", justification: "" });
+        setNewReport({ purpose: "", submission_date: new Date().toISOString().slice(0, 10), department_id: "", cost_center_id: "", project_code: "", currency: "INR", justification: "" });
         queryClient.invalidateQueries({ queryKey: ["expenses"] });
       } catch (err: any) {
         toast.error(err.response?.data?.detail || "Failed to process expense report");
@@ -826,7 +826,7 @@ const Expenses: React.FC = () => {
                         {editingReceiptId === receipt.receipt_id ? (
                           <div className="flex items-center gap-1.5 bg-muted/80 p-1.5 rounded-xl border border-border">
                             <div className="relative">
-                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-bold">$</span>
+                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-bold">₹</span>
                               <Input
                                 type="number"
                                 className="w-24 pl-6 pr-2 text-right font-bold h-8 text-xs bg-background rounded-lg"

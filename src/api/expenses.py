@@ -299,7 +299,7 @@ async def upload_receipts(
             ):
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Duplicate receipt error: Receipt from '{merchant}' dated {parsed_date} for ${ocr_amount} already exists on this report."
+                    detail=f"Duplicate receipt error: Receipt from '{merchant}' dated {parsed_date} for ₹{ocr_amount} already exists on this report."
                 )
                 
         # Global duplicate check across all reports for this user

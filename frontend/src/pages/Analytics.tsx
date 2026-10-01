@@ -96,7 +96,7 @@ export const Analytics: React.FC = () => {
     labels: monthsList,
     datasets: [
       {
-        label: "Operational Spend ($)",
+        label: "Operational Spend (₹)",
         data: mappedMonthlySpend,
         borderColor: "rgba(59, 130, 246, 1)",
         backgroundColor: "rgba(59, 130, 246, 0.1)",
@@ -411,7 +411,7 @@ export const Analytics: React.FC = () => {
                   <tr className="hover:bg-accent/20 cursor-pointer" onClick={() => navigate("/vendors")}>
                     <td className="p-4 font-bold text-foreground">Dell Technologies</td>
                     <td className="p-4"><Badge variant="success">Active</Badge></td>
-                    <td className="p-4 font-semibold">$54,200</td>
+                    <td className="p-4 font-semibold">₹54,200</td>
                   </tr>
                 )}
               </tbody>
@@ -449,7 +449,7 @@ export const Analytics: React.FC = () => {
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-xs font-semibold">
                     <span className="font-bold text-primary">IT-OPS-2026</span>
-                    <span className="text-muted-foreground">$64,000 / $100,000 (64%)</span>
+                    <span className="text-muted-foreground">₹64,000 / ₹100,000 (64%)</span>
                   </div>
                   <div className="w-full h-2 bg-muted rounded-full overflow-hidden border border-border">
                     <div className="h-full bg-amber-500 w-[64%]" />
@@ -458,7 +458,7 @@ export const Analytics: React.FC = () => {
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-xs font-semibold">
                     <span className="font-bold text-primary">ENG-DEV-2026</span>
-                    <span className="text-muted-foreground">$120,000 / $250,000 (48%)</span>
+                    <span className="text-muted-foreground">₹120,000 / ₹250,000 (48%)</span>
                   </div>
                   <div className="w-full h-2 bg-muted rounded-full overflow-hidden border border-border">
                     <div className="h-full bg-emerald-500 w-[48%]" />

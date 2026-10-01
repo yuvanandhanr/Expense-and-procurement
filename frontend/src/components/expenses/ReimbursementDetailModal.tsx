@@ -176,9 +176,9 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                     const conf = receipt.ocr_confidence != null ? Number(receipt.ocr_confidence) : null;
                     
                     const extractedAmount = (receipt.ocr_amount && Number(receipt.ocr_amount) > 0) 
-                      ? `$₹{Number(receipt.ocr_amount).toFixed(2)}` 
+                      ? `₹${Number(receipt.ocr_amount).toFixed(2)}` 
                       : (receipt.total_amount && Number(receipt.total_amount) > 0) 
-                        ? `$₹{Number(receipt.total_amount).toFixed(2)}`
+                        ? `₹${Number(receipt.total_amount).toFixed(2)}`
                         : "Not detected";
                     
                     const rawUrl = receipt.file_url || receipt.image_path;
