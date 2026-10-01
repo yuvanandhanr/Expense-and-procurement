@@ -126,35 +126,60 @@ async def create_asset(
     if not any(r in ("Admin", "SuperAdmin") for r in user_roles):
         raise HTTPException(status_code=403, detail="Only Admins can create assets manually")
 
-    new_asset = Asset(
-        asset_number=data.asset_number or str(uuid.uuid4())[:8].upper(),
-        asset_tag=data.asset_tag,
-        category_id=data.category_id,
-        po_id=data.po_id,
-        vendor_id=data.vendor_id,
-        serial_number=data.serial_number,
-        model=data.model,
-        manufacturer=data.manufacturer,
-        department_id=data.department_id,
-        purchase_date=data.purchase_date,
-        warranty_expiry=data.warranty_expiry,
-        amc_expiry=data.amc_expiry,
-        location=data.location,
-        cost=data.cost,
-        status=data.status or "Unassigned"
-    )
+    # Check if asset with this tag already exists
+    stmt = select(Asset).where(Asset.asset_tag == data.asset_tag)
+    res = await session.execute(stmt)
+    existing_asset = res.scalar_one_or_none()
     
-    session.add(new_asset)
-    
-    history = AssetHistory(
-        asset=new_asset,
-        action_type="Manual Creation",
-        action_by=current_user.user_id,
-        details="Asset manually created by Admin."
-    )
-    session.add(history)
-    
-    await session.commit()
+    if existing_asset:
+        existing_asset.model = data.model
+        if data.category_id is not None:
+            existing_asset.category_id = data.category_id
+        if data.cost is not None:
+            existing_asset.cost = data.cost
+        if data.status is not None:
+            existing_asset.status = data.status
+            
+        history = AssetHistory(
+            asset=existing_asset,
+            action_type="Manual Update",
+            action_by=current_user.user_id,
+            details="Asset updated via creation endpoint (tag already existed)."
+        )
+        session.add(history)
+        await session.commit()
+        target_asset_id = existing_asset.asset_id
+    else:
+        new_asset = Asset(
+            asset_number=data.asset_number or str(uuid.uuid4())[:8].upper(),
+            asset_tag=data.asset_tag,
+            category_id=data.category_id,
+            po_id=data.po_id,
+            vendor_id=data.vendor_id,
+            serial_number=data.serial_number,
+            model=data.model,
+            manufacturer=data.manufacturer,
+            department_id=data.department_id,
+            purchase_date=data.purchase_date,
+            warranty_expiry=data.warranty_expiry,
+            amc_expiry=data.amc_expiry,
+            location=data.location,
+            cost=data.cost,
+            status=data.status or "Unassigned"
+        )
+        
+        session.add(new_asset)
+        
+        history = AssetHistory(
+            asset=new_asset,
+            action_type="Manual Creation",
+            action_by=current_user.user_id,
+            details="Asset manually created by Admin."
+        )
+        session.add(history)
+        
+        await session.commit()
+        target_asset_id = new_asset.asset_id
     
     # Reload with relationships
     stmt = select(Asset).options(
@@ -163,7 +188,7 @@ async def create_asset(
         selectinload(Asset.assignments),
         selectinload(Asset.history),
         selectinload(Asset.documents)
-    ).where(Asset.asset_id == new_asset.asset_id)
+    ).where(Asset.asset_id == target_asset_id)
     result = await session.execute(stmt)
     return result.scalar_one()
 
