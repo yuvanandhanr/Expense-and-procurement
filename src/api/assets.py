@@ -244,6 +244,10 @@ async def update_asset(
 
     if data.model is not None:
         asset.model = data.model
+    if data.asset_number is not None:
+        asset.asset_number = data.asset_number
+    if data.asset_tag is not None:
+        asset.asset_tag = data.asset_tag
     if data.category_id is not None:
         asset.category_id = data.category_id
     if data.status is not None:

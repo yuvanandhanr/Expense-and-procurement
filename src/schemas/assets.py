@@ -88,6 +88,8 @@ class AssetCreate(BaseModel):
 
 
 class AssetUpdate(BaseModel):
+    asset_number: Optional[str] = None
+    asset_tag: Optional[str] = None
     status: Optional[str] = None
     model: Optional[str] = None
     category_id: Optional[int] = None
@@ -95,7 +97,6 @@ class AssetUpdate(BaseModel):
     cost: Optional[float] = None
     warranty_expiry: Optional[date] = None
     amc_expiry: Optional[date] = None
-    cost: Optional[float] = None
 
 
 class AssetSchema(BaseModel):

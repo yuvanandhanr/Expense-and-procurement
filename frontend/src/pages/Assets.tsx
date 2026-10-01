@@ -23,7 +23,7 @@ export const Assets: React.FC = () => {
   // Add Asset State
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
   const [editingAssetId, setEditingAssetId] = useState<number | null>(null);
-  const [newAsset, setNewAsset] = useState({ name: "", category_id: "", cost: "", status: "Unassigned" });
+  const [newAsset, setNewAsset] = useState({ asset_tag: "", name: "", category_id: "", cost: "", status: "Unassigned" });
 
   const MAIN_CATEGORIES = [
     "All",
@@ -114,7 +114,7 @@ export const Assets: React.FC = () => {
   };
 
   const openAddModal = () => {
-    setNewAsset({ name: "", category_id: "", cost: "", status: "Unassigned" });
+    setNewAsset({ asset_tag: "", name: "", category_id: "", cost: "", status: "Unassigned" });
     setEditingAssetId(null);
     setIsAssetModalOpen(true);
   }
@@ -123,6 +123,7 @@ export const Assets: React.FC = () => {
     // Find category ID from category name
     const cat = categories.find(c => c.name === asset.category);
     setNewAsset({ 
+      asset_tag: asset.asset_code || "",
       name: asset.asset_name || "", 
       category_id: cat?.id?.toString() || "", 
       cost: asset.cost?.toString() || "", 
@@ -133,11 +134,16 @@ export const Assets: React.FC = () => {
   }
 
   const handleSaveAsset = async () => {
-    if (!newAsset.name || !newAsset.category_id || !newAsset.cost || Number(newAsset.cost) <= 0) return;
+    if (!newAsset.asset_tag || !newAsset.name || !newAsset.category_id || !newAsset.cost || Number(newAsset.cost) <= 0) {
+      toast.error("Please fill all required fields");
+      return;
+    }
     setIsSubmitting(true);
     try {
       if (editingAssetId) {
         await api.put(`/assets/${editingAssetId}`, {
+          asset_tag: newAsset.asset_tag,
+          asset_number: newAsset.asset_tag,
           model: newAsset.name,
           status: newAsset.status,
           cost: Number(newAsset.cost),
@@ -146,8 +152,8 @@ export const Assets: React.FC = () => {
         toast.success("Asset updated successfully!");
       } else {
         await api.post(`/assets`, {
-          asset_number: `AST-${Math.floor(Math.random() * 1000000)}`,
-          asset_tag: `TAG-${Math.floor(Math.random() * 1000000)}`,
+          asset_number: newAsset.asset_tag,
+          asset_tag: newAsset.asset_tag,
           model: newAsset.name,
           category_id: Number(newAsset.category_id),
           cost: Number(newAsset.cost),
@@ -183,7 +189,7 @@ export const Assets: React.FC = () => {
   const getMainCategoryCount = (mainCat: string) => {
     if (mainCat === "All") return assets.length;
     const allowedSubcats = SUB_CATEGORIES[mainCat] || [];
-    return assets.filter(a => allowedSubcats.includes(a.category)).length;
+    return assets.filter(a => allowedSubcats.includes(a.category) || a.category === mainCat).length;
   };
 
   const getSubCategoryCount = (subCat: string, mainCat: string) => {
@@ -203,7 +209,7 @@ export const Assets: React.FC = () => {
       return a.category === activeSubCategory;
     } else {
       const allowedSubcats = SUB_CATEGORIES[activeMainCategory] || [];
-      return allowedSubcats.includes(a.category);
+      return allowedSubcats.includes(a.category) || a.category === activeMainCategory;
     }
   });
 
@@ -224,7 +230,7 @@ export const Assets: React.FC = () => {
         matchesCategory = a.category === activeSubCategory;
       } else {
         const allowedSubcats = SUB_CATEGORIES[activeMainCategory] || [];
-        matchesCategory = allowedSubcats.includes(a.category);
+        matchesCategory = allowedSubcats.includes(a.category) || a.category === activeMainCategory;
       }
     }
 
@@ -410,6 +416,10 @@ export const Assets: React.FC = () => {
       {/* Add / Edit Asset Modal */}
       <Dialog isOpen={isAssetModalOpen} onClose={() => setIsAssetModalOpen(false)} title={editingAssetId ? "Edit Asset" : "Add Asset"} description="Fill in the asset details below.">
         <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Asset Tag / Device ID</label>
+            <Input value={newAsset.asset_tag} onChange={e => setNewAsset({ ...newAsset, asset_tag: e.target.value })} placeholder="e.g., AST-1001" disabled={!!editingAssetId} />
+          </div>
           <div>
             <label className="block text-sm font-medium mb-1">Asset Model / Name</label>
             <Input value={newAsset.name} onChange={e => setNewAsset({ ...newAsset, name: e.target.value })} placeholder="e.g., MacBook Pro M3" />
