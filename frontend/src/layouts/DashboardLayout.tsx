@@ -411,7 +411,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         />
         
         {/* Apple Sidebar Header & Logo */}
-        <div className="h-16 flex items-center justify-between px-3 border-b border-border/60 relative z-40 overflow-hidden shrink-0">
+        <div className="h-16 flex items-center justify-between px-3 border-b border-border/60 relative z-40 shrink-0">
           <div className="flex items-center space-x-3 overflow-hidden cursor-pointer" onClick={() => {
             if (isSidebarOpen) {
               setSidebarWidth(64);
@@ -437,7 +437,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
           </div>
 
           {/* Notification Center */}
-          {(() => {
+          {isSidebarOpen && (() => {
             const unreadCount = notifications.filter(n => n.status === "Unread").length;
             return (
               <div className="relative" ref={notificationRef}>
