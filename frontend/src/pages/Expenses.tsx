@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Upload, CheckCircle, XCircle, FileText, AlertCircle, RefreshCw, RupeeSign, Clock, CheckSquare, XOctagon, Trash2, ClipboardList, Building, Briefcase, Eye } from "lucide-react";
+import { Plus, Upload, CheckCircle, XCircle, FileText, AlertCircle, RefreshCw, IndianRupee, Clock, CheckSquare, XOctagon, Trash2, ClipboardList, Building, Briefcase, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "../services/api";
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Skeleton, Badge, StatusBadge, Dialog, HeroTimestamp, EmptyState } from "../components/ui";
