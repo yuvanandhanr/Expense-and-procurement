@@ -9,6 +9,7 @@ export const MyAssets: React.FC = () => {
   const [assets, setAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"Assets" | "Incidents">("Assets");
+  const [statusFilter, setStatusFilter] = useState("All");
 
   const [incidents, setIncidents] = useState<any[]>([]);
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
@@ -125,6 +126,29 @@ export const MyAssets: React.FC = () => {
     }
   };
 
+  const subTabCounts: Record<string, number> = {
+    All: incidents.length,
+    Draft: incidents.filter((i: any) => i.status === "Draft").length,
+    Submitted: incidents.filter((i: any) => {
+      const s = i.status.toLowerCase();
+      return s.includes("pending") || s.includes("reported") || s.includes("approved") || s.includes("waiting") || s.includes("repair");
+    }).length,
+    Approved: incidents.filter((i: any) => i.status === "Resolved / Completed" || i.status === "Closed").length,
+    Rejected: incidents.filter((i: any) => i.status === "Rejected").length,
+    "Return for Correction": incidents.filter((i: any) => i.status === "Returned for Correction").length,
+  };
+
+  const filteredIncidents = incidents.filter((i: any) => {
+    if (statusFilter === "All") return true;
+    if (statusFilter === "Submitted") {
+      const s = i.status.toLowerCase();
+      return s.includes("pending") || s.includes("reported") || s.includes("approved") || s.includes("waiting") || s.includes("repair");
+    }
+    if (statusFilter === "Approved") return i.status === "Resolved / Completed" || i.status === "Closed";
+    if (statusFilter === "Return for Correction") return i.status === "Returned for Correction";
+    return i.status === statusFilter;
+  });
+
   return (
     <div className="space-y-6">
       <div>
@@ -213,11 +237,33 @@ export const MyAssets: React.FC = () => {
         )}
 
         {activeTab === "Incidents" && (
-        <Card>
-          <CardContent className="p-0">
-            {incidents.length === 0 ? (
-              <EmptyState title="No incidents reported." description="You haven't reported any asset issues." />
-            ) : (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center space-x-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50 gap-y-2">
+            {["All", "Draft", "Submitted", "Approved", "Rejected", "Return for Correction"].map((status) => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
+                  statusFilter === status
+                    ? "bg-primary text-primary-foreground shadow-sm font-bold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                }`}
+              >
+                <span>{status}</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                  statusFilter === status ? "bg-primary-foreground/20 text-primary-foreground font-bold" : "bg-muted text-muted-foreground"
+                }`}>
+                  {subTabCounts[status]}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <Card>
+            <CardContent className="p-0">
+              {filteredIncidents.length === 0 ? (
+                <EmptyState title="No incidents found." description={`There are no incidents matching "${statusFilter}".`} />
+              ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm border-collapse">
                   <thead>
@@ -230,7 +276,7 @@ export const MyAssets: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {incidents.map((inc: any) => (
+                    {filteredIncidents.map((inc: any) => (
                       <tr key={inc.incident_id} className="hover:bg-accent/20">
                         <td className="p-4 font-bold text-xs tracking-wider text-primary">#{inc.incident_id}</td>
                         <td className="p-4 text-xs font-semibold">{inc.incident_type}</td>
@@ -258,8 +304,9 @@ export const MyAssets: React.FC = () => {
             )}
           </CardContent>
         </Card>
-        )}
       </div>
+      )}
+    </div>
 
       <Dialog isOpen={isIncidentModalOpen} onClose={() => setIsIncidentModalOpen(false)} title="Report Asset Issue">
         <form onSubmit={(e) => submitIncident(e, false)} className="space-y-4">
