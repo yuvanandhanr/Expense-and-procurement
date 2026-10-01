@@ -115,6 +115,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       const interval = setInterval(fetchNotifications, 60000);
       return () => clearInterval(interval);
     }
+    return undefined;
   }, [user]);
 
   // Click outside listener to close notification, profile, and search dropdowns
@@ -248,6 +249,37 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       );
     } catch (err) {
       console.error("Error marking notification read:", err);
+    }
+  };
+
+  const handleNotificationClick = async (n: Notification, isUnread: boolean) => {
+    if (isUnread) {
+      await markAsRead(n.notification_id);
+    }
+    
+    setIsNotificationOpen(false);
+    
+    const title = n.title.toLowerCase();
+    const message = n.message.toLowerCase();
+    
+    if (title.includes("approval") || message.includes("approval")) {
+      navigate("/approvals");
+    } else if (title.includes("expense") || message.includes("expense") || title.includes("exp-")) {
+      navigate("/expenses");
+    } else if (title.includes("invoice") || message.includes("invoice") || title.includes("inv-")) {
+      navigate("/invoices");
+    } else if (title.includes("pr ") || title.includes("requisition") || title.includes("pr-")) {
+      navigate("/prs");
+    } else if (title.includes("po ") || title.includes("purchase order") || title.includes("po-")) {
+      navigate("/pos");
+    } else if (title.includes("vendor")) {
+      navigate("/vendors");
+    } else if (title.includes("rfq") || title.includes("quotation")) {
+      navigate("/rfqs");
+    } else if (title.includes("grn") || title.includes("delivery")) {
+      navigate("/grns");
+    } else {
+      navigate("/approvals"); 
     }
   };
 
@@ -838,10 +870,10 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
                             return (
                               <div
                                 key={n.notification_id}
-                                onClick={() => isUnread && markAsRead(n.notification_id)}
-                                className={`p-3.5 text-xs transition-all duration-200 relative group flex gap-3 ${
+                                onClick={() => handleNotificationClick(n, isUnread)}
+                                className={`p-3.5 text-xs transition-all duration-200 relative group flex gap-3 cursor-pointer ${
                                   isUnread
-                                    ? "bg-primary/8 dark:bg-primary/15 hover:bg-primary/12 border-l-4 border-primary cursor-pointer shadow-sm"
+                                    ? "bg-primary/8 dark:bg-primary/15 hover:bg-primary/12 border-l-4 border-primary shadow-sm"
                                     : "bg-transparent hover:bg-muted/30 opacity-60 hover:opacity-100 border-l-4 border-transparent"
                                 }`}
                               >
