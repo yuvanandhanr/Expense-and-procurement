@@ -23,7 +23,7 @@ export const Assets: React.FC = () => {
   // Add Asset State
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
   const [editingAssetId, setEditingAssetId] = useState<number | null>(null);
-  const [newAsset, setNewAsset] = useState({ asset_tag: "", name: "", category_id: "", cost: "", status: "Unassigned" });
+  const [newAsset, setNewAsset] = useState({ asset_tag: "", name: "", main_category: "", sub_category: "", cost: "", status: "Unassigned" });
 
   const MAIN_CATEGORIES = [
     "All",
@@ -114,18 +114,32 @@ export const Assets: React.FC = () => {
   };
 
   const openAddModal = () => {
-    setNewAsset({ asset_tag: "", name: "", category_id: "", cost: "", status: "Unassigned" });
+    setNewAsset({ asset_tag: "", name: "", main_category: "", sub_category: "", cost: "", status: "Unassigned" });
     setEditingAssetId(null);
     setIsAssetModalOpen(true);
   }
 
   const openEditModal = (asset: any) => {
-    // Find category ID from category name
-    const cat = categories.find(c => c.name === asset.category);
+    let mainCat = "";
+    let subCat = "";
+    
+    if (MAIN_CATEGORIES.includes(asset.category)) {
+      mainCat = asset.category;
+    } else {
+      for (const [main, subs] of Object.entries(SUB_CATEGORIES)) {
+        if (subs.includes(asset.category)) {
+          mainCat = main;
+          subCat = asset.category;
+          break;
+        }
+      }
+    }
+
     setNewAsset({ 
       asset_tag: asset.asset_code || "",
       name: asset.asset_name || "", 
-      category_id: cat?.id?.toString() || "", 
+      main_category: mainCat,
+      sub_category: subCat,
       cost: asset.cost?.toString() || "", 
       status: asset.status || "Unassigned" 
     });
@@ -134,7 +148,11 @@ export const Assets: React.FC = () => {
   }
 
   const handleSaveAsset = async () => {
-    if (!newAsset.asset_tag || !newAsset.name || !newAsset.category_id || !newAsset.cost || Number(newAsset.cost) <= 0) {
+    const selectedCategoryName = newAsset.sub_category || newAsset.main_category;
+    const cat = categories.find(c => c.name === selectedCategoryName) || categories.find(c => c.name === newAsset.main_category);
+    const categoryId = cat?.id;
+
+    if (!newAsset.asset_tag || !newAsset.name || !categoryId || !newAsset.cost || Number(newAsset.cost) <= 0) {
       toast.error("Please fill all required fields");
       return;
     }
@@ -147,7 +165,7 @@ export const Assets: React.FC = () => {
           model: newAsset.name,
           status: newAsset.status,
           cost: Number(newAsset.cost),
-          category_id: Number(newAsset.category_id)
+          category_id: Number(categoryId)
         });
         toast.success("Asset updated successfully!");
       } else {
@@ -155,7 +173,7 @@ export const Assets: React.FC = () => {
           asset_number: newAsset.asset_tag,
           asset_tag: newAsset.asset_tag,
           model: newAsset.name,
-          category_id: Number(newAsset.category_id),
+          category_id: Number(categoryId),
           cost: Number(newAsset.cost),
           status: newAsset.status
         });
@@ -418,7 +436,7 @@ export const Assets: React.FC = () => {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Asset Tag / Device ID</label>
-            <Input value={newAsset.asset_tag} onChange={e => setNewAsset({ ...newAsset, asset_tag: e.target.value })} placeholder="e.g., AST-1001" disabled={!!editingAssetId} />
+            <Input value={newAsset.asset_tag} onChange={e => setNewAsset({ ...newAsset, asset_tag: e.target.value })} placeholder="e.g., AST-1001" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Asset Model / Name</label>
@@ -426,13 +444,30 @@ export const Assets: React.FC = () => {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Category</label>
-            <Select value={newAsset.category_id} onChange={e => setNewAsset({ ...newAsset, category_id: e.target.value })}>
+            <Select 
+              value={newAsset.main_category} 
+              onChange={e => setNewAsset({ ...newAsset, main_category: e.target.value, sub_category: "" })}
+            >
               <option value="">Select a category</option>
-              {(categories || []).map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+              {MAIN_CATEGORIES.filter(c => c !== "All").map(c => (
+                <option key={c} value={c}>{c}</option>
               ))}
             </Select>
           </div>
+          {newAsset.main_category && SUB_CATEGORIES[newAsset.main_category] && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Subcategory</label>
+              <Select 
+                value={newAsset.sub_category} 
+                onChange={e => setNewAsset({ ...newAsset, sub_category: e.target.value })}
+              >
+                <option value="">Select a subcategory</option>
+                {SUB_CATEGORIES[newAsset.main_category].filter(c => c !== "All").map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </Select>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium mb-1">Cost ($)</label>
             <Input type="number" value={newAsset.cost} onChange={e => setNewAsset({ ...newAsset, cost: e.target.value })} placeholder="0.00" />
