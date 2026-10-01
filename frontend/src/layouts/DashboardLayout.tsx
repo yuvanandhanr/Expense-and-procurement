@@ -709,8 +709,8 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
           <div className="flex items-center space-x-3">
             {/* Apple Minimalist Quick Search with Live Dropdown */}
             <div className="hidden lg:block relative" ref={searchContainerRef}>
-              <form onSubmit={handleGlobalSearch} className="flex items-center relative">
-                <Search className="w-3.5 h-3.5 absolute left-3.5 text-muted-foreground/60" />
+              <form onSubmit={handleGlobalSearch} className="flex items-center w-60 focus-within:w-80 rounded-full bg-background/80 backdrop-blur-md border border-border/80 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/40 transition-all duration-300 shadow-inner">
+                <Search className="w-3.5 h-3.5 ml-3.5 text-muted-foreground/60 shrink-0 pointer-events-none" />
                 <input
                   ref={searchInputRef}
                   type="text"
@@ -721,7 +721,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
                     setSearchQuery(e.target.value);
                     setIsSearchOpen(true);
                   }}
-                  className="pl-9 pr-8 py-1.5 w-60 rounded-full bg-background/80 backdrop-blur-md border border-border/80 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary focus:w-80 transition-all duration-300 shadow-inner placeholder:text-muted-foreground/50"
+                  className="w-full pl-2 pr-8 py-1.5 text-xs bg-transparent focus:outline-none placeholder:text-muted-foreground/50"
                 />
                 <span className="absolute right-3 text-[10px] font-mono text-muted-foreground/50 flex items-center">
                   <Command className="w-2.5 h-2.5 mr-0.5" />K

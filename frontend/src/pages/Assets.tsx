@@ -394,14 +394,14 @@ export const Assets: React.FC = () => {
           </div>
 
           {/* Search Bar */}
-          <div className="relative w-full max-w-sm xl:max-w-[260px] xl:ml-auto shrink-0">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <div className="flex items-center w-full max-w-sm xl:max-w-[260px] xl:ml-auto shrink-0 bg-background/50 hover:bg-background focus-within:bg-background focus-within:ring-2 focus-within:ring-primary/20 rounded-xl border border-border/50 transition-all shadow-sm">
+            <Search className="w-4 h-4 ml-3 text-muted-foreground shrink-0 pointer-events-none" />
             <input 
               type="text" 
               placeholder="Search by tag or name..." 
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-1.5 text-sm rounded-xl border border-border/50 bg-background/50 hover:bg-background focus:bg-background focus:ring-2 focus:ring-primary/20 outline-none transition-all shadow-sm"
+              className="w-full pl-2 pr-4 py-1.5 text-sm bg-transparent outline-none"
             />
           </div>
         </div>
@@ -555,14 +555,14 @@ export const Assets: React.FC = () => {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Search Employee</label>
-            <div className="relative mb-2">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <div className="flex items-center mb-2 bg-background border border-border rounded-lg focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+              <Search className="w-4 h-4 ml-3 text-muted-foreground shrink-0 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search by name or role..."
                 value={assigneeSearchQuery}
                 onChange={e => setAssigneeSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-border bg-background outline-none"
+                className="w-full pl-2 pr-4 py-2 text-sm bg-transparent outline-none"
               />
             </div>
             <div className="border border-border rounded-lg max-h-48 overflow-y-auto bg-card">
