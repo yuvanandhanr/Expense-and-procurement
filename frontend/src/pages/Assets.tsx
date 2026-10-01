@@ -392,26 +392,24 @@ export const Assets: React.FC = () => {
               </button>
             ))}
           </div>
+
+          {/* Search Bar */}
+          <div className="relative w-full max-w-sm xl:max-w-[260px] xl:ml-auto shrink-0">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input 
+              type="text" 
+              placeholder="Search by tag or name..." 
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-4 py-1.5 text-sm rounded-xl border border-border/50 bg-background/50 hover:bg-background focus:bg-background focus:ring-2 focus:ring-primary/20 outline-none transition-all shadow-sm"
+            />
+          </div>
         </div>
       </div>
 
       <div className="flex-1 space-y-4">
           <Card>
             <CardContent className="p-0">
-              {/* Filters Bar */}
-              <div className="p-4 border-b border-border bg-accent/10 flex items-center justify-between">
-                <div className="relative max-w-[260px] w-full">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input 
-                    type="text" 
-                    placeholder="Search by tag or name..." 
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-border bg-background focus:ring-2 focus:ring-violet outline-none"
-                  />
-                </div>
-              </div>
-
               {loading ? (
                 <div className="p-6 space-y-4">
                   <Skeleton className="h-8 w-full rounded-lg" />
