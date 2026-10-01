@@ -230,13 +230,6 @@ export const Users: React.FC = () => {
                           >
                             Edit
                           </Button>
-                          <Button 
-                            variant={user.is_locked ? "outline" : "danger"} 
-                            size="sm" 
-                            onClick={() => handleToggleLock(user)}
-                          >
-                            {user.is_locked ? "Unlock" : "Lock"}
-                          </Button>
                           <Button
                             variant="danger"
                             size="sm"
