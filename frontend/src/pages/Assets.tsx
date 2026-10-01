@@ -127,9 +127,9 @@ export const Assets: React.FC = () => {
       mainCat = asset.category;
     } else {
       for (const [main, subs] of Object.entries(SUB_CATEGORIES)) {
-        if (subs.includes(asset.category)) {
+        if (subs.map(s => s.toLowerCase()).includes((asset.category || "").toLowerCase())) {
           mainCat = main;
-          subCat = asset.category;
+          subCat = subs.find(s => s.toLowerCase() === (asset.category || "").toLowerCase()) || asset.category;
           break;
         }
       }
@@ -149,7 +149,8 @@ export const Assets: React.FC = () => {
 
   const handleSaveAsset = async () => {
     const selectedCategoryName = newAsset.sub_category || newAsset.main_category;
-    const cat = categories.find(c => c.name === selectedCategoryName) || categories.find(c => c.name === newAsset.main_category);
+    const cat = categories.find(c => (c.name || "").toLowerCase() === selectedCategoryName.toLowerCase()) 
+             || categories.find(c => (c.name || "").toLowerCase() === newAsset.main_category.toLowerCase());
     const categoryId = cat?.id;
 
     if (!newAsset.asset_tag || !newAsset.name || !categoryId || !newAsset.cost || Number(newAsset.cost) <= 0) {
@@ -206,13 +207,16 @@ export const Assets: React.FC = () => {
 
   const getMainCategoryCount = (mainCat: string) => {
     if (mainCat === "All") return assets.length;
-    const allowedSubcats = SUB_CATEGORIES[mainCat] || [];
-    return assets.filter(a => allowedSubcats.includes(a.category) || a.category === mainCat).length;
+    const allowedSubcats = (SUB_CATEGORIES[mainCat] || []).map(s => s.toLowerCase());
+    return assets.filter(a => {
+      const cat = (a.category || "").toLowerCase();
+      return allowedSubcats.includes(cat) || cat === mainCat.toLowerCase();
+    }).length;
   };
 
   const getSubCategoryCount = (subCat: string, mainCat: string) => {
     if (subCat === "All") return getMainCategoryCount(mainCat);
-    return assets.filter(a => a.category === subCat).length;
+    return assets.filter(a => (a.category || "").toLowerCase() === subCat.toLowerCase()).length;
   };
 
   const handleMainCategoryChange = (mainCat: string) => {
@@ -222,12 +226,13 @@ export const Assets: React.FC = () => {
 
   // We only count based on the current category filter so the counts are accurate for the current view
   const categoryFilteredAssets = assets.filter(a => {
+    const cat = (a.category || "").toLowerCase();
     if (activeMainCategory === "All") return true;
     if (activeSubCategory !== "All") {
-      return a.category === activeSubCategory;
+      return cat === activeSubCategory.toLowerCase();
     } else {
-      const allowedSubcats = SUB_CATEGORIES[activeMainCategory] || [];
-      return allowedSubcats.includes(a.category) || a.category === activeMainCategory;
+      const allowedSubcats = (SUB_CATEGORIES[activeMainCategory] || []).map(s => s.toLowerCase());
+      return allowedSubcats.includes(cat) || cat === activeMainCategory.toLowerCase();
     }
   });
 
@@ -243,12 +248,13 @@ export const Assets: React.FC = () => {
                           a.asset_name.toLowerCase().includes(searchTerm.toLowerCase());
     
     let matchesCategory = true;
+    const cat = (a.category || "").toLowerCase();
     if (activeMainCategory !== "All") {
       if (activeSubCategory !== "All") {
-        matchesCategory = a.category === activeSubCategory;
+        matchesCategory = cat === activeSubCategory.toLowerCase();
       } else {
-        const allowedSubcats = SUB_CATEGORIES[activeMainCategory] || [];
-        matchesCategory = allowedSubcats.includes(a.category) || a.category === activeMainCategory;
+        const allowedSubcats = (SUB_CATEGORIES[activeMainCategory] || []).map(s => s.toLowerCase());
+        matchesCategory = allowedSubcats.includes(cat) || cat === activeMainCategory.toLowerCase();
       }
     }
 
