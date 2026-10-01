@@ -4,7 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { api } from "../services/api";
 import { Card, CardHeader, CardTitle, CardContent, Skeleton, Badge, HeroTimestamp, StatusBadge } from "../components/ui";
 import { formatDate } from "../utils/helpers";
-import { HardDrive, Receipt, FileText, CheckCircle, Clock, AlertCircle, TrendingUp, DollarSign, ShieldCheck, ArrowUpRight, ChevronRight, Info } from "lucide-react";
+import { HardDrive, Receipt, FileText, CheckCircle, Clock, AlertCircle, TrendingUp, RupeeSign, ShieldCheck, ArrowUpRight, ChevronRight, Info } from "lucide-react";
 
 export const Dashboard: React.FC = () => {
   const { user, hasRole } = useAuth();
@@ -152,7 +152,7 @@ export const Dashboard: React.FC = () => {
               <div className="flex items-center gap-1.5">
                 <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-[#0071E3] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
                 <div className="w-8 h-8 rounded-xl bg-[#0071E3]/10 flex items-center justify-center text-[#0071E3] group-hover:scale-110 transition-transform">
-                  <DollarSign className="w-4 h-4" />
+                  <RupeeSign className="w-4 h-4" />
                 </div>
               </div>
             </div>

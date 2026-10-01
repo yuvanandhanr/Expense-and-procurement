@@ -44,7 +44,7 @@ class POService:
                 detail=f"Vendor contract '{expired_contract.contract_number}' is expired. Cannot create Purchase Order."
             )
 
-        # Business Rule: High-value purchases (> $10,000) require minimum three vendor quotations,
+        # Business Rule: High-value purchases (> ₹10,000) require minimum three vendor quotations,
         # unless an existing rate contract is bypass-valid.
         pr_total = Decimal("0.00")
         has_rate_contract = True
@@ -76,13 +76,13 @@ class POService:
                 if len(quotes) < 3:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"High-value purchase exceeds $10,000 and requires at least 3 vendor quotations. Currently submitted: {len(quotes)}"
+                        detail=f"High-value purchase exceeds ₹10,000 and requires at least 3 vendor quotations. Currently submitted: {len(quotes)}"
                     )
             elif pr_total > Decimal("10000.00"):
                 # Missing RFQ completely on high-value
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="High-value purchase exceeds $10,000 and requires RFQ with at least 3 vendor quotations."
+                    detail="High-value purchase exceeds ₹10,000 and requires RFQ with at least 3 vendor quotations."
                 )
 
         po = PurchaseOrder(
@@ -137,7 +137,7 @@ class POService:
         if not po:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PO not found")
 
-        # Business Rule: Procurement Manager approval required. High-value PO (> $50,000) requires CFO approval.
+        # Business Rule: Procurement Manager approval required. High-value PO (> ₹50,000) requires CFO approval.
         # CFO role_id fallback is mapped dynamically (e.g. role_id = 4).
         # We record the approval step
         approval = POApproval(

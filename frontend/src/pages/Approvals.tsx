@@ -278,7 +278,7 @@ export const Approvals: React.FC = () => {
                 <tr key={wf.workflow_id} className="hover:bg-muted/50 transition-colors">
                   <td className="p-4 font-semibold">EXP-{wf.entity_id}</td>
                   <td className="p-4 font-medium max-w-[200px] truncate" title={wf.title}>{wf.title?.replace('Expense: ', '')}</td>
-                  <td className="p-4 font-bold tracking-tight">${Number(wf.amount || 0).toFixed(2)}</td>
+                  <td className="p-4 font-bold tracking-tight">₹{Number(wf.amount || 0).toFixed(2)}</td>
                   <td className="p-4">
                     <StatusBadge status={wf.status} />
                   </td>

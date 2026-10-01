@@ -450,7 +450,7 @@ export const Assets: React.FC = () => {
                             })()}
                           </td>
                           {canViewAll && <td className="p-4 text-xs font-semibold">{a.assigned_to_name || "Unassigned"}</td>}
-                          {canViewCost && <td className="p-4 font-mono">${a.cost?.toLocaleString()}</td>}
+                          {canViewCost && <td className="p-4 font-mono">₹{a.cost?.toLocaleString()}</td>}
                           <td className="p-4">
                             <Badge 
                               variant={

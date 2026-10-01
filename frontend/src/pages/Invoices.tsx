@@ -167,7 +167,7 @@ export const Invoices: React.FC = () => {
                       <td className="p-4 font-semibold text-primary whitespace-nowrap">{inv.invoice_number}</td>
                       <td className="p-4 whitespace-nowrap">{inv.vendor_name || `Vendor #${inv.vendor_id}`}</td>
                       <td className="p-4 text-muted-foreground whitespace-nowrap">{formatDate(inv.invoice_date)}</td>
-                      <td className="p-4 font-mono font-semibold whitespace-nowrap">${Number(inv.grand_total || 0).toLocaleString('en-US')}</td>
+                      <td className="p-4 font-mono font-semibold whitespace-nowrap">₹{Number(inv.grand_total || 0).toLocaleString('en-US')}</td>
                       <td className="p-4 whitespace-nowrap">
                         <StatusBadge status={inv.status} />
                       </td>
@@ -212,7 +212,7 @@ export const Invoices: React.FC = () => {
               <option value="">-- No PO Linked --</option>
               {availablePOs.map((po) => (
                 <option key={po.po_id} value={po.po_id}>
-                  {po.po_number} - ${Number(po.total_amount).toLocaleString()}
+                  {po.po_number} - ₹{Number(po.total_amount).toLocaleString()}
                 </option>
               ))}
             </select>
@@ -258,7 +258,7 @@ export const Invoices: React.FC = () => {
                 </div>
                 <div className="space-y-1 text-sm">
                   <p><span className="text-muted-foreground">PO Number:</span> {generateMatchDetails(selectedInvoice).po.number}</p>
-                  <p><span className="text-muted-foreground">Amount:</span> <span className="font-mono font-semibold">${generateMatchDetails(selectedInvoice).po.amount.toLocaleString()}</span></p>
+                  <p><span className="text-muted-foreground">Amount:</span> <span className="font-mono font-semibold">₹{generateMatchDetails(selectedInvoice).po.amount.toLocaleString()}</span></p>
                 </div>
               </div>
 
@@ -290,7 +290,7 @@ export const Invoices: React.FC = () => {
                   <p>
                     <span className="text-muted-foreground">Amount:</span> 
                     <span className={`ml-1 font-mono font-semibold ${selectedInvoice.matching_status === 'Discrepancy' ? 'text-destructive' : ''}`}>
-                      ${Number(generateMatchDetails(selectedInvoice).inv.grand_total || 0).toLocaleString('en-US')}
+                      ₹{Number(generateMatchDetails(selectedInvoice).inv.grand_total || 0).toLocaleString('en-US')}
                     </span>
                   </p>
                 </div>

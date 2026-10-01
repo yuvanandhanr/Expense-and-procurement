@@ -120,7 +120,7 @@ export const Quotations: React.FC = () => {
                                 <tr key={q.quotation_id} className="hover:bg-accent/10">
                                   <td className="p-3 pl-4 font-medium whitespace-nowrap">{(q as any).vendor?.vendor_name || `Vendor #${q.vendor_id}`}</td>
                                   <td className="p-3 font-mono text-muted-foreground whitespace-nowrap">#QT-{q.quotation_id}</td>
-                                  <td className="p-3 font-bold text-primary whitespace-nowrap">${Number(q.total_amount).toLocaleString()}</td>
+                                  <td className="p-3 font-bold text-primary whitespace-nowrap">₹{Number(q.total_amount).toLocaleString()}</td>
                                   <td className="p-3 whitespace-nowrap">{q.lead_time_days} days</td>
                                   <td className="p-3 whitespace-nowrap">
                                     <StatusBadge status={statusDisplay} />

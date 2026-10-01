@@ -192,7 +192,7 @@ export const VendorPortal: React.FC = () => {
                       <tr key={q.quotation_id} className="hover:bg-accent/10">
                         <td className="p-4 font-mono font-bold text-xs">#QT-{q.quotation_id}</td>
                         <td className="p-4 font-mono text-xs">#RFQ-{q.rfq_id}</td>
-                        <td className="p-4 font-bold text-primary">${q.total_amount?.toLocaleString()}</td>
+                        <td className="p-4 font-bold text-primary">₹{q.total_amount?.toLocaleString()}</td>
                         <td className="p-4 text-xs">{q.lead_time_days} days</td>
                         <td className="p-4">
                           <Badge 

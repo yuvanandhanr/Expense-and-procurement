@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Upload, CheckCircle, XCircle, FileText, AlertCircle, RefreshCw, DollarSign, Clock, CheckSquare, XOctagon, Trash2, ClipboardList, Building, Briefcase, Eye } from "lucide-react";
+import { Plus, Upload, CheckCircle, XCircle, FileText, AlertCircle, RefreshCw, RupeeSign, Clock, CheckSquare, XOctagon, Trash2, ClipboardList, Building, Briefcase, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "../services/api";
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Skeleton, Badge, StatusBadge, Dialog, HeroTimestamp, EmptyState } from "../components/ui";
@@ -395,7 +395,7 @@ const Expenses: React.FC = () => {
                         <div className="text-xs text-muted-foreground truncate max-w-[200px]">{report.justification}</div>
                       </td>
                       <td className="p-4 font-bold text-foreground">
-                        ${Number(report.total_amount).toFixed(2)}
+                        ₹{Number(report.total_amount).toFixed(2)}
                       </td>
                       <td className="p-4">
                         {getStatusBadge(report.status)}
@@ -571,7 +571,7 @@ const Expenses: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <div className="text-3xl font-black text-blue-600">
-                    ${Number(report.total_amount).toFixed(2)}
+                    ₹{Number(report.total_amount).toFixed(2)}
                   </div>
                   <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">Verified Total</div>
                 </div>
@@ -816,7 +816,7 @@ const Expenses: React.FC = () => {
                         </div>
                         {report.status !== "Draft" && (
                           <div className="text-[11px] text-muted-foreground mt-1.5 font-medium">
-                            OCR Extracted: ${Number(receipt.ocr_amount).toFixed(2)}
+                            OCR Extracted: ₹{Number(receipt.ocr_amount).toFixed(2)}
                           </div>
                         )}
                       </div>
@@ -846,7 +846,7 @@ const Expenses: React.FC = () => {
                               title={report.status === "Draft" || (report.status === "Returned for Correction" && isOwner(report)) ? "Click to correct amount" : ""}
                             >
                               <span className="text-xl font-extrabold text-foreground tracking-tight">
-                                ${Number(receipt.verified_amount).toFixed(2)}
+                                ₹{Number(receipt.verified_amount).toFixed(2)}
                               </span>
                               {(report.status === "Draft" || (report.status === "Returned for Correction" && isOwner(report))) && (
                                 <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider mt-0.5">
@@ -903,7 +903,7 @@ const Expenses: React.FC = () => {
           </div>
           <div className="flex justify-between items-center text-sm mt-2">
             <span className="text-muted-foreground">Calculated Claim Total:</span>
-            <span className="text-xl font-bold text-primary">${Number(report.total_amount).toFixed(2)}</span>
+            <span className="text-xl font-bold text-primary">₹{Number(report.total_amount).toFixed(2)}</span>
           </div>
         </div>
 
@@ -911,7 +911,7 @@ const Expenses: React.FC = () => {
           <div className="bg-rose-50 text-rose-700 p-3 rounded-lg border border-rose-200 flex items-start gap-2">
             <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
             <div>
-              <strong>Action Required:</strong> You have {unverified} receipt(s) with an unverified or $0.00 amount. Please review and correct the amounts before submission.
+              <strong>Action Required:</strong> You have {unverified} receipt(s) with an unverified or ₹0.00 amount. Please review and correct the amounts before submission.
             </div>
           </div>
         )}
