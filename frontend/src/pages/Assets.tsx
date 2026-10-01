@@ -389,7 +389,17 @@ export const Assets: React.FC = () => {
                         <tr key={a.asset_id} className="hover:bg-accent/10 transition-colors">
                           <td className="p-4 font-bold text-xs tracking-wider text-primary">{a.asset_code}</td>
                           <td className="p-4 font-semibold">{a.asset_name}</td>
-                          <td className="p-4 text-muted-foreground">{a.category}</td>
+                          <td className="p-4 text-muted-foreground">
+                            {(() => {
+                              if (MAIN_CATEGORIES.includes(a.category)) return a.category;
+                              for (const [main, subs] of Object.entries(SUB_CATEGORIES)) {
+                                if (subs.map(s => s.toLowerCase()).includes((a.category || "").toLowerCase())) {
+                                  return `${main} > ${a.category}`;
+                                }
+                              }
+                              return a.category;
+                            })()}
+                          </td>
                           {canViewAll && <td className="p-4 text-xs font-semibold">{a.assigned_to_name || "Unassigned"}</td>}
                           {canViewCost && <td className="p-4 font-mono">${a.cost?.toLocaleString()}</td>}
                           <td className="p-4">
