@@ -4,7 +4,39 @@ import { Asset, User } from "../types";
 import { Card, CardContent, Badge, Skeleton, Button, Dialog, EmptyState, Input, Select } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
-import { ArrowRightLeft, Filter, Plus, Search, Edit2, Layers, CheckCircle2, AlertCircle, Package } from "lucide-react";
+import { ArrowRightLeft, Filter, Plus, Search, Edit2, Layers, CheckCircle2, AlertCircle, Package, ChevronLeft, ChevronRight } from "lucide-react";
+
+const ScrollableRow = ({ children, className = "" }: { children: React.ReactNode, className?: string }) => {
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const scroll = (offset: number) => {
+    if (scrollRef.current) scrollRef.current.scrollBy({ left: offset, behavior: 'smooth' });
+  };
+  
+  return (
+    <div className={`relative group flex items-center w-full ${className}`}>
+      <button 
+        onClick={() => scroll(-300)} 
+        className="absolute left-0 z-10 p-1 m-1 bg-background/95 backdrop-blur-sm border border-border shadow-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted focus:outline-none"
+      >
+        <ChevronLeft className="w-4 h-4 text-foreground"/>
+      </button>
+      
+      <div 
+        ref={scrollRef} 
+        className="flex items-center gap-1.5 bg-muted/40 p-1.5 rounded-xl w-full border border-border/50 overflow-x-auto flex-nowrap scrollbar-hide scroll-smooth"
+      >
+        {children}
+      </div>
+      
+      <button 
+        onClick={() => scroll(300)} 
+        className="absolute right-0 z-10 p-1 m-1 bg-background/95 backdrop-blur-sm border border-border shadow-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted focus:outline-none"
+      >
+        <ChevronRight className="w-4 h-4 text-foreground"/>
+      </button>
+    </div>
+  );
+};
 
 export const Assets: React.FC = () => {
   const { user } = useAuth();
@@ -23,7 +55,7 @@ export const Assets: React.FC = () => {
   // Add Asset State
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
   const [editingAssetId, setEditingAssetId] = useState<number | null>(null);
-  const [newAsset, setNewAsset] = useState({ asset_tag: "", name: "", category_id: "", cost: "", status: "Unassigned" });
+  const [newAsset, setNewAsset] = useState({ asset_tag: "", name: "", main_category: "", sub_category: "", cost: "", status: "Unassigned" });
 
   const MAIN_CATEGORIES = [
     "All",
@@ -114,18 +146,32 @@ export const Assets: React.FC = () => {
   };
 
   const openAddModal = () => {
-    setNewAsset({ asset_tag: "", name: "", category_id: "", cost: "", status: "Unassigned" });
+    setNewAsset({ asset_tag: "", name: "", main_category: "", sub_category: "", cost: "", status: "Unassigned" });
     setEditingAssetId(null);
     setIsAssetModalOpen(true);
   }
 
   const openEditModal = (asset: any) => {
-    // Find category ID from category name
-    const cat = categories.find(c => c.name === asset.category);
+    let mainCat = "";
+    let subCat = "";
+    
+    if (MAIN_CATEGORIES.includes(asset.category)) {
+      mainCat = asset.category;
+    } else {
+      for (const [main, subs] of Object.entries(SUB_CATEGORIES)) {
+        if (subs.map(s => s.toLowerCase()).includes((asset.category || "").toLowerCase())) {
+          mainCat = main;
+          subCat = subs.find(s => s.toLowerCase() === (asset.category || "").toLowerCase()) || asset.category;
+          break;
+        }
+      }
+    }
+
     setNewAsset({ 
       asset_tag: asset.asset_code || "",
       name: asset.asset_name || "", 
-      category_id: cat?.id?.toString() || "", 
+      main_category: mainCat,
+      sub_category: subCat,
       cost: asset.cost?.toString() || "", 
       status: asset.status || "Unassigned" 
     });
@@ -134,7 +180,12 @@ export const Assets: React.FC = () => {
   }
 
   const handleSaveAsset = async () => {
-    if (!newAsset.asset_tag || !newAsset.name || !newAsset.category_id || !newAsset.cost || Number(newAsset.cost) <= 0) {
+    const selectedCategoryName = newAsset.sub_category || newAsset.main_category;
+    const cat = categories.find(c => (c.name || "").toLowerCase() === selectedCategoryName.toLowerCase()) 
+             || categories.find(c => (c.name || "").toLowerCase() === newAsset.main_category.toLowerCase());
+    const categoryId = cat?.id;
+
+    if (!newAsset.asset_tag || !newAsset.name || !categoryId || !newAsset.cost || Number(newAsset.cost) <= 0) {
       toast.error("Please fill all required fields");
       return;
     }
@@ -147,7 +198,7 @@ export const Assets: React.FC = () => {
           model: newAsset.name,
           status: newAsset.status,
           cost: Number(newAsset.cost),
-          category_id: Number(newAsset.category_id)
+          category_id: Number(categoryId)
         });
         toast.success("Asset updated successfully!");
       } else {
@@ -155,7 +206,7 @@ export const Assets: React.FC = () => {
           asset_number: newAsset.asset_tag,
           asset_tag: newAsset.asset_tag,
           model: newAsset.name,
-          category_id: Number(newAsset.category_id),
+          category_id: Number(categoryId),
           cost: Number(newAsset.cost),
           status: newAsset.status
         });
@@ -188,13 +239,16 @@ export const Assets: React.FC = () => {
 
   const getMainCategoryCount = (mainCat: string) => {
     if (mainCat === "All") return assets.length;
-    const allowedSubcats = SUB_CATEGORIES[mainCat] || [];
-    return assets.filter(a => allowedSubcats.includes(a.category) || a.category === mainCat).length;
+    const allowedSubcats = (SUB_CATEGORIES[mainCat] || []).map(s => s.toLowerCase());
+    return assets.filter(a => {
+      const cat = (a.category || "").toLowerCase();
+      return allowedSubcats.includes(cat) || cat === mainCat.toLowerCase();
+    }).length;
   };
 
   const getSubCategoryCount = (subCat: string, mainCat: string) => {
     if (subCat === "All") return getMainCategoryCount(mainCat);
-    return assets.filter(a => a.category === subCat).length;
+    return assets.filter(a => (a.category || "").toLowerCase() === subCat.toLowerCase()).length;
   };
 
   const handleMainCategoryChange = (mainCat: string) => {
@@ -204,19 +258,20 @@ export const Assets: React.FC = () => {
 
   // We only count based on the current category filter so the counts are accurate for the current view
   const categoryFilteredAssets = assets.filter(a => {
+    const cat = (a.category || "").toLowerCase();
     if (activeMainCategory === "All") return true;
     if (activeSubCategory !== "All") {
-      return a.category === activeSubCategory;
+      return cat === activeSubCategory.toLowerCase();
     } else {
-      const allowedSubcats = SUB_CATEGORIES[activeMainCategory] || [];
-      return allowedSubcats.includes(a.category) || a.category === activeMainCategory;
+      const allowedSubcats = (SUB_CATEGORIES[activeMainCategory] || []).map(s => s.toLowerCase());
+      return allowedSubcats.includes(cat) || cat === activeMainCategory.toLowerCase();
     }
   });
 
-  const counts = {
-    "All Assets": categoryFilteredAssets.length,
+  const statusCounts = {
+    "All": categoryFilteredAssets.length,
+    "Available": categoryFilteredAssets.filter(isUnassignedAsset).length,
     "Assigned": categoryFilteredAssets.filter(isAssignedAsset).length,
-    "Unassigned": categoryFilteredAssets.filter(isUnassignedAsset).length,
     "Out of Service": categoryFilteredAssets.filter(isOutOfServiceAsset).length,
   };
 
@@ -225,18 +280,19 @@ export const Assets: React.FC = () => {
                           a.asset_name.toLowerCase().includes(searchTerm.toLowerCase());
     
     let matchesCategory = true;
+    const cat = (a.category || "").toLowerCase();
     if (activeMainCategory !== "All") {
       if (activeSubCategory !== "All") {
-        matchesCategory = a.category === activeSubCategory;
+        matchesCategory = cat === activeSubCategory.toLowerCase();
       } else {
-        const allowedSubcats = SUB_CATEGORIES[activeMainCategory] || [];
-        matchesCategory = allowedSubcats.includes(a.category) || a.category === activeMainCategory;
+        const allowedSubcats = (SUB_CATEGORIES[activeMainCategory] || []).map(s => s.toLowerCase());
+        matchesCategory = allowedSubcats.includes(cat) || cat === activeMainCategory.toLowerCase();
       }
     }
 
     let matchesStatus = true;
     if (statusFilter === "Assigned") matchesStatus = isAssignedAsset(a);
-    else if (statusFilter === "Unassigned") matchesStatus = isUnassignedAsset(a);
+    else if (statusFilter === "Available") matchesStatus = isUnassignedAsset(a);
     else if (statusFilter === "Out of Service") matchesStatus = isOutOfServiceAsset(a);
     
     return matchesSearch && matchesCategory && matchesStatus;
@@ -260,15 +316,15 @@ export const Assets: React.FC = () => {
       </div>
 
       
-      {/* Filters (Categories) */}
-      <div className="space-y-4">
+      {/* Filters (Categories & Status) */}
+      <div className="space-y-3">
         {/* Main Category Filters */}
-        <div className="flex flex-wrap items-center gap-2 bg-muted/40 p-1.5 rounded-xl w-full border border-border/50">
+        <ScrollableRow>
           {MAIN_CATEGORIES.map((cat) => (
             <button
               key={cat}
               onClick={() => handleMainCategoryChange(cat)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 shrink-0 ${
                 activeMainCategory === cat
                   ? "bg-primary text-primary-foreground shadow-sm font-bold"
                   : "text-muted-foreground hover:text-foreground hover:bg-background/50"
@@ -284,61 +340,76 @@ export const Assets: React.FC = () => {
               </span>
             </button>
           ))}
-        </div>
+        </ScrollableRow>
 
-        {/* Sub Category Filters */}
-        {activeMainCategory !== "All" && SUB_CATEGORIES[activeMainCategory] && (
-          <div className="flex flex-wrap items-center gap-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50">
-            {SUB_CATEGORIES[activeMainCategory].map((subCat) => (
+        <div className="flex flex-col xl:flex-row gap-3">
+          {/* Sub Category Filters */}
+          {activeMainCategory !== "All" && SUB_CATEGORIES[activeMainCategory] && (
+            <ScrollableRow className="flex-1 min-w-0">
+              {SUB_CATEGORIES[activeMainCategory].map((subCat) => (
+                <button
+                  key={subCat}
+                  onClick={() => setActiveSubCategory(subCat)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 shrink-0 ${
+                    activeSubCategory === subCat
+                      ? "bg-primary text-primary-foreground shadow-sm font-bold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                  }`}
+                >
+                  <span>{subCat}</span>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+                    activeSubCategory === subCat
+                      ? "bg-primary-foreground/20 text-primary-foreground font-bold"
+                      : "bg-muted text-muted-foreground"
+                  }`}>
+                    {getSubCategoryCount(subCat, activeMainCategory)}
+                  </span>
+                </button>
+              ))}
+            </ScrollableRow>
+          )}
+
+          {/* Asset Status Filters */}
+          <div className="flex items-center gap-1.5 bg-muted/40 p-1.5 rounded-xl w-full xl:w-fit border border-border/50 overflow-x-auto flex-nowrap scrollbar-hide shrink-0">
+            {["All", "Available", "Assigned", "Out of Service"].map((status) => (
               <button
-                key={subCat}
-                onClick={() => setActiveSubCategory(subCat)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
-                  activeSubCategory === subCat
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 shrink-0 ${
+                  statusFilter === status
                     ? "bg-primary text-primary-foreground shadow-sm font-bold"
                     : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                 }`}
               >
-                <span>{subCat}</span>
+                <span>{status}</span>
                 <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-                  activeSubCategory === subCat
+                  statusFilter === status
                     ? "bg-primary-foreground/20 text-primary-foreground font-bold"
                     : "bg-muted text-muted-foreground"
                 }`}>
-                  {getSubCategoryCount(subCat, activeMainCategory)}
+                  {statusCounts[status as keyof typeof statusCounts]}
                 </span>
               </button>
             ))}
           </div>
-        )}
+
+          {/* Search Bar */}
+          <div className="flex items-center w-full max-w-sm xl:max-w-[260px] xl:ml-auto shrink-0 bg-background/50 hover:bg-background focus-within:bg-background focus-within:ring-2 focus-within:ring-primary/20 rounded-xl border border-border/50 transition-all shadow-sm">
+            <Search className="w-4 h-4 ml-3 text-muted-foreground shrink-0 pointer-events-none" />
+            <input 
+              type="text" 
+              placeholder="Search by tag or name..." 
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-2 pr-4 py-1.5 text-sm bg-transparent outline-none"
+            />
+          </div>
+        </div>
       </div>
 
       <div className="flex-1 space-y-4">
           <Card>
             <CardContent className="p-0">
-              {/* Filters Bar */}
-              <div className="p-4 border-b border-border bg-accent/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="relative max-w-sm w-full">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input 
-                    type="text" 
-                    placeholder="Search by tag or name..." 
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-border bg-background focus:ring-2 focus:ring-violet outline-none"
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Filter className="w-4 h-4 text-muted-foreground" />
-                  <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-40 text-sm">
-                    <option value="All">All Statuses</option>
-                    <option value="Assigned">Assigned</option>
-                    <option value="Unassigned">Unassigned</option>
-                    <option value="Out of Service">Out of Service</option>
-                  </Select>
-                </div>
-              </div>
-
               {loading ? (
                 <div className="p-6 space-y-4">
                   <Skeleton className="h-8 w-full rounded-lg" />
@@ -365,9 +436,19 @@ export const Assets: React.FC = () => {
                         <tr key={a.asset_id} className="hover:bg-accent/10 transition-colors">
                           <td className="p-4 font-bold text-xs tracking-wider text-primary">{a.asset_code}</td>
                           <td className="p-4 font-semibold">{a.asset_name}</td>
-                          <td className="p-4 text-muted-foreground">{a.category}</td>
+                          <td className="p-4 text-muted-foreground">
+                            {(() => {
+                              if (MAIN_CATEGORIES.includes(a.category)) return a.category;
+                              for (const [main, subs] of Object.entries(SUB_CATEGORIES)) {
+                                if (subs.map(s => s.toLowerCase()).includes((a.category || "").toLowerCase())) {
+                                  return `${main} > ${a.category}`;
+                                }
+                              }
+                              return a.category;
+                            })()}
+                          </td>
                           {canViewAll && <td className="p-4 text-xs font-semibold">{a.assigned_to_name || "Unassigned"}</td>}
-                          {canViewCost && <td className="p-4 font-mono">${a.cost?.toLocaleString()}</td>}
+                          {canViewCost && <td className="p-4 font-mono">₹{a.cost?.toLocaleString()}</td>}
                           <td className="p-4">
                             <Badge 
                               variant={
@@ -418,7 +499,7 @@ export const Assets: React.FC = () => {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Asset Tag / Device ID</label>
-            <Input value={newAsset.asset_tag} onChange={e => setNewAsset({ ...newAsset, asset_tag: e.target.value })} placeholder="e.g., AST-1001" disabled={!!editingAssetId} />
+            <Input value={newAsset.asset_tag} onChange={e => setNewAsset({ ...newAsset, asset_tag: e.target.value })} placeholder="e.g., AST-1001" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Asset Model / Name</label>
@@ -426,15 +507,32 @@ export const Assets: React.FC = () => {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Category</label>
-            <Select value={newAsset.category_id} onChange={e => setNewAsset({ ...newAsset, category_id: e.target.value })}>
+            <Select 
+              value={newAsset.main_category} 
+              onChange={e => setNewAsset({ ...newAsset, main_category: e.target.value, sub_category: "" })}
+            >
               <option value="">Select a category</option>
-              {(categories || []).map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+              {MAIN_CATEGORIES.filter(c => c !== "All").map(c => (
+                <option key={c} value={c}>{c}</option>
               ))}
             </Select>
           </div>
+          {newAsset.main_category && SUB_CATEGORIES[newAsset.main_category] && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Subcategory</label>
+              <Select 
+                value={newAsset.sub_category} 
+                onChange={e => setNewAsset({ ...newAsset, sub_category: e.target.value })}
+              >
+                <option value="">Select a subcategory</option>
+                {SUB_CATEGORIES[newAsset.main_category].filter(c => c !== "All").map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </Select>
+            </div>
+          )}
           <div>
-            <label className="block text-sm font-medium mb-1">Cost ($)</label>
+            <label className="block text-sm font-medium mb-1">Cost (₹)</label>
             <Input type="number" value={newAsset.cost} onChange={e => setNewAsset({ ...newAsset, cost: e.target.value })} placeholder="0.00" />
           </div>
           <div>
@@ -457,14 +555,14 @@ export const Assets: React.FC = () => {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Search Employee</label>
-            <div className="relative mb-2">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <div className="flex items-center mb-2 bg-background border border-border rounded-lg focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+              <Search className="w-4 h-4 ml-3 text-muted-foreground shrink-0 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search by name or role..."
                 value={assigneeSearchQuery}
                 onChange={e => setAssigneeSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-border bg-background outline-none"
+                className="w-full pl-2 pr-4 py-2 text-sm bg-transparent outline-none"
               />
             </div>
             <div className="border border-border rounded-lg max-h-48 overflow-y-auto bg-card">

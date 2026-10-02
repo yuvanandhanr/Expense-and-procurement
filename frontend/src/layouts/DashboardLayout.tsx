@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../hooks/useTheme";
@@ -115,6 +116,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       const interval = setInterval(fetchNotifications, 60000);
       return () => clearInterval(interval);
     }
+    return undefined;
   }, [user]);
 
   // Click outside listener to close notification, profile, and search dropdowns
@@ -251,6 +253,37 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const handleNotificationClick = async (n: Notification, isUnread: boolean) => {
+    if (isUnread) {
+      await markAsRead(n.notification_id);
+    }
+    
+    setIsNotificationOpen(false);
+    
+    const title = n.title.toLowerCase();
+    const message = n.message.toLowerCase();
+    
+    if (title.includes("approval") || message.includes("approval")) {
+      navigate("/approvals");
+    } else if (title.includes("expense") || message.includes("expense") || title.includes("exp-")) {
+      navigate("/expenses");
+    } else if (title.includes("invoice") || message.includes("invoice") || title.includes("inv-")) {
+      navigate("/invoices");
+    } else if (title.includes("pr ") || title.includes("requisition") || title.includes("pr-")) {
+      navigate("/prs");
+    } else if (title.includes("po ") || title.includes("purchase order") || title.includes("po-")) {
+      navigate("/pos");
+    } else if (title.includes("vendor")) {
+      navigate("/vendors");
+    } else if (title.includes("rfq") || title.includes("quotation")) {
+      navigate("/rfqs");
+    } else if (title.includes("grn") || title.includes("delivery")) {
+      navigate("/grns");
+    } else {
+      navigate("/approvals"); 
+    }
+  };
+
   // Quick navigation destinations
   const quickPages = [
     { label: "Employee Reimbursements", path: "/expenses", icon: FileText, category: "Claims" },
@@ -315,7 +348,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       {
         title: "Overview",
         items: [
-          { label: isExecOrAdmin || isCTO ? "Executive Dashboard" : "Dashboard", path: "/", icon: LayoutDashboard, show: true },
+          { label: "Dashboard", path: "/", icon: LayoutDashboard, show: true },
         ],
       },
       {
@@ -411,7 +444,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         />
         
         {/* Apple Sidebar Header & Logo */}
-        <div className="h-16 flex items-center justify-between px-3 border-b border-border/60 relative z-40 overflow-hidden shrink-0">
+        <div className="h-16 flex items-center justify-between px-3 border-b border-border/60 relative z-40 shrink-0">
           <div className="flex items-center space-x-3 overflow-hidden cursor-pointer" onClick={() => {
             if (isSidebarOpen) {
               setSidebarWidth(64);
@@ -437,7 +470,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
           </div>
 
           {/* Notification Center */}
-          {(() => {
+          {isSidebarOpen && (() => {
             const unreadCount = notifications.filter(n => n.status === "Unread").length;
             return (
               <div className="relative" ref={notificationRef}>
@@ -456,8 +489,8 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
                   )}
                 </button>
 
-                {isNotificationOpen && (
-                  <div className="absolute left-4 mt-3 w-84 sm:w-96 apple-glass-heavy border border-border/80 rounded-2xl shadow-2xl overflow-hidden z-50 animate-slide-up">
+                {isNotificationOpen && createPortal(
+                  <div className="fixed top-14 left-[260px] w-84 sm:w-96 apple-glass-heavy border border-border/80 rounded-2xl shadow-2xl overflow-hidden z-[100] animate-slide-up">
                     <div className="p-3.5 border-b border-border/60 flex items-center justify-between bg-card/70 backdrop-blur-md">
                       <div className="flex items-center gap-2">
                         <span className="font-extrabold text-xs tracking-tight text-foreground">Notifications</span>
@@ -493,10 +526,10 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
                           return (
                             <div
                               key={n.notification_id}
-                              onClick={() => isUnread && markAsRead(n.notification_id)}
-                              className={`p-3.5 text-xs transition-all duration-200 relative group flex gap-3 ${
+                              onClick={() => handleNotificationClick(n, isUnread)}
+                              className={`p-3.5 text-xs transition-all duration-200 relative group flex gap-3 cursor-pointer ${
                                 isUnread
-                                  ? "bg-primary/8 dark:bg-primary/15 hover:bg-primary/12 border-l-4 border-primary cursor-pointer shadow-sm"
+                                  ? "bg-primary/8 dark:bg-primary/15 hover:bg-primary/12 border-l-4 border-primary shadow-sm"
                                   : "bg-transparent hover:bg-muted/30 opacity-60 hover:opacity-100 border-l-4 border-transparent"
                               }`}
                             >
@@ -538,13 +571,12 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
                         })
                       )}
                     </div>
-                  </div>
+                  </div>,
+                  document.body
                 )}
               </div>
             );
           })()}
-
-
         </div>
 
         {/* Navigation Items */}
@@ -677,8 +709,8 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
           <div className="flex items-center space-x-3">
             {/* Apple Minimalist Quick Search with Live Dropdown */}
             <div className="hidden lg:block relative" ref={searchContainerRef}>
-              <form onSubmit={handleGlobalSearch} className="flex items-center relative">
-                <Search className="w-3.5 h-3.5 absolute left-3.5 text-muted-foreground/60" />
+              <form onSubmit={handleGlobalSearch} className="flex items-center w-60 focus-within:w-80 rounded-full bg-background/80 backdrop-blur-md border border-border/80 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/40 transition-all duration-300 shadow-inner">
+                <Search className="w-3.5 h-3.5 ml-3.5 text-muted-foreground/60 shrink-0 pointer-events-none" />
                 <input
                   ref={searchInputRef}
                   type="text"
@@ -689,7 +721,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
                     setSearchQuery(e.target.value);
                     setIsSearchOpen(true);
                   }}
-                  className="pl-9 pr-8 py-1.5 w-60 rounded-full bg-background/80 backdrop-blur-md border border-border/80 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary focus:w-80 transition-all duration-300 shadow-inner placeholder:text-muted-foreground/50"
+                  className="w-full pl-2 pr-8 py-1.5 text-xs bg-transparent focus:outline-none placeholder:text-muted-foreground/50"
                 />
                 <span className="absolute right-3 text-[10px] font-mono text-muted-foreground/50 flex items-center">
                   <Command className="w-2.5 h-2.5 mr-0.5" />K
@@ -886,6 +918,8 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
                 </div>
               )}
             </div>
+
+
 
             {/* Dark / Light Toggle */}
             <button 

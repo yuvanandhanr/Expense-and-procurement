@@ -47,7 +47,7 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                 <span className="text-sm font-medium text-muted-foreground ml-3">Created: {formatDate(receiptDetails.created_at || receiptDetails.submission_date || receiptDetails.date)}</span>
               </div>
               <div className="text-right">
-                <div className="text-4xl font-bold text-blue-600 tracking-tight">${Number(receiptDetails.total_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                <div className="text-4xl font-bold text-blue-600 tracking-tight">₹{Number(receiptDetails.total_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
                 <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Verified Total</div>
               </div>
             </div>
@@ -176,9 +176,9 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                     const conf = receipt.ocr_confidence != null ? Number(receipt.ocr_confidence) : null;
                     
                     const extractedAmount = (receipt.ocr_amount && Number(receipt.ocr_amount) > 0) 
-                      ? `$${Number(receipt.ocr_amount).toFixed(2)}` 
+                      ? `₹${Number(receipt.ocr_amount).toFixed(2)}` 
                       : (receipt.total_amount && Number(receipt.total_amount) > 0) 
-                        ? `$${Number(receipt.total_amount).toFixed(2)}`
+                        ? `₹${Number(receipt.total_amount).toFixed(2)}`
                         : "Not detected";
                     
                     const rawUrl = receipt.file_url || receipt.image_path;
@@ -234,7 +234,7 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                         </div>
                         <div className="text-right pt-1">
                           <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Receipt Total</div>
-                          <div className="font-bold text-xl text-foreground">${Number(receipt.verified_amount || receipt.total_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                          <div className="font-bold text-xl text-foreground">₹{Number(receipt.verified_amount || receipt.total_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
                         </div>
                       </div>
                     );

@@ -299,7 +299,7 @@ async def upload_receipts(
             ):
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Duplicate receipt error: Receipt from '{merchant}' dated {parsed_date} for ${ocr_amount} already exists on this report."
+                    detail=f"Duplicate receipt error: Receipt from '{merchant}' dated {parsed_date} for ₹{ocr_amount} already exists on this report."
                 )
                 
         # Global duplicate check across all reports for this user
@@ -496,7 +496,7 @@ async def submit_report(
         raise HTTPException(status_code=400, detail="Description / Justification is required")
     if not report.total_amount or report.total_amount <= Decimal("0.00"):
         _log_action(current_user, "expense_submission_validation_failed", report_id, level=logging.WARNING)
-        raise HTTPException(status_code=400, detail="Cannot submit an expense claim with $0.00. Please upload and verify receipts with valid amounts.")
+        raise HTTPException(status_code=400, detail="Cannot submit an expense claim with ₹0.00. Please upload and verify receipts with valid amounts.")
 
     # Validate that all receipts have been verified (no 0.00 amounts unless it's a legit 0 receipt)
     for r in report.receipts:
@@ -528,7 +528,7 @@ async def submit_report(
                 _log_action(current_user, "receipt_duplicate_detected_across_reports", report_id, level=logging.WARNING)
                 
         if r.verified_amount > Decimal("100.00") and not r.category:
-            policy_issues.append(f"Receipt {r.file_name} > $100 requires a category")
+            policy_issues.append(f"Receipt {r.file_name} > ₹100 requires a category")
             
     report.duplicate_flag = duplicates_found
     report.policy_flags = ", ".join(policy_issues) if policy_issues else None

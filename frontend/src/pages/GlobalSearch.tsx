@@ -47,14 +47,14 @@ export const GlobalSearch: React.FC = () => {
       </div>
 
       <form onSubmit={handleSearchSubmit} className="flex items-center space-x-2 bg-card p-3 rounded-lg border border-border">
-        <div className="relative flex-1">
-          <Search className="w-5 h-5 absolute left-3 top-2.5 text-muted-foreground/60" />
+        <div className="flex items-center flex-1 bg-background border border-border rounded-lg focus-within:ring-2 focus-within:ring-ring transition-all">
+          <Search className="w-5 h-5 ml-3 text-muted-foreground/60 shrink-0 pointer-events-none" />
           <input
             type="text"
             placeholder="Type query keywords (e.g. Acme, server, PO-)..."
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
+            className="w-full pl-2 pr-4 py-2.5 text-sm bg-transparent focus:outline-none"
           />
         </div>
         <Button type="submit" className="font-bold text-xs uppercase px-6 py-2.5">

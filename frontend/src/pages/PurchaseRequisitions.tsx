@@ -269,7 +269,7 @@ export const PurchaseRequisitions: React.FC = () => {
                       <td className="p-4 font-bold text-xs tracking-wider text-primary whitespace-nowrap">{pr.pr_number}</td>
                       <td className="p-4 whitespace-nowrap">{pr.requestor_name || "Unknown"}</td>
                       <td className="p-4 font-semibold">{pr.title}</td>
-                      <td className="p-4 font-bold whitespace-nowrap">{pr.total_estimated_amount > 0 ? `$${pr.total_estimated_amount?.toLocaleString()}` : "TBD"}</td>
+                      <td className="p-4 font-bold whitespace-nowrap">{pr.total_estimated_amount > 0 ? `₹${pr.total_estimated_amount?.toLocaleString()}` : "TBD"}</td>
                       <td className="p-4 whitespace-nowrap">
                         <Badge variant={pr.priority === "High" ? "error" : pr.priority === "Medium" ? "warning" : "neutral"}>
                           {pr.priority || "Standard"}

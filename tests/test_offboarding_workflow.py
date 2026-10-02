@@ -316,7 +316,7 @@ async def test_offboarding_financial_pending_dues(
     # Clear task with pending dues
     response = await async_client.post(
         f"/api/v1/offboarding/tasks/3/clear",
-        json={"notes": "Needs to pay 50 dollars", "action": "Pending Dues"}
+        json={"notes": "Needs to pay 50 rupees", "action": "Pending Dues"}
     )
     
     assert response.status_code == status.HTTP_200_OK

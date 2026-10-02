@@ -93,7 +93,7 @@ export const PurchaseOrders: React.FC = () => {
                         </td>
                         <td className="p-4 font-bold text-xs tracking-wider text-primary whitespace-nowrap">{p.po_number}</td>
                         <td className="p-4 whitespace-nowrap">#PR-{p.pr_id}</td>
-                        <td className="p-4 font-bold whitespace-nowrap">${p.total_amount?.toLocaleString()}</td>
+                        <td className="p-4 font-bold whitespace-nowrap">₹{p.total_amount?.toLocaleString()}</td>
                         <td className="p-4 whitespace-nowrap">
                           <StatusBadge status={p.status} />
                         </td>
@@ -112,7 +112,7 @@ export const PurchaseOrders: React.FC = () => {
                                     <div>
                                       <span className="font-semibold text-sm block text-foreground/90">{item.item_name}</span>
                                       <span className="text-[10px] text-muted-foreground block mt-0.5">
-                                        Qty: {item.quantity} | Total: ${item.total_price?.toLocaleString()}
+                                        Qty: {item.quantity} | Total: ₹{item.total_price?.toLocaleString()}
                                       </span>
                                     </div>
                                     <div className="flex items-center gap-3">

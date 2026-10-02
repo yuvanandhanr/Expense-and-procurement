@@ -90,7 +90,7 @@ export const DeliveredItems: React.FC = () => {
                         </td>
                         <td className="p-4 font-mono font-bold text-xs">{po.po_number}</td>
                         <td className="p-4 font-mono text-xs">{po.rfq_id ? `#RFQ-${po.rfq_id}` : "N/A"}</td>
-                        <td className="p-4 font-bold text-primary">${po.grand_total?.toLocaleString()}</td>
+                        <td className="p-4 font-bold text-primary">₹{po.grand_total?.toLocaleString()}</td>
                         <td className="p-4 text-xs">{formatDate(po.created_at)}</td>
                         <td className="p-4">
                           <Badge variant="neutral">{po.status}</Badge>
@@ -107,7 +107,7 @@ export const DeliveredItems: React.FC = () => {
                                     <div>
                                       <span className="font-semibold text-sm block text-foreground/90">{item.item_name}</span>
                                       <span className="text-[10px] text-muted-foreground block mt-0.5">
-                                        Qty: {item.quantity} | Total: ${item.total_price?.toLocaleString()}
+                                        Qty: {item.quantity} | Total: ₹{item.total_price?.toLocaleString()}
                                       </span>
                                     </div>
                                     <div className="flex items-center gap-3">
