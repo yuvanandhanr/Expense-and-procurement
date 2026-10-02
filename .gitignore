@@ -133,3 +133,6 @@ logs/
 node_modules/
 playwright-report/
 test-results/
+
+# Auth & local tokens
+token.json
