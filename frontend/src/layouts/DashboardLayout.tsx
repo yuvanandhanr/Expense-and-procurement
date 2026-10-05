@@ -432,7 +432,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   return (
-    <div className="min-h-screen bg-background flex text-foreground transition-colors duration-300 antialiased">
+    <div className="h-screen overflow-hidden bg-background flex text-foreground transition-colors duration-300 antialiased">
       {/* Sidebar - Apple Glass Desktop */}
       <aside
         className="hidden md:flex flex-col border-r border-border/70 bg-card/75 backdrop-blur-2xl transition-all duration-300 shadow-apple-sm z-20 relative"
