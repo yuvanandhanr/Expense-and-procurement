@@ -372,6 +372,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
           { label: "Reimbursements", path: "/expenses", icon: FileText, show: isExecOrAdmin },
           { label: isExecOrAdmin ? "Vendor Payments" : "Vendor Invoices", path: "/invoices", icon: CreditCard, show: isFinance || isExecOrAdmin },
           { label: "Financial Analytics", path: "/analytics", icon: TrendingUp, show: isFinance || isCFO || isAdmin || isCEO },
+          { label: "Executive Dossier", path: "/reports/executive", icon: Sparkles, show: isFinance || isCFO || isAdmin || isCEO },
           { label: "Reports", path: "/reports", icon: FileSpreadsheet, show: isFinance || isCFO || isAdmin || isCEO },
         ]
       },

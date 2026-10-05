@@ -1,11 +1,18 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../services/api";
+import { useAuth } from "../hooks/useAuth";
 import { Report } from "../types";
 import {Button, Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, Input, EmptyState} from "../components/ui";
 import { formatDate } from "../utils/helpers";
+import { Sparkles, ChevronRight } from "lucide-react";
 import toast from "react-hot-toast";
 
 export const Reports: React.FC = () => {
+  const { hasRole } = useAuth();
+  const navigate = useNavigate();
+  const isFinanceOrAdmin = hasRole("Admin") || hasRole("CEO") || hasRole("CFO") || hasRole("Finance Manager") || hasRole("Finance");
+
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -23,6 +30,7 @@ export const Reports: React.FC = () => {
     } catch (err) {
       console.error("Failed to load reports history:", err);
     } finally {
+      if (false) setLoading(false);
       setLoading(false);
     }
   };
@@ -56,10 +64,48 @@ export const Reports: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">System Exports & Reports</h1>
-        <p className="text-xs text-muted-foreground mt-1">Export transaction data, requisitions, invoices, and audit logs.</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">System Exports & Reports</h1>
+          <p className="text-xs text-muted-foreground mt-1">Export transaction data, requisitions, invoices, and audit logs.</p>
+        </div>
+        {isFinanceOrAdmin && (
+          <Button
+            onClick={() => navigate("/reports/executive")}
+            className="bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-apple-sm"
+          >
+            <Sparkles className="w-4 h-4" /> Dataeko Executive Dossier Generator <ChevronRight className="w-3.5 h-3.5" />
+          </Button>
+        )}
       </div>
+
+      {/* Dataeko Executive Banner for CFO / Finance */}
+      {isFinanceOrAdmin && (
+        <div
+          onClick={() => navigate("/reports/executive")}
+          className="p-4 rounded-2xl bg-gradient-to-r from-[#0F172A] to-[#1E293B] text-white border border-sky-500/30 flex items-center justify-between cursor-pointer hover:border-sky-400/60 transition-all shadow-md group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-sky-500/30 text-sky-300">
+                  Dataeko AI
+                </span>
+                <span className="text-xs font-bold text-slate-300">Executive Financial & Performance Report</span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Generate 5-year longitudinal historical archive or custom date range PDF with multi-level cascading parameters.
+              </p>
+            </div>
+          </div>
+          <Button size="sm" className="bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs gap-1">
+            <span>Open Builder</span> <ChevronRight className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Export Request Card */}

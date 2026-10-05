@@ -21,6 +21,7 @@ const Invoices = lazy(() => import("../pages/Invoices"));
 const Expenses = lazy(() => import("../pages/Expenses"));
 const Analytics = lazy(() => import("../pages/Analytics"));
 const Reports = lazy(() => import("../pages/Reports"));
+const ExecutiveReport = lazy(() => import("../pages/ExecutiveReport"));
 const AuditLogs = lazy(() => import("../pages/AuditLogs"));
 const SystemHealth = lazy(() => import("../pages/SystemHealth"));
 const Settings = lazy(() => import("../pages/Settings"));
@@ -236,6 +237,14 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute>
               <Reports />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/executive"
+          element={
+            <ProtectedRoute allowedRoles={["Admin", "CEO", "CFO", "Finance Manager", "Finance"]}>
+              <ExecutiveReport />
             </ProtectedRoute>
           }
         />

@@ -253,6 +253,39 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
 
+      {/* Dataeko Executive Dossier Generator Card (CFO / Finance Admin Exclusive) */}
+      {isFinanceOrAdmin && (
+        <div 
+          onClick={() => navigate("/reports/executive")}
+          className="p-4 md:p-5 rounded-2xl bg-gradient-to-r from-[#0F172A] via-[#1E293B] to-[#0F172A] text-white border border-sky-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 cursor-pointer hover:border-sky-400/60 transition-all duration-300 group shadow-xl"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-sky-500/20 border border-sky-500/40 text-sky-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-sky-500/30 text-sky-300 border border-sky-500/40">
+                  Dataeko AI Intelligence
+                </span>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                  CFO & Executive Dossier
+                </span>
+              </div>
+              <h3 className="text-base font-extrabold text-white mt-1 group-hover:text-sky-300 transition-colors">
+                Generate 5-Year Longitudinal & Custom Executive Financial PDF
+              </h3>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Multi-level cascading parameters (Employee / Department / Category) with live Dataeko 7-section financial report layout.
+              </p>
+            </div>
+          </div>
+          <Button size="sm" className="bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs gap-1.5 shadow-md self-end md:self-auto shrink-0">
+            <span>Launch Report Engine</span> <ChevronRight className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      )}
+
       {/* Apple Metrics Overview Bento Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
