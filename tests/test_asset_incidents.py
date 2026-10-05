@@ -85,13 +85,34 @@ async def test_report_incident(
     override_db: AsyncMock,
     mock_asset
 ):
-    mock_result = MagicMock()
-    mock_result.scalar_one_or_none.return_value = mock_asset
-    override_db.execute = AsyncMock(return_value=mock_result)
+    mock_incident = AssetIncident(
+        incident_id=1,
+        asset_id=10,
+        reporter_id=1,
+        description="Screen cracked",
+        incident_type="Damage",
+        status="Submitted",
+        incident_date=date.today(),
+        asset=mock_asset
+    )
+
+    mock_asset_result = MagicMock()
+    mock_asset_result.scalar_one_or_none.return_value = mock_asset
+
+    mock_incident_result = MagicMock()
+    mock_incident_result.scalar_one.return_value = mock_incident
+    mock_incident_result.scalar_one_or_none.return_value = mock_incident
+
+    override_db.execute = AsyncMock(side_effect=[mock_asset_result, mock_incident_result])
 
     async def mock_refresh(instance):
         instance.incident_id = 1
         instance.incident_date = date.today()
+        instance.description = "Screen cracked"
+        instance.incident_type = "Damage"
+        instance.status = "Submitted"
+        instance.asset = mock_asset
+
     override_db.refresh = AsyncMock(side_effect=mock_refresh)
 
     response = await async_client.post(
@@ -128,9 +149,14 @@ async def test_manager_approve_incident(
         asset=mock_asset
     )
 
-    mock_result = MagicMock()
-    mock_result.scalar_one_or_none.return_value = mock_incident
-    override_db.execute = AsyncMock(return_value=mock_result)
+    mock_result_initial = MagicMock()
+    mock_result_initial.scalar_one_or_none.return_value = mock_incident
+
+    mock_result_reload = MagicMock()
+    mock_result_reload.scalar_one.return_value = mock_incident
+    mock_result_reload.scalar_one_or_none.return_value = mock_incident
+
+    override_db.execute = AsyncMock(side_effect=[mock_result_initial, mock_result_reload])
 
     response = await async_client.post(
         "/api/v1/asset-incidents/1/action",
@@ -141,7 +167,6 @@ async def test_manager_approve_incident(
         }
     )
 
-    assert response.status_code == status.HTTP_200_OK
     assert response.status_code == status.HTTP_200_OK
     assert response.json()["status"] == "Manager Approved"
 
@@ -164,9 +189,14 @@ async def test_manager_reject_incident(
         asset=mock_asset
     )
 
-    mock_result = MagicMock()
-    mock_result.scalar_one_or_none.return_value = mock_incident
-    override_db.execute = AsyncMock(return_value=mock_result)
+    mock_result_initial = MagicMock()
+    mock_result_initial.scalar_one_or_none.return_value = mock_incident
+
+    mock_result_reload = MagicMock()
+    mock_result_reload.scalar_one.return_value = mock_incident
+    mock_result_reload.scalar_one_or_none.return_value = mock_incident
+
+    override_db.execute = AsyncMock(side_effect=[mock_result_initial, mock_result_reload])
 
     response = await async_client.post(
         "/api/v1/asset-incidents/2/action",
@@ -209,8 +239,12 @@ async def test_it_replace_incident(
 
     mock_cat_result = MagicMock()
     mock_cat_result.scalar_one_or_none.return_value = AssetCategory(category_id=1, category_name="Hardware")
+
+    mock_reload_result = MagicMock()
+    mock_reload_result.scalar_one.return_value = mock_incident
+    mock_reload_result.scalar_one_or_none.return_value = mock_incident
     
-    override_db.execute = AsyncMock(side_effect=[mock_result, mock_avail_result, mock_cat_result])
+    override_db.execute = AsyncMock(side_effect=[mock_result, mock_avail_result, mock_cat_result, mock_reload_result])
     
     # Mock PR Service
     mock_pr_service_inst = mock_pr_service_cls.return_value
@@ -230,3 +264,4 @@ async def test_it_replace_incident(
     assert response.status_code == status.HTTP_200_OK
     assert response.json()["status"] == "Waiting for Procurement"
     assert response.json()["linked_pr_id"] == 99
+
