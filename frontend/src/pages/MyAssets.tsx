@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { Card, CardContent, Badge, Skeleton, EmptyState, Dialog, Button, Input } from "../components/ui";
 import toast from "react-hot-toast";
-import { isValidText } from "../utils/helpers";
+import { isValidText, resolveImageUrl } from "../utils/helpers";
 import { Eye, Edit3, AlertCircle } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 
@@ -528,14 +528,25 @@ export const MyAssets: React.FC = () => {
               </div>
             </div>
 
-            {selectedIncident.image_url && (
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Attachments / Photos</p>
-                <a href={selectedIncident.image_url} target="_blank" rel="noreferrer" className="text-xs text-primary underline break-all">
-                  {selectedIncident.image_url}
-                </a>
-              </div>
-            )}
+            {selectedIncident.image_url && (() => {
+              const url = resolveImageUrl(selectedIncident.image_url);
+              return (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Attachments / Photos</p>
+                  <div className="max-h-48 overflow-hidden rounded-lg border bg-background flex flex-col items-center justify-center p-2">
+                    <img
+                      src={url}
+                      alt="Incident Evidence"
+                      className="max-h-40 object-contain rounded"
+                      onError={(e: any) => { e.target.style.display = 'none'; }}
+                    />
+                    <a href={url} target="_blank" rel="noreferrer" className="text-xs text-primary underline break-all mt-1">
+                      {selectedIncident.image_url}
+                    </a>
+                  </div>
+                </div>
+              );
+            })()}
 
             {selectedIncident.manager_inspection_assessment && (
               <div className="p-3 bg-muted/30 rounded-xl border border-border text-xs space-y-1">

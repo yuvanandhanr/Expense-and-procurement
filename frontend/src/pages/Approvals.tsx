@@ -4,7 +4,7 @@ import { ApprovalWorkflow } from "../types";
 import { Button, Card, CardHeader, CardTitle, CardContent, Badge, StatusBadge, Skeleton, Dialog, Input, EmptyState } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
-import { formatDate, getErrorMessage, isValidText } from "../utils/helpers";
+import { formatDate, getErrorMessage, isValidText, resolveImageUrl } from "../utils/helpers";
 import { Check, X as XIcon, Eye } from "lucide-react";
 import { ReimbursementDetailModal } from "../components/expenses/ReimbursementDetailModal";
 
@@ -619,27 +619,30 @@ export const Approvals: React.FC = () => {
               </div>
             )}
 
-            {selectedIncident.attachment_url && (
-              <div className="p-3 bg-muted/30 rounded-lg border space-y-2">
-                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Attachment / Photo Evidence</span>
-                <div className="max-h-48 overflow-hidden rounded-lg border bg-background flex items-center justify-center p-2">
-                  <img 
-                    src={selectedIncident.attachment_url} 
-                    alt="Damage Evidence" 
-                    className="max-h-44 object-contain rounded"
-                    onError={(e: any) => { e.target.style.display = 'none'; }}
-                  />
-                  <a 
-                    href={selectedIncident.attachment_url} 
-                    target="_blank" 
-                    rel="noreferrer" 
-                    className="text-xs text-primary underline block text-center mt-1"
-                  >
-                    Open Full Attachment
-                  </a>
+            {selectedIncident.attachment_url && (() => {
+              const url = resolveImageUrl(selectedIncident.attachment_url);
+              return (
+                <div className="p-3 bg-muted/30 rounded-lg border space-y-2">
+                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Attachment / Photo Evidence</span>
+                  <div className="max-h-48 overflow-hidden rounded-lg border bg-background flex flex-col items-center justify-center p-2">
+                    <img
+                      src={url}
+                      alt="Damage Evidence"
+                      className="max-h-40 object-contain rounded"
+                      onError={(e: any) => { e.target.style.display = 'none'; }}
+                    />
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-primary underline block text-center mt-1"
+                    >
+                      Open Full Attachment
+                    </a>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {selectedIncident.manager_inspection_assessment && (
               <div className="p-3 bg-primary/5 rounded-lg border border-primary/20 space-y-1 text-xs">

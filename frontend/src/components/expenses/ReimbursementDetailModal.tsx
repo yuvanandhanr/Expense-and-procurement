@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Building, Briefcase, FileText } from "lucide-react";
 import { Dialog, StatusBadge, Button } from "../ui";
-import { formatDate } from "../../utils/helpers";
+import { formatDate, resolveImageUrl } from "../../utils/helpers";
 
 interface ReimbursementDetailModalProps {
   isOpen: boolean;
@@ -182,16 +182,7 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                         : "Not detected";
                     
                     const rawUrl = receipt.file_url || receipt.image_path;
-                    let finalUrl = null;
-                    if (rawUrl) {
-                       if (rawUrl.startsWith('http') || rawUrl.startsWith('data:')) {
-                          finalUrl = rawUrl;
-                       } else {
-                          const basePath = import.meta.env.VITE_API_URL || '/api/v1';
-                          const cleanPath = rawUrl.startsWith('/uploads') ? rawUrl.replace('/uploads', '') : (rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`);
-                          finalUrl = `${basePath}/uploads${cleanPath}`;
-                       }
-                    }
+                    const finalUrl = resolveImageUrl(rawUrl, receipt.receipt_id);
                     
                     return (
                       <div key={idx} className="flex gap-6 p-5 bg-card border border-border rounded-2xl items-start hover:shadow-md transition-shadow shadow-sm">

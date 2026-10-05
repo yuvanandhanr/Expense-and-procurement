@@ -23,3 +23,32 @@ export const isValidText = (text?: string | null): boolean => {
   if (!text) return false;
   return /[a-zA-Z0-9]/.test(text);
 };
+
+export const resolveImageUrl = (rawUrl?: string | null, fallbackId?: number | null): string => {
+  if (!rawUrl && !fallbackId) return "";
+
+  if (rawUrl && (rawUrl.startsWith("http://") || rawUrl.startsWith("https://") || rawUrl.startsWith("data:"))) {
+    return rawUrl;
+  }
+
+  // Derive origin from VITE_API_URL or relative
+  const envApi = import.meta.env.VITE_API_URL || "";
+  let baseOrigin = "";
+  if (envApi.startsWith("http")) {
+    baseOrigin = envApi.replace(/\/api\/v1\/?$/, "").replace(/\/$/, "");
+  }
+
+  if (fallbackId && (!rawUrl || rawUrl === "N/A" || rawUrl === "None" || rawUrl === "null")) {
+    return `${baseOrigin}/api/v1/expenses/receipts/${fallbackId}/image`;
+  }
+
+  if (!rawUrl) return "";
+
+  let path = rawUrl.trim();
+  if (!path.startsWith("/")) {
+    path = `/${path}`;
+  }
+
+  return `${baseOrigin}${path}`;
+};
+

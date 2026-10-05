@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { api } from "../services/api";
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Skeleton, Badge, StatusBadge, Dialog, HeroTimestamp, EmptyState } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
-import { isValidText } from "../utils/helpers";
+import { isValidText, resolveImageUrl } from "../utils/helpers";
 import { ReimbursementDetailModal } from "../components/expenses/ReimbursementDetailModal";
 
 const Expenses: React.FC = () => {
@@ -773,33 +773,42 @@ const Expenses: React.FC = () => {
                   return (
                     <div key={receipt.receipt_id} className={`flex flex-col md:flex-row gap-4 p-4 rounded-2xl border transition-all duration-200 shadow-apple-sm ${alert && (report.status === "Draft" || report.status === "Returned for Correction") ? 'border-amber-500/40 bg-amber-500/10' : 'apple-card'}`}>
                       {/* Apple Thumbnail Preview */}
-                      <div
-                        className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/60 rounded-xl border border-border flex items-center justify-center overflow-hidden shrink-0 group relative shadow-inner cursor-pointer"
-                        onClick={() => {
-                            const basePath = import.meta.env.VITE_API_URL || '/api/v1';
-                            const cleanPath = receipt.image_path.startsWith('/uploads') ? receipt.image_path.replace('/uploads', '') : (receipt.image_path.startsWith('/') ? receipt.image_path : `/${receipt.image_path}`);
-                            const fullUrl = receipt.image_path.startsWith('http') ? receipt.image_path : `${basePath}/uploads${cleanPath}`;
-                            setPreviewReceiptUrl(fullUrl);
-                        }}
-                      >
-                        {receipt.image_path ? (
-                          <>
-                            {receipt.image_path.toLowerCase().endsWith('.pdf') ? (
-                              <div className="flex flex-col items-center justify-center gap-1 text-red-500">
-                                <FileText className="w-8 h-8" />
-                                <span className="text-[9px] font-bold">PDF</span>
-                              </div>
+                      {(() => {
+                        const imgUrl = resolveImageUrl(receipt.image_path, receipt.receipt_id);
+                        return (
+                          <div
+                            className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/60 rounded-xl border border-border flex items-center justify-center overflow-hidden shrink-0 group relative shadow-inner cursor-pointer"
+                            onClick={() => {
+                              if (imgUrl) setPreviewReceiptUrl(imgUrl);
+                            }}
+                          >
+                            {imgUrl ? (
+                              <>
+                                {imgUrl.toLowerCase().includes('.pdf') ? (
+                                  <div className="flex flex-col items-center justify-center gap-1 text-red-500">
+                                    <FileText className="w-8 h-8" />
+                                    <span className="text-[9px] font-bold">PDF</span>
+                                  </div>
+                                ) : (
+                                  <img
+                                    src={imgUrl}
+                                    alt="Receipt"
+                                    className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5NDkzYjgiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cmVjdCB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHg9IjMiIHk9IjMiIHJ4PSIyIiByeT0iMiIvPjxjaXJjbGUgY3g9IjkuIiBjeT0iOSIgcj0iMiIvPjxwYXRoIGQ9Im0yMSAxNS0zLjA4Ni0zLjA4NmEtMiAyIDAgMCAwLTIuODI4IDBsLTUuNzg2IDUuNzg2Ii8+PC9zdmc+';
+                                    }}
+                                  />
+                                )}
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <Eye className="w-5 h-5 text-white" />
+                                </div>
+                              </>
                             ) : (
-                              <img src={receipt.image_path.startsWith('http') ? receipt.image_path : `${import.meta.env.VITE_API_URL || '/api/v1'}/uploads${receipt.image_path.startsWith('/uploads') ? receipt.image_path.replace('/uploads', '') : (receipt.image_path.startsWith('/') ? receipt.image_path : `/${receipt.image_path}`)}`} alt="Receipt" className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity" />
+                              <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-muted-foreground/50" />
                             )}
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <Eye className="w-5 h-5 text-white" />
-                            </div>
-                          </>
-                        ) : (
-                          <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-muted-foreground/50" />
-                        )}
-                      </div>
+                          </div>
+                        );
+                      })()}
 
                       {/* Details */}
                       <div className="flex-1 flex flex-col justify-center min-w-0">

@@ -71,6 +71,7 @@ class Receipt(Base):
     content_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     ocr_confidence: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True) # 0.00 to 100.00
     ocr_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    file_data: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
     # Relationship

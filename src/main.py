@@ -106,6 +106,10 @@ async def lifespan(app: FastAPI):
                 await conn.execute(text("ALTER TABLE purchase_requisitions ADD COLUMN allocated_asset_id BIGINT;"))
             except Exception:
                 pass
+            try:
+                await conn.execute(text("ALTER TABLE receipts ADD COLUMN file_data TEXT;"))
+            except Exception:
+                pass
         logger.info("Database schema patch applied successfully.")
     except Exception as e:
         logger.error(f"Error applying database schema patch on startup: {e}")

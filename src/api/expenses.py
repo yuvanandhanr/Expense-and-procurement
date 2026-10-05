@@ -1,6 +1,6 @@
 import asyncio
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from typing import List
+from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 import aiofiles
 import os
@@ -338,6 +338,9 @@ async def upload_receipts(
             for k, v in ocr_result.items()
         }
         
+        import base64
+        b64_content = base64.b64encode(content).decode("utf-8")
+        
         receipt = Receipt(
             expense_report_id=report_id,
             merchant_name=merchant,
@@ -350,7 +353,8 @@ async def upload_receipts(
             file_name=file.filename,
             content_hash=content_hash,
             ocr_confidence=confidence,
-            ocr_json=safe_ocr_result
+            ocr_json=safe_ocr_result,
+            file_data=b64_content
         )
         await repo.add_receipt(receipt)
         _log_action(current_user, "receipt_uploaded_ocr_completed", receipt.receipt_id)
@@ -820,3 +824,60 @@ async def pay_expense(
     await db.commit()
     _log_action(current_user, "expense_paid", report_id)
     return {"status": "Paid", "reference": report.payment_reference, "payment_reference": report.payment_reference}
+
+
+@router.get("/receipts/{receipt_id}/image")
+@router.get("/{report_id}/receipts/{receipt_id}/image")
+async def get_receipt_image(
+    receipt_id: int,
+    report_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Serves a receipt image or PDF file by ID with automatic DB backup restoration.
+    """
+    from fastapi.responses import Response
+    repo = ExpenseRepository(db)
+    receipt = await repo.get_receipt_by_id(receipt_id)
+    if not receipt:
+        raise HTTPException(status_code=404, detail="Receipt record not found")
+
+    filename = os.path.basename(receipt.image_path) if receipt.image_path else f"receipt_{receipt_id}.png"
+    filepath = os.path.join(UPLOAD_DIR, filename)
+
+    content = None
+    if os.path.exists(filepath):
+        async with aiofiles.open(filepath, "rb") as f:
+            content = await f.read()
+    elif getattr(receipt, "file_data", None):
+        import base64
+        try:
+            content = base64.b64decode(receipt.file_data)
+            # Recreate on disk for future static requests
+            os.makedirs(UPLOAD_DIR, exist_ok=True)
+            async with aiofiles.open(filepath, "wb") as f:
+                await f.write(content)
+        except Exception as err:
+            logger.error(f"Failed to restore receipt image from DB: {err}")
+
+    if not content:
+        raise HTTPException(status_code=404, detail="Receipt image file not available")
+
+    ext = os.path.splitext(filename)[1].lower()
+    media_type = "image/png"
+    if ext in [".jpg", ".jpeg"]:
+        media_type = "image/jpeg"
+    elif ext == ".pdf":
+        media_type = "application/pdf"
+    elif ext == ".webp":
+        media_type = "image/webp"
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            "Content-Disposition": f'inline; filename="{filename}"'
+        }
+    )
+
