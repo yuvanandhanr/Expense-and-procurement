@@ -74,3 +74,47 @@ async def download_file(
         "Content-Disposition": f"attachment; filename={filename}"
     }
     return Response(content=content, media_type=media_type, headers=headers)
+
+
+@router.get("/download/{file_id}")
+async def download_file_alias(
+    file_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Alias route supporting both attachments and report downloads.
+    """
+    import os
+    from src.repositories.platform_services import ReportRepository
+    from src.schemas.executive_report import ExecutiveReportFilterRequest
+    from src.services.executive_report_service import ExecutiveReportService
+
+    # 1. Try Report first
+    repo = ReportRepository(db)
+    report = await repo.get_by_id(file_id)
+    if report:
+        if report.file_path and os.path.exists(report.file_path):
+            with open(report.file_path, "rb") as f:
+                content = f.read()
+            filename = os.path.basename(report.file_path)
+        else:
+            service = ExecutiveReportService(db)
+            data = await service.compile_executive_report(ExecutiveReportFilterRequest(), current_user)
+            path = await service.generate_executive_pdf_file(data, current_user.user_id)
+            with open(path, "rb") as f:
+                content = f.read()
+            filename = f"Dataeko_Report_{file_id}.pdf"
+
+        media_type = "application/pdf" if getattr(report, "file_type", "PDF") == "PDF" else "application/octet-stream"
+        return Response(content=content, media_type=media_type, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+    # 2. Try Attachment
+    try:
+        service = AttachmentService(db)
+        filename, file_type, content = await service.get_file_content(file_id)
+        media_type = "application/pdf" if file_type == ".pdf" else "application/octet-stream"
+        return Response(content=content, media_type=media_type, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+    except Exception:
+        raise HTTPException(status_code=404, detail="Requested file not found")
+

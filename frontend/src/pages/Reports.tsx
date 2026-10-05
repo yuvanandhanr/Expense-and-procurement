@@ -62,6 +62,55 @@ export const Reports: React.FC = () => {
     }
   };
 
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+
+  const handleDownloadReport = async (rep: any) => {
+    setDownloadingId(rep.report_id);
+    try {
+      const response = await api.get(`/reports/${rep.report_id}/download`, {
+        responseType: "blob",
+      });
+      const ext = rep.file_type?.toLowerCase() === "pdf" ? "pdf" : (rep.file_type?.toLowerCase() === "excel" ? "xlsx" : "csv");
+      const filename = rep.name ? (rep.name.includes(".") ? rep.name : `${rep.name}.${ext}`) : `Report_${rep.report_id}.${ext}`;
+      const mime = ext === "pdf" ? "application/pdf" : (ext === "xlsx" ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "text/csv");
+      
+      const blob = new Blob([response.data], { type: mime });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success(`Downloaded ${filename} directly to your disk!`);
+    } catch (err: any) {
+      console.error("Report download failed:", err);
+      // Fallback to /files/download/ endpoint
+      try {
+        const response = await api.get(`/files/download/${rep.report_id}`, {
+          responseType: "blob",
+        });
+        const ext = rep.file_type?.toLowerCase() === "pdf" ? "pdf" : (rep.file_type?.toLowerCase() === "excel" ? "xlsx" : "csv");
+        const filename = rep.name ? (rep.name.includes(".") ? rep.name : `${rep.name}.${ext}`) : `Report_${rep.report_id}.${ext}`;
+        const blob = new Blob([response.data]);
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        toast.success(`Downloaded ${filename} directly to your disk!`);
+      } catch (fallbackErr: any) {
+        toast.error(err.response?.data?.detail || "Failed to download file from server.");
+      }
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -199,14 +248,14 @@ export const Reports: React.FC = () => {
                         </td>
                         <td className="p-4">
                           {rep.status === "Completed" && (
-                            <a
-                              href={`/api/v1/files/download/${rep.report_id}`}
-                              className="text-xs font-bold text-primary hover:underline uppercase tracking-wider"
-                              target="_blank"
-                              rel="noreferrer"
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadReport(rep)}
+                              disabled={downloadingId === rep.report_id}
+                              className="text-xs font-bold text-sky-500 hover:text-sky-600 hover:underline uppercase tracking-wider cursor-pointer bg-transparent border-none p-0 inline-flex items-center gap-1"
                             >
-                              Download
-                            </a>
+                              {downloadingId === rep.report_id ? "Downloading..." : "Download"}
+                            </button>
                           )}
                         </td>
                       </tr>

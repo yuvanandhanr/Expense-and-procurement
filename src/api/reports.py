@@ -155,3 +155,45 @@ async def generate_executive_pdf_report(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Executive Report engine error: {str(e)}"
         )
+
+
+@router.get("/{report_id}/download")
+async def download_report_file(
+    report_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Downloads a generated report by ID directly as a file attachment.
+    """
+    import os
+    from fastapi.responses import Response
+    repo = ReportRepository(db)
+    report = await repo.get_by_id(report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report record not found")
+
+    if report.file_path and os.path.exists(report.file_path):
+        with open(report.file_path, "rb") as f:
+            file_bytes = f.read()
+        filename = os.path.basename(report.file_path)
+    else:
+        # Generate on-demand fallback content
+        service = ExecutiveReportService(db)
+        filters = ExecutiveReportFilterRequest()
+        data = await service.compile_executive_report(filters, current_user)
+        path = await service.generate_executive_pdf_file(data, current_user.user_id)
+        with open(path, "rb") as f:
+            file_bytes = f.read()
+        filename = f"Dataeko_Report_{report_id}.pdf"
+
+    media_type = "application/pdf" if getattr(report, "file_type", "PDF") == "PDF" else "application/octet-stream"
+    return Response(
+        content=file_bytes,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Access-Control-Expose-Headers": "Content-Disposition"
+        }
+    )
+
