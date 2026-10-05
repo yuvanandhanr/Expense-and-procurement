@@ -47,6 +47,9 @@ async def get_pending_approvals(
             elif report.status in ["Payment Requested", "Approved for Payment"] and bool(user_roles_set & {"Finance Manager", "CFO"}):
                 can_approve = True
                 
+            req_roles = [r.role_name for r in report.employee.roles] if report.employee and report.employee.roles else []
+            primary_role = req_roles[0] if req_roles else "Employee"
+            
             pending_workflows.append({
                 "workflow_id": pending_app.approval_id if pending_app else report.expense_report_id,
                 "entity_type": "ExpenseReport",
@@ -58,6 +61,7 @@ async def get_pending_approvals(
                 "updated_at": report.updated_at,
                 "requestor_id": report.employee_id,
                 "requestor_name": f"{report.employee.first_name} {report.employee.last_name}",
+                "requestor_role": primary_role,
                 "title": f"Expense: {report.purpose}",
                 "justification": report.justification,
                 "amount": float(report.total_amount) if report.total_amount else 0.0,

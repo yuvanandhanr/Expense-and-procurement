@@ -268,6 +268,7 @@ export const Approvals: React.FC = () => {
             <thead className="bg-muted text-muted-foreground uppercase text-xs font-bold tracking-wider">
               <tr>
                 <th className="p-4">Report ID</th>
+                <th className="p-4">Employee</th>
                 <th className="p-4">Purpose</th>
                 <th className="p-4">Total Amount</th>
                 <th className="p-4">Status</th>
@@ -279,6 +280,9 @@ export const Approvals: React.FC = () => {
               {filteredWorkflows.map((wf) => (
                 <tr key={wf.workflow_id} className="hover:bg-muted/50 transition-colors">
                   <td className="p-4 font-semibold">EXP-{wf.entity_id}</td>
+                  <td className="p-4 font-medium">
+                    {wf.requestor_name} <span className="text-muted-foreground text-xs font-normal">({(wf as any).requestor_role || 'Employee'})</span>
+                  </td>
                   <td className="p-4 font-medium max-w-[200px] truncate" title={wf.title}>{wf.title?.replace('Expense: ', '')}</td>
                   <td className="p-4 font-bold tracking-tight">₹{Number(wf.amount || 0).toFixed(2)}</td>
                   <td className="p-4">

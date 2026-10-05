@@ -614,7 +614,7 @@ async def approve_expense(
         ExpenseApproval.status == "Pending"
     )
     result = await db.execute(query)
-    approval = None
+    
     try:
         approval = result.scalar_one_or_none()
     except Exception:
@@ -623,16 +623,33 @@ async def approve_expense(
         except Exception:
             approval = None
             
-    if not approval:
+    is_payment = report.status in ["Payment Requested", "Approved for Payment"]
+    
+    if not approval and not is_payment:
         raise HTTPException(status_code=403, detail="No matching pending approval step found for your user.")
             
-    if not _can_act_on_pending_report(report, current_user, approval):
+    if not is_payment and not _can_act_on_pending_report(report, current_user, approval):
         _log_action(current_user, "expense_approval_denied", report_id, level=logging.WARNING)
         raise HTTPException(status_code=403, detail="Not authorized to approve this report")
         
-    approval.status = "Approved"
-    approval.comments = payload.comments
-    approval.actioned_at = datetime.utcnow()
+    if is_payment and not bool(_roles(current_user) & {"Finance Manager", "CFO"}):
+        raise HTTPException(status_code=403, detail="Not authorized to authorize payment")
+        
+    if approval:
+        approval.status = "Approved"
+        approval.comments = payload.comments
+        approval.actioned_at = datetime.utcnow()
+    else:
+        any_app_q = select(ExpenseApproval).where(
+            ExpenseApproval.expense_report_id == report_id,
+            ExpenseApproval.status == "Pending"
+        )
+        any_app_res = await db.execute(any_app_q)
+        any_app = any_app_res.scalars().first()
+        if any_app:
+            any_app.status = "Approved"
+            any_app.comments = payload.comments
+            any_app.actioned_at = datetime.utcnow()
         
     roles = _roles(current_user)
     if report.status in ["Pending Manager Approval", "Corrected Claim", "Pending Approval"]:
