@@ -73,16 +73,21 @@ async def get_pending_approvals(
     
     # Also fetch pending Asset Incidents for Admin/Manager
     user_roles = [r.role_name for r in current_user.roles]
-    if any(r in user_roles for r in ["Admin", "Manager", "IT"]):
+    is_admin = any(r in ["Admin", "SuperAdmin"] for r in user_roles)
+    is_it = "IT" in user_roles
+    is_manager = any(r in ["Manager", "Finance Manager", "CFO", "CEO"] for r in user_roles)
+
+    if is_admin or is_manager or is_it:
         from sqlalchemy import select
+        from sqlalchemy.orm import selectinload
         from src.models.assets import AssetIncident, Asset
         from src.models.auth import User as UserModel
         
         # Determine status filter based on role
         statuses = []
-        if "Manager" in user_roles:
+        if is_manager:
             statuses.extend(["Submitted", "Manager Approved", "Rejected", "Returned for Correction"])
-        if "Admin" in user_roles or "IT" in user_roles:
+        if is_admin or is_it:
             statuses.extend(["Submitted", "Manager Approved", "Admin Approved", "Waiting for Procurement", "Approved", "Resolved", "Resolved / Completed", "Rejected", "Returned for Correction"])
         statuses = list(set(statuses))
             
@@ -90,24 +95,36 @@ async def get_pending_approvals(
             select(AssetIncident, Asset, UserModel)
             .join(Asset, AssetIncident.asset_id == Asset.asset_id)
             .join(UserModel, AssetIncident.reporter_id == UserModel.user_id)
+            .options(selectinload(UserModel.roles))
             .where(AssetIncident.status.in_(statuses))
             .order_by(AssetIncident.created_at.desc())
         )
         
-        # If just a Manager, only see incidents in their department and not their own
-        if "Manager" in user_roles and "Admin" not in user_roles and "IT" not in user_roles:
-            stmt = stmt.where(Asset.department_id == current_user.department_id)
+        # Ensure that non-admins/IT only see incidents for their direct reports
+        if not (is_admin or is_it):
+            stmt = stmt.where(UserModel.manager_id == current_user.user_id)
             
         result = await db.execute(stmt)
         for incident, asset, reporter in result.all():
             can_approve = False
+            reporter_roles = [r.role_name for r in reporter.roles]
+            is_higher_level = any(r in ["Manager", "Finance Manager", "Finance", "CFO", "CEO", "Admin", "SuperAdmin"] for r in reporter_roles)
+
             # Self-approval prevented
             if incident.reporter_id != current_user.user_id:
-                if incident.status == "Submitted" and ("Manager" in user_roles or "Admin" in user_roles):
+                if incident.status == "Submitted":
+                    if reporter.manager_id == current_user.user_id and not is_higher_level:
+                        # Employee -> Manager
+                        can_approve = True
+                    elif (is_admin or is_it) and (is_higher_level or not reporter.manager_id):
+                        # High level -> Admin
+                        can_approve = True
+                    elif (is_admin or is_it) and reporter.manager_id == current_user.user_id:
+                        # Admin is their direct manager
+                        can_approve = True
+                elif incident.status == "Manager Approved" and (is_admin or is_it):
                     can_approve = True
-                elif incident.status == "Manager Approved" and ("Admin" in user_roles or "IT" in user_roles):
-                    can_approve = True
-                elif incident.status in ["Admin Approved", "Waiting for Procurement"] and ("Admin" in user_roles or "IT" in user_roles):
+                elif incident.status in ["Admin Approved", "Waiting for Procurement"] and (is_admin or is_it):
                     can_approve = True
 
             workflow_step = "Manager Review" if incident.status == "Submitted" else ("Admin Review" if incident.status == "Manager Approved" else "Fulfillment")

@@ -69,8 +69,8 @@ export const Approvals: React.FC = () => {
   const handleAction = async () => {
     if (!selectedWorkflow || !actionType) return;
     
-    if ((actionType === 'reject' || actionType === 'return' || selectedWorkflow.entity_type === 'AssetIncident') && !isValidText(comment)) {
-      toast.error("Please enter a valid comment (letters or numbers required).");
+    if ((actionType === 'reject' || actionType === 'return') && !isValidText(comment)) {
+      toast.error("Please enter a valid reason or instruction (letters or numbers required).");
       return;
     }
 
