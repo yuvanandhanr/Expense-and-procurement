@@ -338,20 +338,18 @@ async def action_incident(
                 if not available_asset:
                     raise HTTPException(status_code=400, detail="Selected replacement asset is unavailable or already assigned.")
             else:
-                # Auto check inventory for matching available asset
-                avail_stmt = select(Asset).where(
-                    Asset.status.in_(["Available", "Unassigned", "In Stock"]),
-                    Asset.category_id == incident.asset.category_id
-                )
-                avail_result = await session.execute(avail_stmt)
-                available_asset = avail_result.scalars().first()
-                if not available_asset:
-                    # Fallback to any available asset in inventory
-                    avail_stmt_any = select(Asset).where(
+                # Auto check inventory for matching available asset in the same category
+                if incident.asset and incident.asset.category_id:
+                    avail_stmt = select(Asset).where(
+                        Asset.status.in_(["Available", "Unassigned", "In Stock"]),
+                        Asset.category_id == incident.asset.category_id
+                    )
+                else:
+                    avail_stmt = select(Asset).where(
                         Asset.status.in_(["Available", "Unassigned", "In Stock"])
                     )
-                    avail_res_any = await session.execute(avail_stmt_any)
-                    available_asset = avail_res_any.scalars().first()
+                avail_result = await session.execute(avail_stmt)
+                available_asset = avail_result.scalars().first()
 
             old_employee_id = incident.asset.assigned_employee_id or incident.reporter_id
 

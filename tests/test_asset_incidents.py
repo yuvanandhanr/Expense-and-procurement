@@ -235,7 +235,7 @@ async def test_it_replace_incident(
     mock_result.scalar_one_or_none.return_value = mock_incident
     
     mock_avail_result = MagicMock()
-    mock_avail_result.scalars().first.return_value = None
+    mock_avail_result.scalars.return_value.first.return_value = None
 
     mock_cat_result = MagicMock()
     mock_cat_result.scalar_one_or_none.return_value = AssetCategory(category_id=1, category_name="Hardware")
