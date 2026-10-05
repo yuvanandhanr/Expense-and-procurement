@@ -11,13 +11,15 @@ rbac_dependency = Depends(RoleChecker(["CEO", "CFO", "Finance", "Finance Manager
 
 
 @router.get("/spend", dependencies=[rbac_dependency])
-async def get_spend_analytics(db: AsyncSession = Depends(get_db_session)):
+@router.get("/spending", dependencies=[rbac_dependency])
+async def get_spend_analytics(timeframe: str = "all", db: AsyncSession = Depends(get_db_session)):
     """
-    Retrieves global spending analytics aggregated by department, vendor, category, and month.
+    Retrieves global spending analytics aggregated by department, vendor, category, month, and fiscal year.
     """
     dashboard_service = DashboardService(db)
-    data = await dashboard_service.get_spend_analytics()
+    data = await dashboard_service.get_spend_analytics(timeframe=timeframe)
     return data
+
 
 
 @router.get("/vendors", dependencies=[rbac_dependency])

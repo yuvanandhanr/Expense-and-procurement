@@ -46,9 +46,16 @@ class DashboardService:
 
         # Compile specific metrics based on role
         role_upper = role.upper()
+
+        # Differentiated Monthly (MTD) and Yearly (YTD) Spending Metrics
+        spend_summary = await self._get_monthly_and_yearly_spend_summary(user_id=user_id if role_upper == "EMPLOYEE" else None)
+        data["widgets"]["financial_cadence"] = spend_summary
+
         if role_upper in ("CEO", "CFO", "FINANCE", "FINANCE MANAGER", "ADMIN"):
             data["widgets"]["pending_approvals"] = await self._get_pending_approvals_count()
             data["widgets"]["department_spend"] = await self._get_department_spend()
+            data["widgets"]["department_monthly_spend"] = await self._get_department_spend(period="month")
+            data["widgets"]["department_yearly_spend"] = await self._get_department_spend(period="year")
             data["widgets"]["budget_utilization"] = await self._get_budget_utilization()
             data["widgets"]["employee_reimbursements"] = await self._get_reimbursements_summary()
             data["widgets"]["vendor_invoices"] = await self._get_vendor_invoices_summary()
@@ -65,11 +72,14 @@ class DashboardService:
 
         if role_upper in ("IT", "FINANCE", "FINANCE MANAGER", "ADMIN"):
             data["widgets"]["asset_summary"] = await self._get_asset_summary()
+            data["widgets"]["low_stock_alerts"] = await self._get_low_stock_alerts()
             data["widgets"]["amc_expiry"] = await self._get_expiring_amc_count()
 
         if role_upper == "MANAGER":
             data["widgets"]["pending_approvals"] = await self._get_pending_approvals_count(manager_id=user_id)
             data["widgets"]["department_spend"] = await self._get_department_spend(manager_id=user_id)
+            data["widgets"]["department_monthly_spend"] = await self._get_department_spend(manager_id=user_id, period="month")
+            data["widgets"]["department_yearly_spend"] = await self._get_department_spend(manager_id=user_id, period="year")
             data["widgets"]["employee_reimbursements"] = await self._get_reimbursements_summary()
             data["widgets"]["vendor_invoices"] = await self._get_vendor_invoices_summary()
 
@@ -84,26 +94,22 @@ class DashboardService:
         # Real-time metrics computed directly
         return data
 
-    async def get_spend_analytics(self) -> Dict[str, Any]:
+    async def get_spend_analytics(self, timeframe: str = "all") -> Dict[str, Any]:
         """
-        Gathers spending trends across departments, vendors, categories, and months.
+        Gathers spending trends across departments, vendors, categories, months, and fiscal years.
         """
-        cache_key = "analytics:spend"
-        cached = await self.cache.get(cache_key)
-        if cached:
-            return cached
-
         data = {
+            "timeframe": timeframe,
+            "financial_cadence": await self._get_monthly_and_yearly_spend_summary(),
             "department_spend": await self._get_department_spend(),
+            "department_monthly_spend": await self._get_department_spend(period="month"),
+            "department_yearly_spend": await self._get_department_spend(period="year"),
             "vendor_spend": await self._get_top_vendors(),
             "category_spend": await self._get_category_spend(),
             "monthly_trends": await self._get_monthly_procurement_trends(),
             "yearly_trends": await self._get_yearly_trends(),
             "budget_consumption": await self._get_budget_utilization(),
         }
-
-        # Cache spend analytics for 10 minutes
-        await self.cache.set(cache_key, data, expire_seconds=600)
         return data
 
     async def get_vendor_analytics(self) -> List[Dict[str, Any]]:
@@ -184,7 +190,134 @@ class DashboardService:
                 count += exp_res.scalar() or 0
         return count
 
-    async def _get_department_spend(self, manager_id: Optional[int] = None) -> List[Dict[str, Any]]:
+    async def _get_monthly_and_yearly_spend_summary(self, user_id: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Calculates Month-to-Date (MTD) and Year-to-Date (YTD) spending across expenses, POs, and vendor invoices.
+        """
+        now = datetime.utcnow()
+        start_of_month = datetime(now.year, now.month, 1)
+        start_of_year = datetime(now.year, 1, 1)
+        
+        # Calculate start of prior month
+        if now.month == 1:
+            start_of_prior_month = datetime(now.year - 1, 12, 1)
+            end_of_prior_month = datetime(now.year - 1, 12, 31, 23, 59, 59)
+        else:
+            start_of_prior_month = datetime(now.year, now.month - 1, 1)
+            end_of_prior_month = start_of_month - timedelta(seconds=1)
+
+        # 1. Expense Reports
+        exp_mtd_q = select(func.coalesce(func.sum(ExpenseReport.total_amount), 0), func.count(ExpenseReport.expense_report_id)).where(
+            ExpenseReport.status.in_(["Approved", "Finance Verified", "Paid", "Approved for Payment", "Payment Requested"]),
+            ExpenseReport.created_at >= start_of_month
+        )
+        exp_ytd_q = select(func.coalesce(func.sum(ExpenseReport.total_amount), 0), func.count(ExpenseReport.expense_report_id)).where(
+            ExpenseReport.status.in_(["Approved", "Finance Verified", "Paid", "Approved for Payment", "Payment Requested"]),
+            ExpenseReport.created_at >= start_of_year
+        )
+        exp_prior_q = select(func.coalesce(func.sum(ExpenseReport.total_amount), 0)).where(
+            ExpenseReport.status.in_(["Approved", "Finance Verified", "Paid", "Approved for Payment", "Payment Requested"]),
+            ExpenseReport.created_at >= start_of_prior_month,
+            ExpenseReport.created_at <= end_of_prior_month
+        )
+
+        if user_id:
+            exp_mtd_q = exp_mtd_q.where(ExpenseReport.employee_id == user_id)
+            exp_ytd_q = exp_ytd_q.where(ExpenseReport.employee_id == user_id)
+            exp_prior_q = exp_prior_q.where(ExpenseReport.employee_id == user_id)
+
+        exp_mtd_res = (await self.db.execute(exp_mtd_q)).first()
+        exp_ytd_res = (await self.db.execute(exp_ytd_q)).first()
+        exp_prior_res = (await self.db.execute(exp_prior_q)).scalar() or 0.0
+
+        # 2. Purchase Orders (Procurement Spend)
+        po_mtd_q = select(func.coalesce(func.sum(PurchaseOrder.total_amount), 0), func.count(PurchaseOrder.po_id)).where(
+            PurchaseOrder.status.in_(["Issued", "Delivered", "Billed", "Accepted", "Completed"]),
+            PurchaseOrder.created_at >= start_of_month
+        )
+        po_ytd_q = select(func.coalesce(func.sum(PurchaseOrder.total_amount), 0), func.count(PurchaseOrder.po_id)).where(
+            PurchaseOrder.status.in_(["Issued", "Delivered", "Billed", "Accepted", "Completed"]),
+            PurchaseOrder.created_at >= start_of_year
+        )
+        po_prior_q = select(func.coalesce(func.sum(PurchaseOrder.total_amount), 0)).where(
+            PurchaseOrder.status.in_(["Issued", "Delivered", "Billed", "Accepted", "Completed"]),
+            PurchaseOrder.created_at >= start_of_prior_month,
+            PurchaseOrder.created_at <= end_of_prior_month
+        )
+
+        po_mtd_res = (await self.db.execute(po_mtd_q)).first()
+        po_ytd_res = (await self.db.execute(po_ytd_q)).first()
+        po_prior_res = (await self.db.execute(po_prior_q)).scalar() or 0.0
+
+        exp_mtd_amt = float(exp_mtd_res[0] or 0.0) if exp_mtd_res else 0.0
+        exp_ytd_amt = float(exp_ytd_res[0] or 0.0) if exp_ytd_res else 0.0
+        po_mtd_amt = float(po_mtd_res[0] or 0.0) if po_mtd_res else 0.0
+        po_ytd_amt = float(po_ytd_res[0] or 0.0) if po_ytd_res else 0.0
+
+        total_mtd = exp_mtd_amt + po_mtd_amt
+        total_ytd = exp_ytd_amt + po_ytd_amt
+        total_prior = float(exp_prior_res) + float(po_prior_res)
+
+        mom_growth = ((total_mtd - total_prior) / total_prior * 100) if total_prior > 0 else 0.0
+
+        return {
+            "current_month_name": now.strftime("%B %Y"),
+            "current_fiscal_year": f"FY {now.year}",
+            "monthly_spend": round(total_mtd, 2),
+            "yearly_spend": round(total_ytd, 2),
+            "prior_month_spend": round(total_prior, 2),
+            "mom_growth_percent": round(mom_growth, 1),
+            "reimbursements": {
+                "monthly_amount": round(exp_mtd_amt, 2),
+                "monthly_count": exp_mtd_res[1] if exp_mtd_res else 0,
+                "yearly_amount": round(exp_ytd_amt, 2),
+                "yearly_count": exp_ytd_res[1] if exp_ytd_res else 0,
+            },
+            "procurement": {
+                "monthly_amount": round(po_mtd_amt, 2),
+                "monthly_count": po_mtd_res[1] if po_mtd_res else 0,
+                "yearly_amount": round(po_ytd_amt, 2),
+                "yearly_count": po_ytd_res[1] if po_ytd_res else 0,
+            }
+        }
+
+    async def _get_low_stock_alerts(self) -> Dict[str, Any]:
+        """
+        Audits asset inventory and returns items where available stock is <= 5.
+        """
+        from src.models.assets import AssetCategory
+        query = select(
+            AssetCategory.category_name,
+            func.count(Asset.asset_id).label("available_count")
+        ).join(
+            Asset, AssetCategory.category_id == Asset.category_id
+        ).where(
+            Asset.status.in_(["Available", "Unassigned", "In Stock"])
+        ).group_by(AssetCategory.category_name)
+
+        result = await self.db.execute(query)
+        low_stock_categories = []
+        total_low_stock_count = 0
+
+        for row in result.all():
+            count = int(row.available_count or 0)
+            if count <= 5:
+                low_stock_categories.append({
+                    "category": row.category_name,
+                    "available_stock": count,
+                    "threshold": 5,
+                    "action_required": "Push to Finance Manager / RFQ"
+                })
+                total_low_stock_count += 1
+
+        return {
+            "has_low_stock": len(low_stock_categories) > 0,
+            "low_stock_count": total_low_stock_count,
+            "items": low_stock_categories
+        }
+
+    async def _get_department_spend(self, manager_id: Optional[int] = None, period: Optional[str] = None) -> List[Dict[str, Any]]:
+        now = datetime.utcnow()
         query = select(
             Department.department_name,
             func.sum(PurchaseRequisition.total_estimated_amount).label("total_spend")
@@ -192,7 +325,16 @@ class DashboardService:
             PurchaseRequisition, Department.department_id == PurchaseRequisition.department_id
         ).where(
             PurchaseRequisition.status.in_(["Approved", "Closed"])
-        ).group_by(Department.department_name)
+        )
+
+        if period == "month":
+            start_of_month = datetime(now.year, now.month, 1)
+            query = query.where(PurchaseRequisition.created_at >= start_of_month)
+        elif period == "year":
+            start_of_year = datetime(now.year, 1, 1)
+            query = query.where(PurchaseRequisition.created_at >= start_of_year)
+
+        query = query.group_by(Department.department_name)
         
         result = await self.db.execute(query)
         spend = []

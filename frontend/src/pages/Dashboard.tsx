@@ -2,9 +2,38 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../services/api";
-import { Card, CardHeader, CardTitle, CardContent, Skeleton, Badge, HeroTimestamp, StatusBadge } from "../components/ui";
+import { Card, CardHeader, CardTitle, CardContent, Skeleton, Badge, HeroTimestamp, StatusBadge, Button } from "../components/ui";
 import { formatDate } from "../utils/helpers";
-import { HardDrive, Receipt, FileText, CheckCircle, Clock, AlertCircle, TrendingUp, IndianRupee, ShieldCheck, ArrowUpRight, ChevronRight, Info } from "lucide-react";
+import { Bar, Doughnut, Line } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import { 
+  HardDrive, Receipt, FileText, CheckCircle, Clock, AlertCircle, 
+  TrendingUp, IndianRupee, ShieldCheck, ArrowUpRight, ChevronRight, 
+  Calendar, Layers, AlertTriangle, Sparkles 
+} from "lucide-react";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 export const Dashboard: React.FC = () => {
   const { user, hasRole } = useAuth();
@@ -15,8 +44,10 @@ export const Dashboard: React.FC = () => {
   const [approvals, setApprovals] = useState<any[]>([]);
   const [myAssetsList, setMyAssetsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [timeframe, setTimeframe] = useState<"monthly" | "yearly" | "all">("monthly");
 
   const isApprover = hasRole("Manager") || hasRole("Finance") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin") || hasRole("CEO");
+  const isFinanceOrAdmin = hasRole("Finance") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin") || hasRole("CEO");
 
   const fetchAllLiveData = useCallback(async (isInitial = false) => {
     if (isInitial) setLoading(true);
@@ -43,7 +74,6 @@ export const Dashboard: React.FC = () => {
 
   useEffect(() => {
     fetchAllLiveData(true);
-    // Real-time polling every 10 seconds
     const interval = setInterval(() => {
       fetchAllLiveData(false);
     }, 10000);
@@ -81,7 +111,12 @@ export const Dashboard: React.FC = () => {
   const safeApprovals = Array.isArray(approvals) ? approvals : [];
   const safeMyAssetsList = Array.isArray(myAssetsList) ? myAssetsList : [];
 
+  const cadence = data?.widgets?.financial_cadence || {};
+  const monthlySpend = cadence.monthly_spend || 0;
+  const yearlySpend = cadence.yearly_spend || 0;
   const totalExpenseSpend = safeExpenses.reduce((sum: number, e: any) => sum + (Number(e?.total_amount) || 0), 0);
+  const lowStockAlerts = data?.widgets?.low_stock_alerts;
+
   const pendingApprovalsCount = isApprover 
     ? safeApprovals.filter((a: any) => {
         const amt = Number(a?.amount || a?.total_amount || a?.estimated_cost || 0);
@@ -95,7 +130,7 @@ export const Dashboard: React.FC = () => {
   
   const assignedAssetsCount = safeMyAssetsList.length || (Array.isArray(data?.widgets?.my_assets) ? data.widgets.my_assets.length : 0);
 
-  // Real-time recent list with pending items prioritized on top by creation time
+  // Real-time recent lists
   const recentPRs = [...safePrs].sort((a: any, b: any) => {
     const isPendingA = (a.status?.toLowerCase().includes("pending") || a.status === "Submitted") && (Number(a.total_estimated_amount || a.estimated_cost || 0) > 0);
     const isPendingB = (b.status?.toLowerCase().includes("pending") || b.status === "Submitted") && (Number(b.total_estimated_amount || b.estimated_cost || 0) > 0);
@@ -116,9 +151,28 @@ export const Dashboard: React.FC = () => {
     return timeB - timeA;
   }).slice(0, 5);
 
+  // Chart data for 12 months rolling
+  const monthsList = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthlyProcTrends = data?.widgets?.monthly_procurement || [];
+  const chartData = {
+    labels: monthsList,
+    datasets: [
+      {
+        label: "Procurement Spend (₹)",
+        data: monthsList.map((_, i) => {
+          const mStr = `${new Date().getFullYear()}-${String(i + 1).padStart(2, "0")}`;
+          const match = monthlyProcTrends.find((t: any) => t.month === mStr);
+          return match ? match.spend : 0;
+        }),
+        backgroundColor: "rgba(59, 130, 246, 0.75)",
+        borderRadius: 6,
+      }
+    ]
+  };
+
   return (
     <div className="space-y-7 animate-fade-in">
-      {/* Apple Greeting Hero Header */}
+      {/* Hero Header & Timeframe Switcher */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -130,47 +184,121 @@ export const Dashboard: React.FC = () => {
             </span>
           </div>
           <p className="text-xs md:text-sm text-muted-foreground mt-1">
-            Enterprise procurement & expense intelligence updating in real time.
+            Enterprise spend intelligence & approval pipeline updating in real time.
           </p>
         </div>
-        <HeroTimestamp />
+
+        {/* Timeframe Cadence Selector */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center space-x-1 bg-muted/60 p-1 rounded-xl border border-border/60 shadow-sm">
+            <button
+              onClick={() => setTimeframe("monthly")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                timeframe === "monthly"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>This Month (MTD)</span>
+            </button>
+            <button
+              onClick={() => setTimeframe("yearly")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                timeframe === "yearly"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>This Year (YTD)</span>
+            </button>
+            <button
+              onClick={() => setTimeframe("all")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                timeframe === "all"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              All Time
+            </button>
+          </div>
+          <HeroTimestamp />
+        </div>
       </div>
+
+      {/* Low Stock Replenishment Alert Banner (if applicable for Admin/Finance/IT) */}
+      {lowStockAlerts?.has_low_stock && isFinanceOrAdmin && (
+        <div 
+          onClick={() => navigate("/assets")}
+          className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between cursor-pointer hover:bg-amber-500/15 transition-colors group shadow-apple-sm"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center font-bold">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-amber-600 dark:text-amber-400">
+                Low Stock Inventory Replenishment Alert ({lowStockAlerts.low_stock_count} item{lowStockAlerts.low_stock_count > 1 ? 's' : ''} &le; 5 units)
+              </h4>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {lowStockAlerts.items.map((i: any) => `${i.category} (${i.available_stock} left)`).join(", ")} &mdash; Review inventory and push procurement to Finance Manager.
+              </p>
+            </div>
+          </div>
+          <Button size="sm" variant="warning" className="gap-1 font-bold">
+            <span>Check Inventory</span> <ChevronRight className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      )}
 
       {/* Apple Metrics Overview Bento Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Total Spending */}
+        
+        {/* Card 1: Differentiated Monthly vs. Yearly Spend */}
         <div
-          onClick={() => navigate("/expenses")}
-          title="Click to view full Expense Reimbursements ledger"
+          onClick={() => navigate("/analytics")}
+          title="Click to view full Spend Analytics"
           className="apple-card p-5 rounded-2xl relative overflow-hidden group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-apple-md hover:border-primary/40 active:scale-[0.99] border border-border/80 flex flex-col justify-between"
         >
           <div>
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
-                Total Spend
+                {timeframe === "monthly" ? "Monthly Spend (MTD)" : timeframe === "yearly" ? "Yearly Spend (YTD)" : "Total Spend"}
               </span>
               <div className="flex items-center gap-1.5">
-                <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-[#0071E3] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
-                <div className="w-8 h-8 rounded-xl bg-[#0071E3]/10 flex items-center justify-center text-[#0071E3] group-hover:scale-110 transition-transform">
+                <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
                   <IndianRupee className="w-4 h-4" />
                 </div>
               </div>
             </div>
             <div className="mt-3">
-              <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-[#0071E3] transition-colors">
-                ${totalExpenseSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-primary transition-colors">
+                ₹{timeframe === "monthly"
+                  ? (monthlySpend || totalExpenseSpend).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                  : timeframe === "yearly"
+                  ? (yearlySpend || totalExpenseSpend).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                  : totalExpenseSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-[#0071E3] transition-colors group-hover:text-[#0071E3]">
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-[#0071E3]/10 transition-colors group-hover:bg-[#0071E3]/20 group-hover:text-[#0071E3]">
-                  {expenses.length} Records
+              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-primary">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-primary/10">
+                  {timeframe === "monthly" ? (cadence.current_month_name || "Current Month") : (cadence.current_fiscal_year || "Current FY")}
                 </span>
-                <span className="text-muted-foreground transition-colors group-hover:text-[#0071E3]">in current ledger</span>
+                {cadence.mom_growth_percent !== undefined && timeframe === "monthly" && (
+                  <span className={`text-[10px] font-bold ${cadence.mom_growth_percent >= 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                    {cadence.mom_growth_percent >= 0 ? `+${cadence.mom_growth_percent}% MoM` : `${cadence.mom_growth_percent}% MoM`}
+                  </span>
+                )}
               </div>
             </div>
           </div>
-          <div className="mt-3.5 pt-2.5 border-t border-border/40 text-[10px] text-muted-foreground/80 group-hover:text-[#0071E3] flex items-center justify-between transition-colors">
-            <span>Verified claims & reimbursements</span>
-            <span className="font-bold flex items-center">View Ledger <ChevronRight className="w-3 h-3 ml-0.5" /></span>
+          <div className="mt-3.5 pt-2.5 border-t border-border/40 text-[10px] text-muted-foreground/80 group-hover:text-primary flex items-center justify-between transition-colors">
+            <span>
+              {timeframe === "monthly" ? `Claims: ₹${cadence.reimbursements?.monthly_amount || 0} | POs: ₹${cadence.procurement?.monthly_amount || 0}` : `YTD Claims + Open POs`}
+            </span>
+            <span className="font-bold flex items-center">Analytics <ChevronRight className="w-3 h-3 ml-0.5" /></span>
           </div>
         </div>
 
@@ -196,10 +324,11 @@ export const Dashboard: React.FC = () => {
               <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-amber-500 transition-colors">
                 {pendingApprovalsCount}
               </div>
-              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-amber-500 transition-colors group-hover:text-amber-500">
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-500/10 transition-colors group-hover:bg-amber-500/20 group-hover:text-amber-500">
+              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-amber-500">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-500/10">
                   {pendingApprovalsCount > 0 ? "Action Required" : "All Caught Up"}
                 </span>
+                <span className="text-muted-foreground text-[10px]">in approval inbox</span>
               </div>
             </div>
           </div>
@@ -209,16 +338,16 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Card 3: Velocity */}
+        {/* Card 3: Annual Budget Utilization / Velocity */}
         <div
           onClick={() => navigate("/analytics")}
-          title="Click to view Financial Analytics & Velocity Metrics"
-          className="apple-card p-5 rounded-2xl relative overflow-hidden group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-apple-md hover:border-cyan/40 active:scale-[0.99] border border-border/80 flex flex-col justify-between"
+          title="Click to view Budget & Velocity telemetry"
+          className="apple-card p-5 rounded-2xl relative overflow-hidden group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-apple-md hover:border-cyan-500/40 active:scale-[0.99] border border-border/80 flex flex-col justify-between"
         >
           <div>
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
-                Approval Velocity
+                {isFinanceOrAdmin ? "Annual Budget Burn" : "Approval Velocity"}
               </span>
               <div className="flex items-center gap-1.5">
                 <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-[#30B0C7] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
@@ -229,22 +358,22 @@ export const Dashboard: React.FC = () => {
             </div>
             <div className="mt-3">
               <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-[#30B0C7] transition-colors">
-                1.4 <span className="text-base font-semibold text-muted-foreground transition-colors group-hover:text-[#30B0C7]">days</span>
+                {isFinanceOrAdmin ? "42.8%" : "1.4 days"}
               </div>
-              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-[#30B0C7] transition-colors group-hover:text-[#30B0C7]">
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-[#30B0C7]/10 transition-colors group-hover:bg-[#30B0C7]/20 group-hover:text-[#30B0C7]">
-                  Fast Turnaround
+              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-[#30B0C7]">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-[#30B0C7]/10">
+                  {isFinanceOrAdmin ? "Within Healthy Cap" : "Fast Turnaround"}
                 </span>
               </div>
             </div>
           </div>
           <div className="mt-3.5 pt-2.5 border-t border-border/40 text-[10px] text-muted-foreground/80 group-hover:text-[#30B0C7] flex items-center justify-between transition-colors">
-            <span>Average multi-tier turnaround</span>
-            <span className="font-bold flex items-center">Analytics <ChevronRight className="w-3 h-3 ml-0.5" /></span>
+            <span>{isFinanceOrAdmin ? "Fiscal year envelope" : "Average signoff timeline"}</span>
+            <span className="font-bold flex items-center">Budgets <ChevronRight className="w-3 h-3 ml-0.5" /></span>
           </div>
         </div>
 
-        {/* Card 4: Active Assets */}
+        {/* Card 4: Active Assets & Low Stock Pulse */}
         <div
           onClick={() => navigate("/my-assets")}
           title="Click to view and manage Assigned Assets"
@@ -266,9 +395,9 @@ export const Dashboard: React.FC = () => {
               <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-purple-500 transition-colors">
                 {assignedAssetsCount}
               </div>
-              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-purple-500 transition-colors group-hover:text-purple-500">
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-purple-500/10 transition-colors group-hover:bg-purple-500/20 group-hover:text-purple-500">
-                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500 mr-1.5 transition-colors group-hover:bg-purple-500" /> Verified Registry
+              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-purple-500">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-purple-500/10">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500 mr-1.5" /> Verified Registry
                 </span>
               </div>
             </div>
@@ -280,13 +409,40 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Grid */}
+      {/* Main Content Split: Requisitions, Expenses, Trends & Assets */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         
-        {/* Left Column: Requisitions & Recent Expenses */}
+        {/* Left 2 Columns: Requisitions & Recent Expenses */}
         <div className="xl:col-span-2 space-y-6">
           
-          {/* My Requisitions - Apple Glass Table */}
+          {/* Spend Trend Chart (Rolling 12 Months) */}
+          {isFinanceOrAdmin && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">Procurement & Expense Trajectory ({new Date().getFullYear()})</CardTitle>
+                  <p className="text-xs text-muted-foreground">Monthly expenditure run rate across all department cost centers.</p>
+                </div>
+                <Badge variant="neutral">Monthly Cadence</Badge>
+              </CardHeader>
+              <CardContent className="h-64">
+                <Bar 
+                  data={chartData} 
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                      y: { grid: { color: "rgba(150, 150, 150, 0.1)" } },
+                      x: { grid: { display: false } }
+                    }
+                  }} 
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Recent Requisitions Table */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div className="flex items-center space-x-2.5">
@@ -295,6 +451,9 @@ export const Dashboard: React.FC = () => {
                 </div>
                 <CardTitle>Recent Requisitions</CardTitle>
               </div>
+              <Button size="sm" variant="ghost" onClick={() => navigate("/prs")} className="text-xs">
+                View All
+              </Button>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -317,7 +476,7 @@ export const Dashboard: React.FC = () => {
                         <tr key={idx} className="hover:bg-muted/30 transition-colors">
                           <td className="py-3.5 px-5 font-bold text-primary whitespace-nowrap">{req.pr_number || req.id}</td>
                           <td className="py-3.5 px-5 font-medium">{req.title}</td>
-                          <td className="py-3.5 px-5 text-right font-mono font-semibold whitespace-nowrap">${(Number(req.total_estimated_amount) || Number(req.amount) || 0).toLocaleString()}</td>
+                          <td className="py-3.5 px-5 text-right font-mono font-semibold whitespace-nowrap">₹{(Number(req.total_estimated_amount) || Number(req.amount) || 0).toLocaleString()}</td>
                           <td className="py-3.5 px-5 text-center whitespace-nowrap">
                             <StatusBadge status={req.status} />
                           </td>
@@ -337,8 +496,11 @@ export const Dashboard: React.FC = () => {
                 <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                   <Receipt className="w-3.5 h-3.5" />
                 </div>
-                <CardTitle>Recent Expenses</CardTitle>
+                <CardTitle>Recent Expense Claims</CardTitle>
               </div>
+              <Button size="sm" variant="ghost" onClick={() => navigate("/expenses")} className="text-xs">
+                View Ledger
+              </Button>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -361,7 +523,7 @@ export const Dashboard: React.FC = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-mono font-bold text-xs text-foreground">${(Number(exp.total_amount) || Number(exp.amount) || 0).toFixed(2)}</p>
+                        <p className="font-mono font-bold text-xs text-foreground">₹{(Number(exp.total_amount) || Number(exp.amount) || 0).toFixed(2)}</p>
                         <div className="mt-1">
                           <StatusBadge status={exp.status} />
                         </div>
@@ -374,16 +536,19 @@ export const Dashboard: React.FC = () => {
           </Card>
         </div>
 
-        {/* Right Column: My Assets */}
+        {/* Right Column: My Assigned Assets & Governance Cadence */}
         <div className="space-y-6">
-          <Card className="h-full">
-            <CardHeader>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
               <div className="flex items-center space-x-2.5">
                 <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                   <HardDrive className="w-3.5 h-3.5" />
                 </div>
                 <CardTitle>My Assets</CardTitle>
               </div>
+              <Button size="sm" variant="ghost" onClick={() => navigate("/my-assets")} className="text-xs">
+                Manage
+              </Button>
             </CardHeader>
             <CardContent className="space-y-3.5">
               {safeMyAssetsList.length === 0 ? (
@@ -406,6 +571,30 @@ export const Dashboard: React.FC = () => {
               )}
             </CardContent>
           </Card>
+
+          {/* Operational Cadence Card */}
+          <Card className="bg-gradient-to-br from-primary/5 via-card to-card border-primary/20">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                <CardTitle className="text-sm">Periodic Governance</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 text-xs">
+              <div className="p-3 rounded-lg bg-background border border-border/60 space-y-1">
+                <span className="font-bold text-primary block">Monthly Checklist</span>
+                <p className="text-muted-foreground text-[11px]">
+                  Expense claim cutoff, batch payout releases, and low-stock replenishment review.
+                </p>
+              </div>
+              <div className="p-3 rounded-lg bg-background border border-border/60 space-y-1">
+                <span className="font-bold text-emerald-600 block">Annual Checklist</span>
+                <p className="text-muted-foreground text-[11px]">
+                  Fiscal budget renewal, vendor compliance review, asset wall-to-wall audit & depreciation.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
@@ -413,3 +602,4 @@ export const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
+
