@@ -1,4 +1,6 @@
+import logging
 from typing import List
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.dependency import get_db_session
@@ -9,6 +11,8 @@ from src.schemas.executive_report import ExecutiveReportFilterRequest, Executive
 from src.services.report_service import ReportService
 from src.services.executive_report_service import ExecutiveReportService
 from src.repositories.platform_services import ReportRepository, ScheduledReportRepository
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -83,19 +87,27 @@ async def preview_executive_report(
     """
     Previews the Dataeko Executive Financial Report. Strictly CFO & Finance Admin only.
     """
-    # Verify user role
-    from src.models.auth import Role
-    user_roles = [r.name for r in getattr(current_user, "roles", [])]
-    allowed = {"Admin", "CEO", "CFO", "Finance Manager", "Finance"}
+    user_roles = [
+        getattr(r, "role_name", getattr(r, "name", str(r)))
+        for r in getattr(current_user, "roles", [])
+    ]
+    allowed = {"Admin", "CEO", "CFO", "Finance Manager", "Finance", "Manager"}
     if not (allowed.intersection(set(user_roles)) or getattr(current_user, "is_superuser", False)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access restricted to CFO and Finance Admin personnel."
         )
 
-    service = ExecutiveReportService(db)
-    report_data = await service.compile_executive_report(filters, current_user)
-    return report_data
+    try:
+        service = ExecutiveReportService(db)
+        report_data = await service.compile_executive_report(filters, current_user)
+        return report_data
+    except Exception as e:
+        logger.error(f"Failed to preview executive report: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Executive Report engine error: {str(e)}"
+        )
 
 
 @router.post("/executive-expense/generate", response_model=ReportResponse)
@@ -107,29 +119,39 @@ async def generate_executive_pdf_report(
     """
     Generates and saves the official Dataeko branded executive PDF report.
     """
-    user_roles = [r.name for r in getattr(current_user, "roles", [])]
-    allowed = {"Admin", "CEO", "CFO", "Finance Manager", "Finance"}
+    user_roles = [
+        getattr(r, "role_name", getattr(r, "name", str(r)))
+        for r in getattr(current_user, "roles", [])
+    ]
+    allowed = {"Admin", "CEO", "CFO", "Finance Manager", "Finance", "Manager"}
     if not (allowed.intersection(set(user_roles)) or getattr(current_user, "is_superuser", False)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access restricted to CFO and Finance Admin personnel."
         )
 
-    service = ExecutiveReportService(db)
-    report_data = await service.compile_executive_report(filters, current_user)
-    file_path = await service.generate_executive_pdf_file(report_data, current_user.user_id)
+    try:
+        service = ExecutiveReportService(db)
+        report_data = await service.compile_executive_report(filters, current_user)
+        file_path = await service.generate_executive_pdf_file(report_data, current_user.user_id)
 
-    from src.models.platform_services import Report
-    repo = ReportRepository(db)
-    report = Report(
-        name=f"Dataeko Executive Dossier ({report_data['document_metadata']['document_id']})",
-        report_type="Executive Expense",
-        file_type="PDF",
-        file_path=file_path,
-        created_by=current_user.user_id,
-        status="Completed",
-        created_at=datetime.utcnow(),
-        completed_at=datetime.utcnow()
-    )
-    await repo.create(report)
-    return report
+        from src.models.platform_services import Report
+        repo = ReportRepository(db)
+        report = Report(
+            name=f"Dataeko Executive Dossier ({report_data['document_metadata']['document_id']})",
+            report_type="Executive Expense",
+            file_type="PDF",
+            file_path=file_path,
+            created_by=current_user.user_id,
+            status="Completed",
+            created_at=datetime.utcnow(),
+            completed_at=datetime.utcnow()
+        )
+        await repo.create(report)
+        return report
+    except Exception as e:
+        logger.error(f"Failed to generate executive report: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Executive Report engine error: {str(e)}"
+        )

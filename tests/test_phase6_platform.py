@@ -301,3 +301,48 @@ def test_system_health_checks(client: TestClient, override_db: AsyncMock, mock_e
         assert response.json()["status"] == "Healthy"
 
     app.dependency_overrides.clear()
+
+
+# --- Test Executive Report Router ---
+
+def test_executive_report_preview_ceo_allowed(client: TestClient, override_db: AsyncMock, mock_ceo) -> None:
+    async def _current_user_override():
+        return mock_ceo
+    app.dependency_overrides[get_current_user] = _current_user_override
+
+    # Mock DB queries inside ExecutiveReportService
+    override_db.execute.return_value.scalars.return_value.all.return_value = []
+    override_db.execute.return_value.scalar.return_value = 0.0
+
+    payload = {
+        "scope": "all",
+        "time_horizon": "5_YEAR_ARCHIVE",
+        "status": "Approved"
+    }
+
+    response = client.post("/api/v1/reports/executive-expense/preview", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "document_metadata" in data
+    assert "key_financial_metrics" in data
+    assert "balance_sheet_snapshot" in data
+    assert data["company_name"] == "Dataeko Corporate Intelligence"
+
+    app.dependency_overrides.clear()
+
+
+def test_executive_report_preview_employee_forbidden(client: TestClient, override_db: AsyncMock, mock_employee) -> None:
+    async def _current_user_override():
+        return mock_employee
+    app.dependency_overrides[get_current_user] = _current_user_override
+
+    payload = {
+        "scope": "all",
+        "time_horizon": "5_YEAR_ARCHIVE"
+    }
+
+    response = client.post("/api/v1/reports/executive-expense/preview", json=payload)
+    assert response.status_code == 403
+
+    app.dependency_overrides.clear()
+

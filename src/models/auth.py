@@ -130,6 +130,11 @@ class User(Base):
         "Designation", back_populates="users", foreign_keys="[User.designation_id]"
     )
 
+    @property
+    def full_name(self) -> str:
+        parts = [p for p in [self.first_name, self.last_name] if p]
+        return " ".join(parts) if parts else (self.email or f"User #{self.user_id}")
+
 
 class Role(Base):
     """
