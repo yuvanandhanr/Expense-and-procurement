@@ -26,7 +26,7 @@ import {
   Calendar, 
   TrendingUp, 
   TrendingDown, 
-  PackageAlert, 
+  AlertTriangle, 
   PieChart, 
   Layers 
 } from "lucide-react";
@@ -443,7 +443,7 @@ export const Analytics: React.FC = () => {
                 Stock Replenishment
               </span>
               <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500 group-hover:scale-110 transition-transform">
-                <PackageAlert className="w-4 h-4" />
+                <AlertTriangle className="w-4 h-4" />
               </div>
             </div>
             <h3 className="text-2xl font-extrabold text-foreground group-hover:text-amber-500 transition-colors mt-2">
