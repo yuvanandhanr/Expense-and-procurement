@@ -125,11 +125,12 @@ async def update_user(
     if data.department_name is not None and data.department_name != "":
         from sqlalchemy import select
         from src.models.organization import Department
-        res = await db.execute(select(Department.department_name))
-        allowed_depts = [r[0] for r in res.all()]
-        if data.department_name not in allowed_depts:
+        res = await db.execute(select(Department.department_name, Department.department_id))
+        dept_map = {r[0]: r[1] for r in res.all()}
+        if data.department_name not in dept_map:
             from fastapi import HTTPException
             raise HTTPException(status_code=400, detail="Invalid department name.")
+        data.department_id = dept_map[data.department_name]
             
     if data.employee_type is not None and data.employee_type != "":
         allowed_types = ["Intern", "Consultant", "Full-Time", "Part-Time", "Contract"]
