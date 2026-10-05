@@ -597,7 +597,9 @@ async def approve_expense(
         "Pending Finance Verification",
         "Pending Approval",
         "Corrected Claim",
-        "Pending CFO Approval"
+        "Pending CFO Approval",
+        "Payment Requested",
+        "Approved for Payment"
     ]
     if report.status not in valid_statuses:
         raise HTTPException(status_code=400, detail="Report is not pending approval")
@@ -685,6 +687,11 @@ async def approve_expense(
                 approver_id=fin_exec.user_id,
                 status="Pending"
             ))
+    elif report.status in ["Payment Requested", "Approved for Payment"]:
+        import uuid
+        report.status = "Approved"
+        report.payment_status = "Paid"
+        report.payment_reference = f"PAY-EXP-{report_id}-{uuid.uuid4().hex[:6]}"
     else:
         report.status = "Payment Requested"
         report.payment_status = "Pending Payment"
