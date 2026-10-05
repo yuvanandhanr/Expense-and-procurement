@@ -262,12 +262,12 @@ export const Approvals: React.FC = () => {
              <EmptyState title={`No pending ${activeTab.toLowerCase()}.`} description="You're all caught up!" />
           </CardContent>
         </Card>
-      ) : activeTab === "Reimbursements" ? (
+      ) : activeTab === "Reimbursements" || activeTab === "Requisitions" ? (
         <div className="overflow-x-auto rounded-xl border border-border shadow-sm">
           <table className="w-full text-left text-sm text-foreground">
             <thead className="bg-muted text-muted-foreground uppercase text-xs font-bold tracking-wider">
               <tr>
-                <th className="p-4">Report ID</th>
+                <th className="p-4">ID</th>
                 <th className="p-4">Employee</th>
                 <th className="p-4">Purpose</th>
                 <th className="p-4">Total Amount</th>
@@ -279,7 +279,7 @@ export const Approvals: React.FC = () => {
             <tbody className="divide-y divide-border bg-card">
               {filteredWorkflows.map((wf) => (
                 <tr key={wf.workflow_id} className="hover:bg-muted/50 transition-colors">
-                  <td className="p-4 font-semibold">EXP-{wf.entity_id}</td>
+                  <td className="p-4 font-semibold">{activeTab === "Reimbursements" ? "EXP-" : "PR-"}{wf.entity_id}</td>
                   <td className="p-4 font-medium">
                     {wf.requestor_name} <span className="text-muted-foreground text-xs font-normal">({(wf as any).requestor_role || 'Employee'})</span>
                   </td>
@@ -294,7 +294,13 @@ export const Approvals: React.FC = () => {
                       <Button 
                         size="sm" 
                         variant="primary"
-                        onClick={() => handleViewDetails(wf.entity_id)}
+                        onClick={() => {
+                           if (activeTab === "Reimbursements") {
+                             handleViewDetails(wf.entity_id);
+                           } else {
+                             setSelectedWorkflow(wf); setActionType("approve");
+                           }
+                        }}
                         className="gap-1.5 bg-[#0f172a] text-white hover:bg-slate-800"
                       >
                         Need Approval
@@ -303,10 +309,126 @@ export const Approvals: React.FC = () => {
                       <Button 
                         size="sm" 
                         variant="view"
-                        onClick={() => handleViewDetails(wf.entity_id)}
+                        onClick={() => {
+                          if (activeTab === "Reimbursements") {
+                            handleViewDetails(wf.entity_id);
+                          }
+                        }}
                         className="gap-1.5"
                       >
                         <Eye className="w-3.5 h-3.5" /> View
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : activeTab === "Asset Incidents" ? (
+        <div className="overflow-x-auto rounded-xl border border-border shadow-sm">
+          <table className="w-full text-left text-sm text-foreground">
+            <thead className="bg-muted text-muted-foreground uppercase text-xs font-bold tracking-wider">
+              <tr>
+                <th className="p-4">ID</th>
+                <th className="p-4">Reported By</th>
+                <th className="p-4">Issue</th>
+                <th className="p-4">Submission Date</th>
+                <th className="p-4">Status</th>
+                <th className="p-4">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border bg-card">
+              {filteredWorkflows.map((wf) => (
+                <tr key={wf.workflow_id} className="hover:bg-muted/50 transition-colors">
+                  <td className="p-4 font-semibold">INC-{wf.entity_id}</td>
+                  <td className="p-4 font-medium">
+                    {wf.requestor_name}
+                  </td>
+                  <td className="p-4 font-medium max-w-[250px] truncate" title={wf.title}>{wf.title}</td>
+                  <td className="p-4 text-xs text-muted-foreground">{new Date(wf.created_at || Date.now()).toLocaleDateString()}</td>
+                  <td className="p-4">
+                    <StatusBadge status={wf.status} />
+                  </td>
+                  <td className="p-4 flex items-center gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="gap-1.5 text-xs font-semibold"
+                      onClick={() => setSelectedIncident(wf)}
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </Button>
+                    
+                    {wf.can_approve && ["Submitted", "Manager Approved"].includes(wf.status) && (
+                      <>
+                        <Button 
+                          size="sm"
+                          variant="success" 
+                          className="font-bold shadow-apple-sm text-xs"
+                          onClick={() => { setSelectedWorkflow(wf); setActionType("approve"); }}
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button 
+                          size="sm"
+                          variant="warning" 
+                          className="font-bold shadow-apple-sm border border-yellow-500 bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500 hover:text-white transition-colors text-xs"
+                          onClick={() => { setSelectedWorkflow(wf); setActionType("return"); }}
+                        >
+                          Return
+                        </Button>
+                        <Button 
+                          size="sm"
+                          variant="danger" 
+                          className="font-bold shadow-apple-sm text-xs"
+                          onClick={() => { setSelectedWorkflow(wf); setActionType("reject"); }}
+                        >
+                          <XIcon className="w-3.5 h-3.5" />
+                        </Button>
+                      </>
+                    )}
+                    {wf.status === "Admin Approved" && wf.entity_type === "AssetIncident" && (
+                      <>
+                        {wf.admin_inspection_resolution === "Repair Required" ? (
+                          <Button 
+                            size="sm"
+                            variant="success" 
+                            className="font-bold shadow-apple-sm text-xs"
+                            onClick={() => { setSelectedWorkflow(wf); setActionType("complete_repair" as any); }}
+                          >
+                            Repair
+                          </Button>
+                        ) : (
+                          <>
+                            <Button 
+                              size="sm"
+                              variant="info" 
+                              className="font-bold shadow-apple-sm text-xs"
+                              onClick={() => { setSelectedWorkflow(wf); setActionType("assign_replacement" as any); }}
+                            >
+                              Replace
+                            </Button>
+                            <Button 
+                              size="sm"
+                              variant="outline" 
+                              className="font-bold shadow-apple-sm text-xs"
+                              onClick={() => { setSelectedWorkflow(wf); setActionType("complete_procurement" as any); }}
+                            >
+                              Buy
+                            </Button>
+                          </>
+                        )}
+                      </>
+                    )}
+                    {wf.status === "Waiting for Procurement" && wf.entity_type === "AssetIncident" && (
+                      <Button 
+                        size="sm"
+                        variant="success" 
+                        className="font-bold shadow-apple-sm text-xs"
+                        onClick={() => { setSelectedWorkflow(wf); setActionType("assign_replacement" as any); }}
+                      >
+                        Assign
                       </Button>
                     )}
                   </td>
