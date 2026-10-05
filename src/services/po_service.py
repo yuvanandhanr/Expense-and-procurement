@@ -180,6 +180,16 @@ class POService:
         await self.po_repo.update(po)
         return po
 
+    async def accept_po(self, po_id: int) -> PurchaseOrder:
+        po = await self.po_repo.get_by_id(po_id)
+        if not po:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PO not found")
+
+        po.status = "Accepted"
+        await self.po_repo.update(po)
+        return po
+
+
     async def mark_item_delivered_by_vendor(self, po_id: int, po_item_id: int, vendor_product_id: str) -> PurchaseOrderItem:
         po = await self.po_repo.get_by_id(po_id)
         if not po:

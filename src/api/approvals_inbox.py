@@ -77,34 +77,42 @@ async def get_pending_approvals(
         # Determine status filter based on role
         statuses = []
         if "Manager" in user_roles:
-            statuses.append("Submitted")
+            statuses.extend(["Submitted", "Manager Approved", "Rejected", "Returned for Correction"])
         if "Admin" in user_roles or "IT" in user_roles:
-            statuses.append("Manager Approved")
-            statuses.append("Admin Approved")
-            statuses.append("Waiting for Procurement")
+            statuses.extend(["Submitted", "Manager Approved", "Admin Approved", "Waiting for Procurement", "Approved", "Resolved", "Resolved / Completed", "Rejected", "Returned for Correction"])
+        statuses = list(set(statuses))
             
         stmt = (
             select(AssetIncident, Asset, UserModel)
             .join(Asset, AssetIncident.asset_id == Asset.asset_id)
             .join(UserModel, AssetIncident.reporter_id == UserModel.user_id)
             .where(AssetIncident.status.in_(statuses))
+            .order_by(AssetIncident.created_at.desc())
         )
         
-        # If just a Manager, only see incidents in their department
+        # If just a Manager, only see incidents in their department and not their own
         if "Manager" in user_roles and "Admin" not in user_roles and "IT" not in user_roles:
             stmt = stmt.where(Asset.department_id == current_user.department_id)
             
         result = await db.execute(stmt)
         for incident, asset, reporter in result.all():
-            # Exclude Approved incidents if the user is a Manager who is not an Admin/IT
-            # (Handled by the status filter above)
-            workflow_step = "Manager Review" if incident.status == "Submitted" else "Pending Fulfillment"
+            can_approve = False
+            # Self-approval prevented
+            if incident.reporter_id != current_user.user_id:
+                if incident.status == "Submitted" and ("Manager" in user_roles or "Admin" in user_roles):
+                    can_approve = True
+                elif incident.status == "Manager Approved" and ("Admin" in user_roles or "IT" in user_roles):
+                    can_approve = True
+                elif incident.status in ["Admin Approved", "Waiting for Procurement"] and ("Admin" in user_roles or "IT" in user_roles):
+                    can_approve = True
+
+            workflow_step = "Manager Review" if incident.status == "Submitted" else ("Admin Review" if incident.status == "Manager Approved" else "Fulfillment")
             asset_name_str = asset.model if asset.model else "Asset"
             pending_workflows.append({
-                "workflow_id": incident.incident_id, # using incident_id as workflow_id since entity_type distinguishes it
+                "workflow_id": incident.incident_id,
                 "entity_type": "AssetIncident",
                 "entity_id": incident.incident_id,
-                "current_step_sequence": 1,
+                "current_step_sequence": 1 if incident.status == "Submitted" else 2,
                 "workflow_step": workflow_step,
                 "status": incident.status,
                 "created_at": incident.created_at,
@@ -116,7 +124,19 @@ async def get_pending_approvals(
                 "past_approvers": [],
                 "pending_approvers": ["Admin/Manager"],
                 "steps": [],
-                "can_approve": True
+                "can_approve": can_approve,
+                "reason": incident.reason,
+                "incident_type": incident.incident_type,
+                "asset_tag": asset.asset_tag,
+                "asset_name": asset.model,
+                "serial_number": asset.serial_number,
+                "attachment_url": incident.attachment_url,
+                "incident_date": str(incident.incident_date) if incident.incident_date else None,
+                "manager_inspection_assessment": incident.manager_inspection_assessment,
+                "manager_inspection_comments": incident.manager_inspection_comments,
+                "admin_inspection_resolution": incident.admin_inspection_resolution,
+                "admin_comments": incident.admin_comments,
+                "linked_pr_id": incident.linked_pr_id
             })
 
     return pending_workflows

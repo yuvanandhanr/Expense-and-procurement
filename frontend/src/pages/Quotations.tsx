@@ -14,7 +14,7 @@ export const Quotations: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [expandedRfq, setExpandedRfq] = useState<number | null>(null);
 
-  const isFinanceManager = user?.roles?.some(r => r.role_name === "Finance Manager" || r.role_name === "CFO" || r.role_name === "Admin");
+  const isFinanceManager = user?.roles?.some(r => r.role_name === "Finance Manager" || r.role_name === "Admin");
 
   const fetchData = async () => {
     setLoading(true);
@@ -111,9 +111,11 @@ export const Quotations: React.FC = () => {
                             {rfqQuotes.map((q) => {
                               let statusDisplay = q.status;
                               if (q.status === "Selected" || q.is_selected) {
-                                statusDisplay = "Selected";
-                              } else if (q.status === "Rejected" || hasSelected) {
-                                statusDisplay = "Rejected";
+                                statusDisplay = "Selected Quote";
+                              } else if (hasSelected) {
+                                statusDisplay = "Non-Selected Quote";
+                              } else if (q.status === "Rejected") {
+                                statusDisplay = "Rejected Quote";
                               }
 
                               return (
@@ -123,7 +125,9 @@ export const Quotations: React.FC = () => {
                                   <td className="p-3 font-bold text-primary whitespace-nowrap">₹{Number(q.total_amount).toLocaleString()}</td>
                                   <td className="p-3 whitespace-nowrap">{q.lead_time_days} days</td>
                                   <td className="p-3 whitespace-nowrap">
-                                    <StatusBadge status={statusDisplay} />
+                                    <Badge variant={statusDisplay === "Selected Quote" ? "success" : (statusDisplay === "Non-Selected Quote" || statusDisplay === "Rejected Quote") ? "error" : "neutral"}>
+                                      {statusDisplay}
+                                    </Badge>
                                   </td>
                                   <td className="p-3 text-right whitespace-nowrap">
                                     {isFinanceManager && !hasSelected && (

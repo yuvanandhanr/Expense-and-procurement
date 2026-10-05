@@ -58,6 +58,33 @@ async def list_quotations(
         vendor_id = result.scalar_one_or_none()
         if vendor_id:
             return await service.quote_repo.list_by_vendor(vendor_id)
-        return []
-    
     return []
+
+
+@router.post("/{id}/approve", response_model=QuotationSchema)
+@router.post("/{id}/select", response_model=QuotationSchema)
+async def select_quotation(
+    id: int,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    user_roles = [role.role_name for role in current_user.roles]
+    if not any(role in ("Admin", "SuperAdmin", "Procurement Manager", "Finance Manager", "Finance") for role in user_roles):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Finance Manager, Procurement Manager, or Administrators are permitted to select quotations"
+        )
+    service = RFQService(db)
+    quote = await service.quote_repo.get_by_id(id)
+    if not quote:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quotation not found")
+        
+    await service.select_vendor(
+        rfq_id=quote.rfq_id,
+        selected_vendor_id=quote.vendor_id,
+        selected_quotation_id=quote.quotation_id,
+        reason="Selected from Quotations Inbox",
+        user_id=current_user.user_id
+    )
+    return await service.quote_repo.get_by_id(id)
+

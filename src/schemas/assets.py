@@ -128,10 +128,31 @@ class AssetSchema(BaseModel):
     documents: List[AssetDocumentSchema] = []
 
 
+class AssetNestedSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    asset_id: int
+    asset_number: Optional[str] = None
+    asset_tag: Optional[str] = None
+    model: Optional[str] = None
+    serial_number: Optional[str] = None
+    status: Optional[str] = None
+    category_id: Optional[int] = None
+
+class UserNestedSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    user_id: int
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[str] = None
+    department_id: Optional[int] = None
+
 class AssetIncidentCreate(BaseModel):
     asset_id: int
     description: str
     incident_type: str
+    reason: Optional[str] = None
+    comments: Optional[str] = None
+    incident_date: Optional[date] = None
     image_url: Optional[str] = None
     is_draft: Optional[bool] = False
     department_name: Optional[str] = None
@@ -141,16 +162,20 @@ class AssetIncidentCreate(BaseModel):
 class AssetIncidentUpdate(BaseModel):
     description: Optional[str] = None
     incident_type: Optional[str] = None
+    reason: Optional[str] = None
+    comments: Optional[str] = None
+    incident_date: Optional[date] = None
     image_url: Optional[str] = None
 
 
 class AssetIncidentAction(BaseModel):
-    action: str # Approve, Reject, Return for Correction
+    action: str # Approve, Reject, Return for Correction, Assign Replacement, Complete Repair, Complete Procurement Replacement
     resolution: Optional[str] = None
     manager_inspection_assessment: Optional[str] = None
     manager_inspection_comments: Optional[str] = None
     admin_inspection_resolution: Optional[str] = None
     admin_comments: Optional[str] = None
+    replacement_asset_id: Optional[int] = None
 
 
 class AssetIncidentSchema(BaseModel):
@@ -173,3 +198,6 @@ class AssetIncidentSchema(BaseModel):
     linked_pr_id: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    asset: Optional[AssetNestedSummary] = None
+    reporter: Optional[UserNestedSummary] = None
+

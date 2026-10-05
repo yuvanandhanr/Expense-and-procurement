@@ -456,22 +456,36 @@ export const PurchaseRequisitions: React.FC = () => {
 
                 {selectedPr.requestor_id !== user?.user_id && user?.roles?.some(r => r.role_name === "Admin") && (selectedPr.status === "Pending Admin Approval" || selectedPr.status === "Under Review") && (
                   <div className="mt-4 p-4 border border-border bg-muted/20 rounded-lg space-y-4">
-                    <h4 className="font-bold text-sm">Inventory Check & Allocation</h4>
+                    <h4 className="font-bold text-sm">Asset Inventory Check & Resolution</h4>
+                    
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs space-y-1">
+                      <span className="font-bold text-amber-600 block">Inventory Assessment Rule:</span>
+                      <p className="text-muted-foreground">
+                        If available stock &gt; 5, allocate an existing asset to close this requisition. If stock &le; 5 or unavailable, you can push the requirement to Finance Manager to start vendor RFQ procurement.
+                      </p>
+                    </div>
+
                     <div className="space-y-2">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase">Allocate from Available Inventory</label>
+                      <label className="text-xs font-semibold text-muted-foreground uppercase">Option A: Allocate from Available Inventory (Stock &gt; 0)</label>
                       <div className="flex gap-2">
                         <Input 
                           id="allocate-asset-id"
-                          placeholder="Enter Asset ID..." 
+                          placeholder="Enter Available Asset ID..." 
                           value={allocateAssetId}
                           onChange={(e) => setAllocateAssetId(e.target.value)}
                         />
-                        <Button onClick={() => handleAdminAction("allocate")} variant="primary" disabled={isSubmitting}>Allocate Asset</Button>
+                        <Button onClick={() => handleAdminAction("allocate")} variant="primary" disabled={isSubmitting}>
+                          Allocate Asset
+                        </Button>
                       </div>
                     </div>
-                    <div className="pt-2 border-t border-border">
-                      <p className="text-xs text-muted-foreground mb-2">If no suitable asset is found in inventory, initiate a new purchase.</p>
-                      <Button onClick={() => handleAdminAction("procure")} variant="outline" className="w-full" disabled={isSubmitting}>Initiate Procurement (Route to CFO)</Button>
+
+                    <div className="pt-3 border-t border-border space-y-2">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase">Option B: Low Stock / No Stock (Stock &le; 5)</label>
+                      <p className="text-xs text-muted-foreground">Push this requirement to the Finance Manager to initiate RFQ and vendor quotation bidding.</p>
+                      <Button onClick={() => handleAdminAction("procure")} variant="warning" className="w-full font-bold" disabled={isSubmitting}>
+                        Push to Finance Manager (Start RFQ Procurement)
+                      </Button>
                     </div>
                   </div>
                 )}

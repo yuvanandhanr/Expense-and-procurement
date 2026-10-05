@@ -199,7 +199,8 @@ export const Approvals: React.FC = () => {
     "Return for Correction": currentTabWorkflows.filter((r: any) => r.status === "Returned for Correction" || r.status === "Returned").length,
   };
 
-  const filteredWorkflows = getFilteredWorkflows();
+  // Incident Details Modal state
+  const [selectedIncident, setSelectedIncident] = useState<any | null>(null);
 
   return (
     <div className="space-y-6">
@@ -314,13 +315,15 @@ export const Approvals: React.FC = () => {
           {filteredWorkflows.map(wf => (
             <Card key={wf.workflow_id} className="flex flex-col">
               <CardHeader className="pb-3 flex flex-col items-start gap-2">
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                    {wf.entity_type === "AssetIncident" ? "ASSET INCIDENT" : wf.entity_type.replace(/([A-Z])/g, ' $1').trim()} #{wf.entity_id}
-                  </span>
-                  <CardTitle className="text-base">{wf.workflow_step || (wf.entity_type === 'AssetIncident' ? 'Request for Repair/Replacement' : `${wf.entity_type.replace(/([A-Z])/g, ' $1').trim()} Step`)}</CardTitle>
+                <div className="w-full flex items-start justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                      {wf.entity_type === "AssetIncident" ? "ASSET INCIDENT" : wf.entity_type.replace(/([A-Z])/g, ' $1').trim()} #{wf.entity_id}
+                    </span>
+                    <CardTitle className="text-base">{wf.workflow_step || (wf.entity_type === 'AssetIncident' ? 'Incident Review' : `${wf.entity_type.replace(/([A-Z])/g, ' $1').trim()} Step`)}</CardTitle>
+                  </div>
+                  <StatusBadge status={wf.status} />
                 </div>
-                <StatusBadge status={wf.status} />
               </CardHeader>
               <CardContent className="flex-1 flex flex-col justify-between pt-0 space-y-4">
                 <div className="text-sm space-y-3 mt-2">
@@ -329,70 +332,106 @@ export const Approvals: React.FC = () => {
                   </div>
                   {wf.justification && (
                     <div>
-                      <span className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Justification / Reason</span>
+                      <span className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Issue Description</span>
                       <p className="text-muted-foreground italic line-clamp-2">{wf.justification}</p>
                     </div>
                   )}
-                  <div className="flex justify-between items-center bg-muted/40 p-2 rounded-lg border">
-                    <span className="text-muted-foreground text-xs">Requested By:</span>
-                    <span className="font-semibold text-xs">{wf.requestor_name || `User ${wf.requester_id}`}</span>
+                  {wf.reason && (
+                    <div>
+                      <span className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Reason / Justification</span>
+                      <p className="text-muted-foreground line-clamp-2">{wf.reason}</p>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center bg-muted/40 p-2 rounded-lg border text-xs">
+                    <span className="text-muted-foreground">Reported By:</span>
+                    <span className="font-semibold">{wf.requestor_name || `User ${wf.requestor_id}`}</span>
                   </div>
-                  <div className="flex justify-between items-center bg-muted/40 p-2 rounded-lg border">
-                    <span className="text-muted-foreground text-xs">Requested Date:</span>
-                    <span className="text-xs">{formatDate(wf.created_at)}</span>
+                  <div className="flex justify-between items-center bg-muted/40 p-2 rounded-lg border text-xs">
+                    <span className="text-muted-foreground">Submission Date:</span>
+                    <span>{formatDate(wf.created_at)}</span>
                   </div>
-                  {(wf.status === "Approved" && wf.updated_at) && (
-                    <div className="flex justify-between items-center bg-muted/40 p-2 rounded-lg border">
-                      <span className="text-muted-foreground text-xs">Approved Date:</span>
-                      <span className="text-xs">{formatDate(wf.updated_at)}</span>
+                  {wf.manager_inspection_assessment && (
+                    <div className="bg-primary/5 p-2.5 rounded-lg border border-primary/20 text-xs space-y-1">
+                      <span className="font-bold text-primary block">Manager Assessment: {wf.manager_inspection_assessment}</span>
+                      {wf.manager_inspection_comments && <p className="text-muted-foreground italic">"{wf.manager_inspection_comments}"</p>}
+                    </div>
+                  )}
+                  {wf.admin_inspection_resolution && (
+                    <div className="bg-emerald-500/5 p-2.5 rounded-lg border border-emerald-500/20 text-xs space-y-1">
+                      <span className="font-bold text-emerald-600 block">Admin Resolution: {wf.admin_inspection_resolution}</span>
+                      {wf.admin_comments && <p className="text-muted-foreground italic">"{wf.admin_comments}"</p>}
                     </div>
                   )}
                 </div>
                 
-                {((["Pending", "Under Review", "Reported", "Payment Requested"].includes(wf.status)) || (wf.status.toLowerCase().includes("pending") && wf.status !== "Approved" && wf.status !== "Pending Fulfillment")) && (
+                {wf.entity_type === "AssetIncident" && (
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="w-full gap-1.5 text-xs font-semibold"
+                    onClick={() => setSelectedIncident(wf)}
+                  >
+                    <Eye className="w-3.5 h-3.5" /> View Full Incident
+                  </Button>
+                )}
+
+                {/* Approver Actions: Approve | Return for Correction | Reject */}
+                {wf.can_approve && ["Submitted", "Manager Approved"].includes(wf.status) && (
                   <div className="flex space-x-2 pt-4 border-t border-border">
                     <Button 
                       variant="success" 
-                      className="flex-1 font-bold shadow-apple-sm"
-                      onClick={() => { setSelectedWorkflow(wf); setActionType(wf.status === "Payment Requested" ? "pay" : "approve"); }}
+                      className="flex-1 font-bold shadow-apple-sm text-xs"
+                      onClick={() => { setSelectedWorkflow(wf); setActionType("approve"); }}
                     >
-                      <Check className="w-4 h-4" />
-                      <span>{wf.status === "Payment Requested" ? "Authorize Payment" : "Approve"}</span>
+                      <Check className="w-3.5 h-3.5 mr-1" />
+                      <span>Approve</span>
                     </Button>
                     <Button 
                       variant="warning" 
-                      className="flex-1 font-bold shadow-apple-sm border border-yellow-500 bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500 hover:text-white transition-colors"
+                      className="flex-1 font-bold shadow-apple-sm border border-yellow-500 bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500 hover:text-white transition-colors text-xs"
                       onClick={() => { setSelectedWorkflow(wf); setActionType("return"); }}
                     >
                       <span>Return</span>
                     </Button>
                     <Button 
                       variant="danger" 
-                      className="flex-1 font-bold shadow-apple-sm"
+                      className="flex-1 font-bold shadow-apple-sm text-xs"
                       onClick={() => { setSelectedWorkflow(wf); setActionType("reject"); }}
                     >
-                      <XIcon className="w-4 h-4" />
+                      <XIcon className="w-3.5 h-3.5 mr-1" />
                       <span>Reject</span>
                     </Button>
                   </div>
                 )}
                 
-                {wf.status === "Pending Fulfillment" && wf.entity_type === "AssetIncident" && (
+                {wf.status === "Admin Approved" && wf.entity_type === "AssetIncident" && (
                   <div className="flex space-x-2 pt-4 border-t border-border">
-                    <Button 
-                      variant="warning" 
-                      className="flex-1 font-bold shadow-apple-sm"
-                      onClick={() => { setSelectedWorkflow(wf); setActionType("repair"); }}
-                    >
-                      <span>Repair</span>
-                    </Button>
-                    <Button 
-                      variant="info" 
-                      className="flex-1 font-bold shadow-apple-sm"
-                      onClick={() => { setSelectedWorkflow(wf); setActionType("replace"); }}
-                    >
-                      <span>Replace</span>
-                    </Button>
+                    {wf.admin_inspection_resolution === "Repair Required" ? (
+                      <Button 
+                        variant="success" 
+                        className="flex-1 font-bold shadow-apple-sm text-xs"
+                        onClick={() => { setSelectedWorkflow(wf); setActionType("complete_repair" as any); }}
+                      >
+                        <span>Complete Repair</span>
+                      </Button>
+                    ) : (
+                      <>
+                        <Button 
+                          variant="info" 
+                          className="flex-1 font-bold shadow-apple-sm text-xs"
+                          onClick={() => { setSelectedWorkflow(wf); setActionType("assign_replacement" as any); }}
+                        >
+                          <span>Assign Replacement</span>
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          className="flex-1 font-bold shadow-apple-sm text-xs"
+                          onClick={() => { setSelectedWorkflow(wf); setActionType("complete_procurement" as any); }}
+                        >
+                          <span>Trigger Procurement</span>
+                        </Button>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -400,10 +439,10 @@ export const Approvals: React.FC = () => {
                   <div className="flex space-x-2 pt-4 border-t border-border">
                     <Button 
                       variant="success" 
-                      className="flex-1 font-bold shadow-apple-sm"
-                      onClick={() => { setSelectedWorkflow(wf); setActionType("assign_replacement"); }}
+                      className="flex-1 font-bold shadow-apple-sm text-xs"
+                      onClick={() => { setSelectedWorkflow(wf); setActionType("assign_replacement" as any); }}
                     >
-                      <span>Assign Replacement</span>
+                      <span>Assign Received Asset</span>
                     </Button>
                   </div>
                 )}
@@ -416,23 +455,33 @@ export const Approvals: React.FC = () => {
       {/* Action Dialog */}
       <Dialog 
         isOpen={!!selectedWorkflow} 
-        onClose={() => { setSelectedWorkflow(null); setActionType(null); setComment(""); 
-      setManagerAssessment("");
-      setManagerComments("");
-      setAdminResolution("");
-      setAdminComments("");
- }}
-        title={`${actionType ? actionType.charAt(0).toUpperCase() + actionType.slice(1) : ''} ${selectedWorkflow?.entity_type} #${selectedWorkflow?.entity_id}`}
+        onClose={() => { 
+          setSelectedWorkflow(null); 
+          setActionType(null); 
+          setComment(""); 
+          setManagerAssessment("");
+          setManagerComments("");
+          setAdminResolution("");
+          setAdminComments("");
+        }}
+        title={`${actionType === "approve" ? "Approve" : actionType === "reject" ? "Reject" : actionType === "return" ? "Return for Correction" : actionType === "complete_repair" ? "Complete Repair" : actionType === "assign_replacement" ? "Assign Replacement" : "Trigger Procurement"} ${selectedWorkflow?.entity_type} #${selectedWorkflow?.entity_id}`}
       >
         <div className="space-y-4">
           
-          
           {selectedWorkflow?.status === "Submitted" && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && (
-            <div className="space-y-4 p-3 bg-muted/30 rounded-xl border border-border/50">
+            <div className="space-y-4 p-4 bg-muted/30 rounded-xl border border-border/50">
                <div>
-                 <label className="block text-sm font-medium mb-1">Inspection / Resolution Assessment <span className="text-red-500">*</span></label>
-                 <select className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" value={managerAssessment} onChange={(e) => setManagerAssessment(e.target.value)}>
-                   <option value="">Select an option</option>
+                 <label className="block text-sm font-semibold mb-1">
+                   Inspection / Resolution Assessment <span className="text-red-500">*</span>
+                 </label>
+                 <p className="text-xs text-muted-foreground mb-2">Record your physical inspection assessment with the employee before approving.</p>
+                 <select 
+                   className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" 
+                   value={managerAssessment} 
+                   onChange={(e) => setManagerAssessment(e.target.value)}
+                   required
+                 >
+                   <option value="">Select Assessment Outcome</option>
                    <option value="No Action Required">No Action Required</option>
                    <option value="Repair Required">Repair Required</option>
                    <option value="Replacement Required">Replacement Required</option>
@@ -440,17 +489,30 @@ export const Approvals: React.FC = () => {
                  </select>
                </div>
                <div>
-                 <label className="block text-sm font-medium mb-1">Manager Inspection Comments</label>
-                 <Input value={managerComments} onChange={(e) => setManagerComments(e.target.value)} placeholder="Notes..." />
+                 <label className="block text-sm font-semibold mb-1">Manager Inspection Comments</label>
+                 <Input 
+                   value={managerComments} 
+                   onChange={(e) => setManagerComments(e.target.value)} 
+                   placeholder="Physical inspection findings, device condition, observations..." 
+                 />
                </div>
             </div>
           )}
+
           {selectedWorkflow?.status === "Manager Approved" && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && (
-            <div className="space-y-4 p-3 bg-muted/30 rounded-xl border border-border/50">
+            <div className="space-y-4 p-4 bg-muted/30 rounded-xl border border-border/50">
                <div>
-                 <label className="block text-sm font-medium mb-1">Admin Inspection / Resolution <span className="text-red-500">*</span></label>
-                 <select className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" value={adminResolution} onChange={(e) => setAdminResolution(e.target.value)}>
-                   <option value="">Select an option</option>
+                 <label className="block text-sm font-semibold mb-1">
+                   Admin Inspection / Resolution <span className="text-red-500">*</span>
+                 </label>
+                 <p className="text-xs text-muted-foreground mb-2">Determine the final resolution following technical/inventory review.</p>
+                 <select 
+                   className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" 
+                   value={adminResolution} 
+                   onChange={(e) => setAdminResolution(e.target.value)}
+                   required
+                 >
+                   <option value="">Select Resolution</option>
                    <option value="Repair Required">Repair Required</option>
                    <option value="Replacement Required">Replacement Required</option>
                    <option value="Further Inspection Required">Further Inspection Required</option>
@@ -458,41 +520,152 @@ export const Approvals: React.FC = () => {
                  </select>
                </div>
                <div>
-                 <label className="block text-sm font-medium mb-1">Admin Comments / Resolution Notes</label>
-                 <Input value={adminComments} onChange={(e) => setAdminComments(e.target.value)} placeholder="Notes..." />
+                 <label className="block text-sm font-semibold mb-1">Admin Comments / Resolution Notes</label>
+                 <Input 
+                   value={adminComments} 
+                   onChange={(e) => setAdminComments(e.target.value)} 
+                   placeholder="Technical findings, inventory availability, next steps..." 
+                 />
                </div>
             </div>
           )}
-          {(actionType === 'reject' || actionType === 'return' || selectedWorkflow?.entity_type === 'AssetIncident') && (
+
+          {(actionType === 'reject' || actionType === 'return' || actionType === 'approve' || actionType === 'complete_repair' || actionType === 'assign_replacement') && (
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Comments {(actionType === 'reject' || actionType === 'return') && <span className="text-red-500">*</span>}
+              <label className="block text-sm font-semibold mb-1">
+                {actionType === 'reject' ? 'Rejection Reason *' : actionType === 'return' ? 'Correction Instructions *' : 'Resolution / Notes'}
               </label>
               <Input 
                 value={comment} 
                 onChange={(e) => setComment(e.target.value)} 
-                placeholder={(actionType === 'reject' || actionType === 'return') ? "Resolution / Reason (required)..." : "Add a note..."} 
+                placeholder={(actionType === 'reject' || actionType === 'return') ? "Mandatory reason..." : "Optional notes..."} 
+                required={actionType === 'reject' || actionType === 'return'}
               />
             </div>
           )}
 
-          <div className="flex justify-end space-x-2">
-            <Button variant="ghost" onClick={() => { setSelectedWorkflow(null); setActionType(null); 
-      setManagerAssessment("");
-      setManagerComments("");
-      setAdminResolution("");
-      setAdminComments("");
- }}>Cancel</Button>
+          <div className="flex justify-end space-x-2 pt-3 border-t border-border">
+            <Button variant="ghost" onClick={() => { 
+              setSelectedWorkflow(null); 
+              setActionType(null); 
+              setManagerAssessment("");
+              setManagerComments("");
+              setAdminResolution("");
+              setAdminComments("");
+            }}>
+              Cancel
+            </Button>
             <Button 
-              variant={actionType === "approve" ? "primary" : actionType === "reject" ? "danger" : actionType === "return" ? "warning" : "outline"} 
+              variant={actionType === "approve" ? "success" : actionType === "reject" ? "danger" : actionType === "return" ? "warning" : "primary"} 
               onClick={handleAction} 
-              disabled={isSubmitting || ((actionType === "reject" || actionType === "return") && !comment.trim()) || (selectedWorkflow?.status === "Submitted" && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && !managerAssessment) || (selectedWorkflow?.status === "Manager Approved" && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && !adminResolution)}
+              disabled={
+                isSubmitting || 
+                ((actionType === "reject" || actionType === "return") && !comment.trim()) || 
+                (selectedWorkflow?.status === "Submitted" && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && !managerAssessment) || 
+                (selectedWorkflow?.status === "Manager Approved" && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && !adminResolution)
+              }
             >
-              {isSubmitting ? "Processing..." : `Confirm ${actionType ? actionType.charAt(0).toUpperCase() + actionType.slice(1) : ''}`}
+              {isSubmitting ? "Processing..." : `Confirm ${actionType === "approve" ? "Approval" : actionType === "reject" ? "Rejection" : actionType === "return" ? "Return" : "Action"}`}
             </Button>
           </div>
         </div>
       </Dialog>
+
+      {/* Incident Details Inspection Modal */}
+      {selectedIncident && (
+        <Dialog 
+          isOpen={!!selectedIncident} 
+          onClose={() => setSelectedIncident(null)} 
+          title={`Asset Incident #${selectedIncident.entity_id} - ${selectedIncident.title}`}
+        >
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="p-3 bg-muted/40 rounded-lg border">
+                <span className="text-muted-foreground block">Asset Tag:</span>
+                <span className="font-bold text-sm text-primary">{selectedIncident.asset_tag || "N/A"}</span>
+              </div>
+              <div className="p-3 bg-muted/40 rounded-lg border">
+                <span className="text-muted-foreground block">Asset Model:</span>
+                <span className="font-bold text-sm">{selectedIncident.asset_name || "N/A"}</span>
+              </div>
+              <div className="p-3 bg-muted/40 rounded-lg border">
+                <span className="text-muted-foreground block">Incident Type:</span>
+                <span className="font-semibold">{selectedIncident.incident_type || "N/A"}</span>
+              </div>
+              <div className="p-3 bg-muted/40 rounded-lg border">
+                <span className="text-muted-foreground block">Status:</span>
+                <StatusBadge status={selectedIncident.status} />
+              </div>
+              <div className="p-3 bg-muted/40 rounded-lg border">
+                <span className="text-muted-foreground block">Reporter:</span>
+                <span className="font-semibold">{selectedIncident.requestor_name}</span>
+              </div>
+              <div className="p-3 bg-muted/40 rounded-lg border">
+                <span className="text-muted-foreground block">Submitted:</span>
+                <span>{formatDate(selectedIncident.created_at)}</span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-muted/30 rounded-lg border space-y-1">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Description</span>
+              <p className="text-xs text-foreground leading-relaxed">{selectedIncident.justification || "None"}</p>
+            </div>
+
+            {selectedIncident.reason && (
+              <div className="p-3 bg-muted/30 rounded-lg border space-y-1">
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Reason / Justification</span>
+                <p className="text-xs text-foreground leading-relaxed">{selectedIncident.reason}</p>
+              </div>
+            )}
+
+            {selectedIncident.attachment_url && (
+              <div className="p-3 bg-muted/30 rounded-lg border space-y-2">
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Attachment / Photo Evidence</span>
+                <div className="max-h-48 overflow-hidden rounded-lg border bg-background flex items-center justify-center p-2">
+                  <img 
+                    src={selectedIncident.attachment_url} 
+                    alt="Damage Evidence" 
+                    className="max-h-44 object-contain rounded"
+                    onError={(e: any) => { e.target.style.display = 'none'; }}
+                  />
+                  <a 
+                    href={selectedIncident.attachment_url} 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="text-xs text-primary underline block text-center mt-1"
+                  >
+                    Open Full Attachment
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {selectedIncident.manager_inspection_assessment && (
+              <div className="p-3 bg-primary/5 rounded-lg border border-primary/20 space-y-1 text-xs">
+                <span className="font-bold text-primary block">Manager Physical Inspection Result:</span>
+                <div className="font-semibold">{selectedIncident.manager_inspection_assessment}</div>
+                {selectedIncident.manager_inspection_comments && (
+                  <div className="text-muted-foreground italic">"{selectedIncident.manager_inspection_comments}"</div>
+                )}
+              </div>
+            )}
+
+            {selectedIncident.admin_inspection_resolution && (
+              <div className="p-3 bg-emerald-500/5 rounded-lg border border-emerald-500/20 space-y-1 text-xs">
+                <span className="font-bold text-emerald-600 block">Admin Inspection / Resolution:</span>
+                <div className="font-semibold">{selectedIncident.admin_inspection_resolution}</div>
+                {selectedIncident.admin_comments && (
+                  <div className="text-muted-foreground italic">"{selectedIncident.admin_comments}"</div>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end pt-3 border-t">
+              <Button variant="outline" onClick={() => setSelectedIncident(null)}>Close</Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
       
       {/* Reimbursement Detail Modal */}
       {selectedReportId && (

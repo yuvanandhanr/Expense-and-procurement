@@ -150,6 +150,18 @@ async def issue_po(
     return await service.issue_po(id)
 
 
+@router.post("/{id}/accept", response_model=POSchema)
+async def accept_po(
+    id: int,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    enforce_po_access(current_user)
+    service = POService(db)
+    return await service.accept_po(id)
+
+
+
 @router.post("/{id}/items/{item_id}/vendor-deliver", response_model=POItemSchema)
 async def vendor_deliver_item(
     id: int,

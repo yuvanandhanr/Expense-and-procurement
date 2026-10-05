@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
-import {Card, CardHeader, CardTitle, CardContent, Badge, Skeleton, EmptyState, Dialog, Button} from "../components/ui";
+import { Card, CardContent, Badge, Skeleton, EmptyState, Dialog, Button, Input } from "../components/ui";
 import toast from "react-hot-toast";
 import { isValidText } from "../utils/helpers";
-import { Eye } from "lucide-react";
+import { Eye, Edit3, AlertCircle } from "lucide-react";
+import { useAuth } from "../hooks/useAuth";
 
 export const MyAssets: React.FC = () => {
+  const { user } = useAuth();
   const [assets, setAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"Assets" | "Incidents">("Assets");
@@ -15,10 +17,16 @@ export const MyAssets: React.FC = () => {
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
   const [selectedIncident, setSelectedIncident] = useState<any>(null);
+  
+  // Incident Form state
+  const [incidentType, setIncidentType] = useState("Damaged");
   const [incidentDescription, setIncidentDescription] = useState("");
-  const [incidentType, setIncidentType] = useState("Damage");
+  const [incidentReason, setIncidentReason] = useState("");
+  const [incidentComments, setIncidentComments] = useState("");
+  const [incidentDate, setIncidentDate] = useState(new Date().toISOString().split("T")[0]);
   const [imageUrl, setImageUrl] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -49,16 +57,22 @@ export const MyAssets: React.FC = () => {
 
   const openIncidentModal = (asset: any) => {
     setSelectedAsset(asset);
+    setIncidentType("Damaged");
     setIncidentDescription("");
-    setIncidentType("Damage");
+    setIncidentReason("");
+    setIncidentComments("");
+    setIncidentDate(new Date().toISOString().split("T")[0]);
     setImageUrl("");
     setIsIncidentModalOpen(true);
   };
 
   const openEditModal = (incident: any) => {
     setSelectedIncident(incident);
-    setIncidentDescription(incident.description);
-    setIncidentType(incident.incident_type);
+    setIncidentType(incident.incident_type || "Damaged");
+    setIncidentDescription(incident.description || "");
+    setIncidentReason("");
+    setIncidentComments("");
+    setIncidentDate(incident.incident_date || new Date().toISOString().split("T")[0]);
     setImageUrl(incident.image_url || "");
     setIsEditModalOpen(true);
   };
@@ -70,7 +84,10 @@ export const MyAssets: React.FC = () => {
 
   const submitIncident = async (e: React.FormEvent, isDraft = false) => {
     e.preventDefault();
-    if (!selectedAsset || !incidentDescription) return;
+    if (!selectedAsset || !incidentDescription.trim()) {
+      toast.error("Please provide a description of the issue.");
+      return;
+    }
 
     if (!isValidText(incidentDescription)) {
       toast.error("Please enter a valid description (letters or numbers required).");
@@ -81,19 +98,22 @@ export const MyAssets: React.FC = () => {
     try {
       await api.post("/asset-incidents", {
         asset_id: selectedAsset.asset_id,
-        description: incidentDescription,
+        description: incidentDescription.trim(),
         incident_type: incidentType,
-        image_url: imageUrl || null,
+        reason: incidentReason.trim() || null,
+        comments: incidentComments.trim() || null,
+        incident_date: incidentDate || null,
+        image_url: imageUrl.trim() || null,
         is_draft: isDraft,
         department_name: user?.department_name || null,
         employee_type: user?.employee_type || null
       });
-      toast.success("Incident reported successfully");
+      toast.success(isDraft ? "Incident draft saved successfully" : "Asset incident report submitted successfully");
       setIsIncidentModalOpen(false);
       fetchAssets();
       fetchIncidents();
-    } catch (err) {
-      toast.error("Failed to report incident");
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to submit incident report");
     } finally {
       setIsSubmitting(false);
     }
@@ -101,7 +121,10 @@ export const MyAssets: React.FC = () => {
 
   const submitEditIncident = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedIncident || !incidentDescription) return;
+    if (!selectedIncident || !incidentDescription.trim()) {
+      toast.error("Please provide a description of the issue.");
+      return;
+    }
 
     if (!isValidText(incidentDescription)) {
       toast.error("Please enter a valid description (letters or numbers required).");
@@ -111,41 +134,50 @@ export const MyAssets: React.FC = () => {
     setIsSubmitting(true);
     try {
       await api.put(`/asset-incidents/${selectedIncident.incident_id}`, {
-        description: incidentDescription,
+        description: incidentDescription.trim(),
         incident_type: incidentType,
-        image_url: imageUrl || null
+        reason: incidentReason.trim() || null,
+        comments: incidentComments.trim() || null,
+        incident_date: incidentDate || null,
+        image_url: imageUrl.trim() || null
       });
-      toast.success("Incident updated and resubmitted successfully");
+      toast.success("Incident corrected and resubmitted successfully");
       setIsEditModalOpen(false);
       fetchAssets();
       fetchIncidents();
-    } catch (err) {
-      toast.error("Failed to update incident");
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to resubmit incident");
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const isSubmittedStatus = (status: string) => {
+    const s = (status || "").toLowerCase();
+    return s === "submitted" || s.includes("pending") || s.includes("reported") || s.includes("manager approved") || s.includes("admin approved") || s.includes("procurement") || s.includes("repair");
+  };
+
+  const isApprovedStatus = (status: string) => {
+    const s = (status || "").toLowerCase();
+    return s === "resolved / completed" || s === "completed" || s === "closed" || s === "resolved";
+  };
+
   const subTabCounts: Record<string, number> = {
     All: incidents.length,
-    Draft: incidents.filter((i: any) => i.status === "Draft").length,
-    Submitted: incidents.filter((i: any) => {
-      const s = i.status.toLowerCase();
-      return s.includes("pending") || s.includes("reported") || s.includes("approved") || s.includes("waiting") || s.includes("repair");
-    }).length,
-    Approved: incidents.filter((i: any) => i.status === "Resolved / Completed" || i.status === "Closed").length,
+    Drafts: incidents.filter((i: any) => i.status === "Draft").length,
+    Submitted: incidents.filter((i: any) => isSubmittedStatus(i.status)).length,
+    Approved: incidents.filter((i: any) => isApprovedStatus(i.status)).length,
     Rejected: incidents.filter((i: any) => i.status === "Rejected").length,
-    "Return for Correction": incidents.filter((i: any) => i.status === "Returned for Correction").length,
+    "Returned for Correction": incidents.filter((i: any) => i.status === "Returned for Correction").length,
   };
 
   const filteredIncidents = incidents.filter((i: any) => {
     if (statusFilter === "All") return true;
-    if (statusFilter === "Submitted") {
-      const s = i.status.toLowerCase();
-      return s.includes("pending") || s.includes("reported") || s.includes("approved") || s.includes("waiting") || s.includes("repair");
-    }
-    if (statusFilter === "Approved") return i.status === "Resolved / Completed" || i.status === "Closed";
-    if (statusFilter === "Return for Correction") return i.status === "Returned for Correction";
+    if (statusFilter === "Drafts") return i.status === "Draft";
+    if (statusFilter === "Submitted") return isSubmittedStatus(i.status);
+    if (statusFilter === "Approved") return isApprovedStatus(i.status);
+    if (statusFilter === "Rejected") return i.status === "Rejected";
+    if (statusFilter === "Returned for Correction") return i.status === "Returned for Correction";
     return i.status === statusFilter;
   });
 
@@ -153,16 +185,16 @@ export const MyAssets: React.FC = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">My Assets</h1>
-        <p className="text-xs text-muted-foreground mt-1">View the assets and equipment assigned to you.</p>
+        <p className="text-xs text-muted-foreground mt-1">View the assets and equipment assigned to you and report damaged or malfunctioning equipment.</p>
       </div>
 
       <div className="flex items-center justify-between mb-4 mt-6">
-        <div className="flex items-center space-x-2 bg-card p-3 rounded-lg border border-border">
-          <span className="text-xs font-semibold text-muted-foreground uppercase px-2">View:</span>
+        <div className="flex items-center space-x-2 bg-card p-2 rounded-xl border border-border shadow-sm">
+          <span className="text-xs font-semibold text-muted-foreground uppercase px-2">Section:</span>
           <button
             onClick={() => setActiveTab("Assets")}
-            className={`px-3 py-1 text-xs font-bold rounded-full transition-all ${activeTab === "Assets"
-                ? "bg-primary text-primary-foreground"
+            className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${activeTab === "Assets"
+                ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:bg-accent"
               }`}
           >
@@ -170,8 +202,8 @@ export const MyAssets: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab("Incidents")}
-            className={`px-3 py-1 text-xs font-bold rounded-full transition-all ${activeTab === "Incidents"
-                ? "bg-primary text-primary-foreground"
+            className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${activeTab === "Incidents"
+                ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:bg-accent"
               }`}
           >
@@ -187,18 +219,19 @@ export const MyAssets: React.FC = () => {
               {loading ? (
                 <div className="p-6 space-y-4">
                   <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
                 </div>
               ) : assets.length === 0 ? (
-                <EmptyState title="No assets assigned to you yet." description="Data will appear here once available." />
+                <EmptyState title="No assets assigned to you yet." description="Assets assigned to you by administrators will appear here." />
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm border-collapse">
                     <thead>
                       <tr className="border-b border-border bg-accent/40 text-xs font-bold text-muted-foreground uppercase">
-                        <th className="p-4">Asset ID</th>
-                        <th className="p-4">Serial / Unique ID</th>
-                        <th className="p-4">Product Name</th>
+                        <th className="p-4">Asset Tag</th>
+                        <th className="p-4">Asset Name</th>
                         <th className="p-4">Category</th>
+                        <th className="p-4">Serial Number</th>
                         <th className="p-4">Status</th>
                         <th className="p-4 text-right">Actions</th>
                       </tr>
@@ -206,25 +239,19 @@ export const MyAssets: React.FC = () => {
                     <tbody className="divide-y divide-border">
                       {assets.map((a: any) => (
                         <tr key={a.asset_id} className="hover:bg-accent/20">
-                          <td className="p-4 font-bold text-xs tracking-wider text-primary">{a.asset_code}</td>
-                          <td className="p-4 font-mono text-xs">{a.serial_number || "N/A"}</td>
+                          <td className="p-4 font-bold text-xs tracking-wider text-primary">{a.serial_number || a.asset_code}</td>
                           <td className="p-4 font-semibold">{a.asset_name}</td>
                           <td className="p-4 text-xs text-muted-foreground">{a.category}</td>
+                          <td className="p-4 font-mono text-xs text-muted-foreground">{a.serial_number || a.asset_code || "N/A"}</td>
                           <td className="p-4">
-                            <Badge variant={a.status === "Assigned" ? "success" : "neutral"}>
+                            <Badge variant={a.status === "Assigned" ? "success" : a.status === "Under Maintenance" ? "warning" : "neutral"}>
                               {a.status}
                             </Badge>
                           </td>
                           <td className="p-4 text-right">
-                            {["Damaged", "Reported", "Under Maintenance"].includes(a.status) ? (
-                              <Button variant="outline" size="sm" disabled>
-                                Reported
-                              </Button>
-                            ) : (
-                              <Button variant="outline" size="sm" onClick={() => openIncidentModal(a)}>
-                                Report Issue
-                              </Button>
-                            )}
+                            <Button variant="outline" size="sm" onClick={() => openIncidentModal(a)}>
+                              Report
+                            </Button>
                           </td>
                         </tr>
                       ))}
@@ -239,7 +266,7 @@ export const MyAssets: React.FC = () => {
         {activeTab === "Incidents" && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center space-x-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50 gap-y-2">
-            {["All", "Draft", "Submitted", "Approved", "Rejected", "Return for Correction"].map((status) => (
+            {["All", "Drafts", "Submitted", "Approved", "Rejected", "Returned for Correction"].map((status) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
@@ -262,42 +289,52 @@ export const MyAssets: React.FC = () => {
           <Card>
             <CardContent className="p-0">
               {filteredIncidents.length === 0 ? (
-                <EmptyState title="No incidents found." description={`There are no incidents matching "${statusFilter}".`} />
+                <EmptyState title="No asset incidents found." description={`There are no incidents matching "${statusFilter}".`} />
               ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm border-collapse">
                   <thead>
                     <tr className="border-b border-border bg-accent/40 text-xs font-bold text-muted-foreground uppercase">
                       <th className="p-4">Incident ID</th>
-                      <th className="p-4">Type</th>
+                      <th className="p-4">Asset Tag</th>
+                      <th className="p-4">Asset Name</th>
+                      <th className="p-4">Incident Type</th>
+                      <th className="p-4">Description</th>
+                      <th className="p-4">Submitted Date</th>
                       <th className="p-4">Status</th>
-                      <th className="p-4">Reported On</th>
                       <th className="p-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {filteredIncidents.map((inc: any) => (
-                      <tr key={inc.incident_id} className="hover:bg-accent/20">
-                        <td className="p-4 font-bold text-xs tracking-wider text-primary">#{inc.incident_id}</td>
-                        <td className="p-4 text-xs font-semibold">{inc.incident_type}</td>
-                        <td className="p-4">
-                          <Badge variant={["Reported", "Pending Fulfillment", "Waiting for Procurement"].includes(inc.status) ? "info" : inc.status === "Returned for Correction" ? "warning" : inc.status === "Closed" ? "neutral" : "success"}>
-                            {inc.status}
-                          </Badge>
-                        </td>
-                        <td className="p-4 text-xs">{new Date(inc.created_at).toLocaleDateString()}</td>
-                        <td className="p-4 text-right flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => openViewModal(inc)} title="View Details">
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          {inc.status === "Returned for Correction" && (
-                            <Button variant="outline" size="sm" onClick={() => openEditModal(inc)}>
-                              Edit & Resubmit
+                    {filteredIncidents.map((inc: any) => {
+                      const assetTag = inc.asset?.asset_tag || inc.asset?.asset_number || `AST-${inc.asset_id}`;
+                      const assetName = inc.asset?.model || "Asset";
+                      return (
+                        <tr key={inc.incident_id} className="hover:bg-accent/20">
+                          <td className="p-4 font-bold text-xs tracking-wider text-primary">#{inc.incident_id}</td>
+                          <td className="p-4 font-mono text-xs">{assetTag}</td>
+                          <td className="p-4 font-semibold text-xs">{assetName}</td>
+                          <td className="p-4 text-xs font-semibold">{inc.incident_type}</td>
+                          <td className="p-4 text-xs max-w-[200px] truncate" title={inc.description}>{inc.description}</td>
+                          <td className="p-4 text-xs text-muted-foreground">{new Date(inc.created_at || Date.now()).toLocaleDateString()}</td>
+                          <td className="p-4">
+                            <Badge variant={inc.status === "Resolved / Completed" ? "success" : inc.status === "Rejected" ? "danger" : inc.status === "Returned for Correction" ? "warning" : "info"}>
+                              {inc.status}
+                            </Badge>
+                          </td>
+                          <td className="p-4 text-right flex justify-end gap-2">
+                            <Button variant="ghost" size="sm" onClick={() => openViewModal(inc)} title="View Complete Incident">
+                              <Eye className="w-4 h-4" />
                             </Button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                            {(inc.status === "Returned for Correction" || inc.status === "Draft") && (
+                              <Button variant="outline" size="sm" onClick={() => openEditModal(inc)} className="gap-1">
+                                <Edit3 className="w-3.5 h-3.5" /> {inc.status === "Draft" ? "Edit Draft" : "Edit & Resubmit"}
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -308,157 +345,235 @@ export const MyAssets: React.FC = () => {
       )}
     </div>
 
-      <Dialog isOpen={isIncidentModalOpen} onClose={() => setIsIncidentModalOpen(false)} title="Report Asset Issue">
+      {/* Report Asset Incident Modal */}
+      <Dialog isOpen={isIncidentModalOpen} onClose={() => setIsIncidentModalOpen(false)} title="Report Damaged / Malfunctioning Asset">
         <form onSubmit={(e) => submitIncident(e, false)} className="space-y-4">
-          <div className="p-3 bg-accent/30 rounded-md border text-sm">
-            Reporting issue for: <span className="font-bold">{selectedAsset?.asset_name}</span> ({selectedAsset?.asset_code})
+          <div className="p-3 bg-muted/40 rounded-xl border border-border text-sm flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Target Asset</span>
+            <span className="font-bold text-foreground">{selectedAsset?.asset_name}</span>
+            <span className="text-xs font-mono text-muted-foreground">Tag: {selectedAsset?.serial_number || selectedAsset?.asset_code} | Category: {selectedAsset?.category}</span>
           </div>
           
-          <div className="space-y-2">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Issue Type</label>
-            <select 
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              value={incidentType}
-              onChange={e => setIncidentType(e.target.value)}
-            >
-              <option value="Damage">Hardware Damage</option>
-              <option value="Loss">Lost or Stolen</option>
-              <option value="Malfunction">Software / System Malfunction</option>
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Incident Type <span className="text-red-500">*</span></label>
+              <select 
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none"
+                value={incidentType}
+                onChange={e => setIncidentType(e.target.value)}
+                required
+              >
+                <option value="Damaged">Damaged</option>
+                <option value="Malfunctioning">Malfunctioning</option>
+                <option value="Repair Required">Repair Required</option>
+                <option value="Replacement Required">Replacement Required</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Date of Incident</label>
+              <Input 
+                type="date"
+                value={incidentDate}
+                onChange={e => setIncidentDate(e.target.value)}
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Description</label>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Description of the Issue / Damage <span className="text-red-500">*</span></label>
             <textarea 
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm min-h-[100px]"
-              placeholder="Please describe exactly what happened..."
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm min-h-[90px] focus:ring-2 focus:ring-primary focus:outline-none"
+              placeholder="Describe what happened, error symptoms, or physical damage observed..."
               value={incidentDescription}
               onChange={e => setIncidentDescription(e.target.value)}
               required
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Image URL (Optional)</label>
-            <input 
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Reason / Justification</label>
+            <Input 
+              placeholder="Why this repair or replacement is needed for your duties..."
+              value={incidentReason}
+              onChange={e => setIncidentReason(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Additional Comments</label>
+            <Input 
+              placeholder="Any additional notes or urgency details..."
+              value={incidentComments}
+              onChange={e => setIncidentComments(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Supporting Photo / Attachment URL</label>
+            <Input 
               type="text"
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              placeholder="https://example.com/image.png"
+              placeholder="https://example.com/asset-photo.jpg"
               value={imageUrl}
               onChange={e => setImageUrl(e.target.value)}
             />
-            <p className="text-xs text-muted-foreground">Provide a link to an image showing the issue.</p>
           </div>
 
-          <div className="flex justify-end space-x-2 pt-4">
+          <div className="flex justify-end space-x-2 pt-4 border-t border-border">
             <Button type="button" variant="outline" onClick={() => setIsIncidentModalOpen(false)}>Cancel</Button>
-            <Button type="button" disabled={isSubmitting || !incidentDescription} variant="outline" onClick={(e) => submitIncident(e as any, true)}>Save Draft</Button>
-            <Button type="submit" disabled={isSubmitting || !incidentDescription}>Submit Report</Button>
+            <Button type="button" disabled={isSubmitting || !incidentDescription.trim()} variant="outline" onClick={(e) => submitIncident(e as any, true)}>Save Draft</Button>
+            <Button type="submit" disabled={isSubmitting || !incidentDescription.trim()}>Submit Report</Button>
           </div>
         </form>
       </Dialog>
 
-      <Dialog isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Edit Asset Issue">
+      {/* Edit & Resubmit Modal */}
+      <Dialog isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Correct & Resubmit Incident Report">
         <form onSubmit={submitEditIncident} className="space-y-4">
-          <div className="space-y-2">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Issue Type</label>
-            <select 
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              value={incidentType}
-              onChange={e => setIncidentType(e.target.value)}
-            >
-              <option value="Damage">Hardware Damage</option>
-              <option value="Loss">Lost or Stolen</option>
-              <option value="Malfunction">Software / System Malfunction</option>
-            </select>
+          {selectedIncident?.resolution && (
+            <div className="p-3.5 bg-yellow-500/10 border border-yellow-500/30 rounded-xl text-xs space-y-1 text-foreground">
+              <div className="flex items-center gap-1.5 font-bold text-yellow-600 dark:text-yellow-400">
+                <AlertCircle className="w-4 h-4" />
+                <span>Return for Correction Reason:</span>
+              </div>
+              <p className="text-muted-foreground">{selectedIncident.resolution}</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Incident Type <span className="text-red-500">*</span></label>
+              <select 
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none"
+                value={incidentType}
+                onChange={e => setIncidentType(e.target.value)}
+                required
+              >
+                <option value="Damaged">Damaged</option>
+                <option value="Malfunctioning">Malfunctioning</option>
+                <option value="Repair Required">Repair Required</option>
+                <option value="Replacement Required">Replacement Required</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Date of Incident</label>
+              <Input 
+                type="date"
+                value={incidentDate}
+                onChange={e => setIncidentDate(e.target.value)}
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Description</label>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Description of the Issue / Damage <span className="text-red-500">*</span></label>
             <textarea 
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm min-h-[100px]"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm min-h-[90px] focus:ring-2 focus:ring-primary focus:outline-none"
               value={incidentDescription}
               onChange={e => setIncidentDescription(e.target.value)}
               required
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Image URL (Optional)</label>
-            <input 
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Supporting Photo / Attachment URL</label>
+            <Input 
               type="text"
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              placeholder="https://example.com/image.png"
+              placeholder="https://example.com/asset-photo.jpg"
               value={imageUrl}
               onChange={e => setImageUrl(e.target.value)}
             />
           </div>
 
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={isSubmitting || !incidentDescription}>Resubmit Report</Button>
-            </div>
-          </form>
-        </Dialog>
+          <div className="flex justify-end space-x-2 pt-4 border-t border-border">
+            <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={isSubmitting || !incidentDescription.trim()}>Resubmit Report</Button>
+          </div>
+        </form>
+      </Dialog>
 
-        <Dialog isOpen={isViewModalOpen} onClose={() => setIsViewModalOpen(false)} title={`Asset Incident #${selectedIncident?.incident_id}`}>
-          {selectedIncident && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4 pb-4 border-b border-border">
-                 <div>
-                   <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Type</p>
-                   <p className="text-sm font-semibold">{selectedIncident.incident_type}</p>
-                 </div>
-                 <div>
-                   <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Status</p>
-                   <Badge variant={["Reported", "Pending Fulfillment", "Waiting for Procurement"].includes(selectedIncident.status) ? "info" : selectedIncident.status === "Returned for Correction" ? "warning" : selectedIncident.status === "Closed" ? "neutral" : "success"}>
-                     {selectedIncident.status}
-                   </Badge>
-                 </div>
-                 <div>
-                   <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Reported On</p>
-                   <p className="text-sm">{new Date(selectedIncident.created_at).toLocaleDateString()}</p>
-                 </div>
-                 {selectedIncident.updated_at && selectedIncident.status !== "Reported" && (
-                   <div>
-                     <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Last Updated</p>
-                     <p className="text-sm">{new Date(selectedIncident.updated_at).toLocaleDateString()}</p>
-                   </div>
-                 )}
+      {/* View Incident Modal */}
+      <Dialog isOpen={isViewModalOpen} onClose={() => setIsViewModalOpen(false)} title={`Asset Incident #${selectedIncident?.incident_id}`}>
+        {selectedIncident && (
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-4 pb-4 border-b border-border">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Asset Tag & Name</p>
+                  <p className="text-sm font-semibold">{selectedIncident.asset?.asset_tag || `Asset #${selectedIncident.asset_id}`}</p>
+                  <p className="text-xs text-muted-foreground">{selectedIncident.asset?.model || ""}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Status</p>
+                  <Badge variant={selectedIncident.status === "Resolved / Completed" ? "success" : selectedIncident.status === "Rejected" ? "danger" : selectedIncident.status === "Returned for Correction" ? "warning" : "info"}>
+                    {selectedIncident.status}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Incident Type</p>
+                  <p className="text-sm font-semibold">{selectedIncident.incident_type}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Incident Date</p>
+                  <p className="text-sm">{selectedIncident.incident_date || new Date(selectedIncident.created_at || Date.now()).toLocaleDateString()}</p>
+                </div>
+            </div>
+            
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Description & Details</p>
+              <div className="bg-muted/40 p-3.5 rounded-xl border border-border text-sm whitespace-pre-wrap">
+                {selectedIncident.description}
               </div>
-              
+            </div>
+
+            {selectedIncident.image_url && (
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Description</p>
-                <div className="bg-muted/40 p-3 rounded-lg border border-border text-sm min-h-[80px]">
-                  {selectedIncident.description}
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Attachments / Photos</p>
+                <a href={selectedIncident.image_url} target="_blank" rel="noreferrer" className="text-xs text-primary underline break-all">
+                  {selectedIncident.image_url}
+                </a>
+              </div>
+            )}
+
+            {selectedIncident.manager_inspection_assessment && (
+              <div className="p-3 bg-muted/30 rounded-xl border border-border text-xs space-y-1">
+                <span className="font-bold text-foreground uppercase tracking-wider text-[10px]">Manager Inspection Assessment:</span>
+                <p className="font-semibold text-primary">{selectedIncident.manager_inspection_assessment}</p>
+                {selectedIncident.manager_inspection_comments && (
+                  <p className="text-muted-foreground mt-1">Comments: {selectedIncident.manager_inspection_comments}</p>
+                )}
+              </div>
+            )}
+
+            {selectedIncident.admin_inspection_resolution && (
+              <div className="p-3 bg-muted/30 rounded-xl border border-border text-xs space-y-1">
+                <span className="font-bold text-foreground uppercase tracking-wider text-[10px]">Admin Inspection & Resolution:</span>
+                <p className="font-semibold text-primary">{selectedIncident.admin_inspection_resolution}</p>
+                {selectedIncident.admin_comments && (
+                  <p className="text-muted-foreground mt-1">Notes: {selectedIncident.admin_comments}</p>
+                )}
+              </div>
+            )}
+            
+            {selectedIncident.resolution && (
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Resolution / Reason Notes</p>
+                <div className="bg-muted/40 p-3 rounded-xl border border-border text-xs">
+                  {selectedIncident.resolution}
                 </div>
               </div>
+            )}
 
-              {selectedIncident.image_url && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Image URL</p>
-                  <a href={selectedIncident.image_url} target="_blank" rel="noreferrer" className="text-sm text-primary underline break-all">
-                    {selectedIncident.image_url}
-                  </a>
-                </div>
-              )}
-              
-              {selectedIncident.resolution && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Approver/Admin Notes (Resolution)</p>
-                  <div className="bg-muted/40 p-3 rounded-lg border border-border text-sm min-h-[60px]">
-                    {selectedIncident.resolution}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-end pt-2">
-                <Button onClick={() => setIsViewModalOpen(false)}>Close</Button>
-              </div>
+            <div className="flex justify-end pt-2">
+              <Button onClick={() => setIsViewModalOpen(false)}>Close</Button>
             </div>
-          )}
-        </Dialog>
-      </div>
+          </div>
+        )}
+      </Dialog>
+    </div>
   );
 };
 export default MyAssets;
+

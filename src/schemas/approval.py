@@ -68,6 +68,19 @@ class InboxApprovalWorkflowSchema(BaseModel):
     past_approvers: List[str] = []
     steps: List[ApprovalStepSchema] = []
     can_approve: bool = False
+    reason: Optional[str] = None
+    incident_type: Optional[str] = None
+    asset_tag: Optional[str] = None
+    asset_name: Optional[str] = None
+    serial_number: Optional[str] = None
+    attachment_url: Optional[str] = None
+    incident_date: Optional[str] = None
+    manager_inspection_assessment: Optional[str] = None
+    manager_inspection_comments: Optional[str] = None
+    admin_inspection_resolution: Optional[str] = None
+    admin_comments: Optional[str] = None
+    linked_pr_id: Optional[int] = None
+
 
 
 class WorkflowHistorySchema(BaseModel):
