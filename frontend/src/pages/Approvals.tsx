@@ -190,6 +190,7 @@ export const Approvals: React.FC = () => {
       });
   };
 
+  const filteredWorkflows = getFilteredWorkflows();
   const currentTabWorkflows = getWorkflowsForTab();
   const subTabCounts: Record<string, number> = {
     All: currentTabWorkflows.length,
