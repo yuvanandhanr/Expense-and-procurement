@@ -105,7 +105,6 @@ export const Approvals: React.FC = () => {
         endpoint = `/pr/${selectedWorkflow.entity_id}/${actionType}`;
       }
 
-      
       await api.post(endpoint, payload);
       toast.success(`Workflow successfully ${actionType}d!`);
       
@@ -119,6 +118,14 @@ export const Approvals: React.FC = () => {
       setAdminComments("");
 
       fetchWorkflows();
+      
+      // Redirect admin to asset inventory after processing an asset incident
+      const userRoles = user?.roles?.map((r: any) => r.role_name) || [];
+      const isAdmin = userRoles.includes("Admin") || userRoles.includes("SuperAdmin") || userRoles.includes("IT");
+      if (isAdmin && selectedWorkflow.entity_type === "AssetIncident" && ["approve", "complete_repair", "assign_replacement", "complete_procurement"].includes(actionType)) {
+          window.location.href = "/assets";
+      }
+
     } catch (err: any) {
       toast.error(getErrorMessage(err, "Failed to process workflow action."));
     } finally {
@@ -351,84 +358,23 @@ export const Approvals: React.FC = () => {
                     <StatusBadge status={wf.status} />
                   </td>
                   <td className="p-4 flex items-center gap-2">
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      className="gap-1.5 text-xs font-semibold"
-                      onClick={() => setSelectedIncident(wf)}
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                    </Button>
-                    
-                    {wf.can_approve && ["Submitted", "Manager Approved"].includes(wf.status) && (
-                      <>
-                        <Button 
-                          size="sm"
-                          variant="success" 
-                          className="font-bold shadow-apple-sm text-xs"
-                          onClick={() => { setSelectedWorkflow(wf); setActionType("approve"); }}
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button 
-                          size="sm"
-                          variant="warning" 
-                          className="font-bold shadow-apple-sm border border-yellow-500 bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500 hover:text-white transition-colors text-xs"
-                          onClick={() => { setSelectedWorkflow(wf); setActionType("return"); }}
-                        >
-                          Return
-                        </Button>
-                        <Button 
-                          size="sm"
-                          variant="danger" 
-                          className="font-bold shadow-apple-sm text-xs"
-                          onClick={() => { setSelectedWorkflow(wf); setActionType("reject"); }}
-                        >
-                          <XIcon className="w-3.5 h-3.5" />
-                        </Button>
-                      </>
-                    )}
-                    {wf.status === "Admin Approved" && wf.entity_type === "AssetIncident" && (
-                      <>
-                        {wf.admin_inspection_resolution === "Repair Required" ? (
-                          <Button 
-                            size="sm"
-                            variant="success" 
-                            className="font-bold shadow-apple-sm text-xs"
-                            onClick={() => { setSelectedWorkflow(wf); setActionType("complete_repair" as any); }}
-                          >
-                            Repair
-                          </Button>
-                        ) : (
-                          <>
-                            <Button 
-                              size="sm"
-                              variant="info" 
-                              className="font-bold shadow-apple-sm text-xs"
-                              onClick={() => { setSelectedWorkflow(wf); setActionType("assign_replacement" as any); }}
-                            >
-                              Replace
-                            </Button>
-                            <Button 
-                              size="sm"
-                              variant="outline" 
-                              className="font-bold shadow-apple-sm text-xs"
-                              onClick={() => { setSelectedWorkflow(wf); setActionType("complete_procurement" as any); }}
-                            >
-                              Buy
-                            </Button>
-                          </>
-                        )}
-                      </>
-                    )}
-                    {wf.status === "Waiting for Procurement" && wf.entity_type === "AssetIncident" && (
+                    {wf.can_approve ? (
                       <Button 
-                        size="sm"
-                        variant="success" 
-                        className="font-bold shadow-apple-sm text-xs"
-                        onClick={() => { setSelectedWorkflow(wf); setActionType("assign_replacement" as any); }}
+                        size="sm" 
+                        variant="primary"
+                        onClick={() => setSelectedIncident(wf)}
+                        className="gap-1.5 bg-[#0f172a] text-white hover:bg-slate-800"
                       >
-                        Assign
+                        Need Approval
+                      </Button>
+                    ) : (
+                      <Button 
+                        size="sm" 
+                        variant="view"
+                        onClick={() => setSelectedIncident(wf)}
+                        className="gap-1.5"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> View
                       </Button>
                     )}
                   </td>
@@ -787,6 +733,77 @@ export const Approvals: React.FC = () => {
                 {selectedIncident.admin_comments && (
                   <div className="text-muted-foreground italic">"{selectedIncident.admin_comments}"</div>
                 )}
+              </div>
+            )}
+
+            {selectedIncident.can_approve && ["Submitted", "Manager Approved"].includes(selectedIncident.status) && (
+              <div className="flex space-x-2 pt-4 border-t border-border">
+                <Button 
+                  variant="success" 
+                  className="flex-1 font-bold shadow-apple-sm text-xs"
+                  onClick={() => { setSelectedWorkflow(selectedIncident); setActionType("approve"); }}
+                >
+                  <Check className="w-3.5 h-3.5 mr-1" />
+                  <span>Approve</span>
+                </Button>
+                <Button 
+                  variant="warning" 
+                  className="flex-1 font-bold shadow-apple-sm border border-yellow-500 bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500 hover:text-white transition-colors text-xs"
+                  onClick={() => { setSelectedWorkflow(selectedIncident); setActionType("return"); }}
+                >
+                  <span>Return</span>
+                </Button>
+                <Button 
+                  variant="danger" 
+                  className="flex-1 font-bold shadow-apple-sm text-xs"
+                  onClick={() => { setSelectedWorkflow(selectedIncident); setActionType("reject"); }}
+                >
+                  <XIcon className="w-3.5 h-3.5 mr-1" />
+                  <span>Reject</span>
+                </Button>
+              </div>
+            )}
+            
+            {selectedIncident.status === "Admin Approved" && selectedIncident.entity_type === "AssetIncident" && (
+              <div className="flex space-x-2 pt-4 border-t border-border">
+                {selectedIncident.admin_inspection_resolution === "Repair Required" ? (
+                  <Button 
+                    variant="success" 
+                    className="flex-1 font-bold shadow-apple-sm text-xs"
+                    onClick={() => { setSelectedWorkflow(selectedIncident); setActionType("complete_repair" as any); }}
+                  >
+                    <span>Complete Repair</span>
+                  </Button>
+                ) : (
+                  <>
+                    <Button 
+                      variant="info" 
+                      className="flex-1 font-bold shadow-apple-sm text-xs"
+                      onClick={() => { setSelectedWorkflow(selectedIncident); setActionType("assign_replacement" as any); }}
+                    >
+                      <span>Assign Replacement</span>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="flex-1 font-bold shadow-apple-sm text-xs"
+                      onClick={() => { setSelectedWorkflow(selectedIncident); setActionType("complete_procurement" as any); }}
+                    >
+                      <span>Trigger Procurement</span>
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {selectedIncident.status === "Waiting for Procurement" && selectedIncident.entity_type === "AssetIncident" && (
+              <div className="flex space-x-2 pt-4 border-t border-border">
+                <Button 
+                  variant="success" 
+                  className="flex-1 font-bold shadow-apple-sm text-xs"
+                  onClick={() => { setSelectedWorkflow(selectedIncident); setActionType("assign_replacement" as any); }}
+                >
+                  <span>Assign Received Asset</span>
+                </Button>
               </div>
             )}
 

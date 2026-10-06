@@ -83,11 +83,12 @@ async def get_pending_approvals(
         from src.models.assets import AssetIncident, Asset
         from src.models.auth import User as UserModel
         
+        is_exec = any(r in ["Finance Manager", "CFO", "CEO"] for r in user_roles)
         # Determine status filter based on role
         statuses = []
-        if is_manager:
+        if is_manager and not is_exec:
             statuses.extend(["Submitted", "Manager Approved", "Rejected", "Returned for Correction"])
-        if is_admin or is_it:
+        if is_admin or is_it or is_exec:
             statuses.extend(["Submitted", "Manager Approved", "Admin Approved", "Waiting for Procurement", "Approved", "Resolved", "Resolved / Completed", "Rejected", "Returned for Correction"])
         statuses = list(set(statuses))
             
@@ -100,8 +101,8 @@ async def get_pending_approvals(
             .order_by(AssetIncident.created_at.desc())
         )
         
-        # Ensure that non-admins/IT only see incidents for their direct reports
-        if not (is_admin or is_it):
+        # Ensure that non-admins/IT/execs only see incidents for their direct reports
+        if not (is_admin or is_it or is_exec):
             stmt = stmt.where(UserModel.manager_id == current_user.user_id)
             
         result = await db.execute(stmt)
