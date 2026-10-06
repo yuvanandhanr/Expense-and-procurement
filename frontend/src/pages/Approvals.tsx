@@ -287,7 +287,7 @@ export const Approvals: React.FC = () => {
                 <tr key={wf.workflow_id} className="hover:bg-muted/50 transition-colors">
                   <td className="p-4 font-semibold">{activeTab === "Reimbursements" ? "EXP-" : "PR-"}{wf.entity_id}</td>
                   <td className="p-4 font-medium">
-                    {wf.requestor_name} <span className="text-muted-foreground text-xs font-normal">({(wf as any).requestor_role || 'Employee'})</span>
+                    {wf.requestor_name} <span className="text-muted-foreground text-xs font-normal">({[(wf as any).requestor_department, (wf as any).requestor_role].filter(Boolean).join(" - ") || 'Employee'})</span>
                   </td>
                   <td className="p-4 font-medium max-w-[200px] truncate" title={wf.title}>{wf.title?.replace('Expense: ', '')}</td>
                   <td className="p-4 font-bold tracking-tight">₹{Number(wf.amount || 0).toFixed(2)}</td>
@@ -349,7 +349,7 @@ export const Approvals: React.FC = () => {
                 <tr key={wf.workflow_id} className="hover:bg-muted/50 transition-colors">
                   <td className="p-4 font-semibold">INC-{wf.entity_id}</td>
                   <td className="p-4 font-medium">
-                    {wf.requestor_name} <span className="text-muted-foreground text-xs font-normal">({(wf as any).requestor_role || 'Employee'})</span>
+                    {wf.requestor_name} <span className="text-muted-foreground text-xs font-normal">({[(wf as any).requestor_department, (wf as any).requestor_role].filter(Boolean).join(" - ") || 'Employee'})</span>
                   </td>
                   <td className="p-4 font-medium max-w-[250px] truncate" title={wf.title}>{wf.title}</td>
                   <td className="p-4 text-xs text-muted-foreground">{new Date(wf.created_at || Date.now()).toLocaleDateString()}</td>
@@ -448,7 +448,7 @@ export const Approvals: React.FC = () => {
                 )}
 
                 {/* Approver Actions: Approve | Return for Correction | Reject */}
-                {wf.can_approve && ["Submitted", "Manager Approved"].includes(wf.status) && (
+                {wf.can_approve && ["Submitted", "Reported", "Manager Approved"].includes(wf.status) && (
                   <div className="flex space-x-2 pt-4 border-t border-border">
                     <Button 
                       variant="success" 
@@ -540,7 +540,7 @@ export const Approvals: React.FC = () => {
       >
         <div className="space-y-4">
           
-          {selectedWorkflow?.status === "Submitted" && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && (
+          {["Submitted", "Reported"].includes(selectedWorkflow?.status || "") && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && (
             <div className="space-y-4 p-4 bg-muted/30 rounded-xl border border-border/50">
                <div>
                  <label className="block text-sm font-semibold mb-1">
@@ -633,7 +633,7 @@ export const Approvals: React.FC = () => {
               disabled={
                 isSubmitting || 
                 ((actionType === "reject" || actionType === "return") && !comment.trim()) || 
-                (selectedWorkflow?.status === "Submitted" && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && !managerAssessment) || 
+                (["Submitted", "Reported"].includes(selectedWorkflow?.status || "") && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && !managerAssessment) ||
                 (selectedWorkflow?.status === "Manager Approved" && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && !adminResolution)
               }
             >
@@ -735,7 +735,7 @@ export const Approvals: React.FC = () => {
               </div>
             )}
 
-            {selectedIncident.can_approve && ["Submitted", "Manager Approved"].includes(selectedIncident.status) && (
+            {selectedIncident.can_approve && ["Submitted", "Reported", "Manager Approved"].includes(selectedIncident.status) && (
               <div className="flex space-x-2 pt-4 border-t border-border">
                 <Button 
                   variant="success" 

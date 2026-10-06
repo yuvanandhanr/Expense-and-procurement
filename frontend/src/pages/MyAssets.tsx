@@ -249,9 +249,13 @@ export const MyAssets: React.FC = () => {
                             </Badge>
                           </td>
                           <td className="p-4 text-right">
-                            <Button variant="outline" size="sm" onClick={() => openIncidentModal(a)}>
-                              Report
-                            </Button>
+                            {!incidents.some(i => i.asset_id === a.asset_id && !["Resolved / Completed", "Completed", "Closed", "Rejected"].includes(i.status)) ? (
+                              <Button variant="outline" size="sm" onClick={() => openIncidentModal(a)}>
+                                Report
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground italic px-2">Reported</span>
+                            )}
                           </td>
                         </tr>
                       ))}

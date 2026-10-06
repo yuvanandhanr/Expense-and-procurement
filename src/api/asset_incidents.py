@@ -41,7 +41,7 @@ async def report_incident(
     if data.comments:
         full_desc += f"\nComments: {data.comments}"
 
-    incident_status = "Draft" if data.is_draft else "Submitted"
+    incident_status = "Draft" if data.is_draft else "Reported"
 
     incident = AssetIncident(
         asset_id=data.asset_id,

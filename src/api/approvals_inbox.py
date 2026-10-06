@@ -62,6 +62,7 @@ async def get_pending_approvals(
                 "requestor_id": report.employee_id,
                 "requestor_name": f"{report.employee.first_name} {report.employee.last_name}",
                 "requestor_role": primary_role,
+                "requestor_department": report.employee.department_name,
                 "title": f"Expense: {report.purpose}",
                 "justification": report.justification,
                 "amount": float(report.total_amount) if report.total_amount else 0.0,
@@ -87,9 +88,9 @@ async def get_pending_approvals(
         # Determine status filter based on role
         statuses = []
         if is_manager and not is_exec:
-            statuses.extend(["Submitted", "Manager Approved", "Rejected", "Returned for Correction"])
+            statuses.extend(["Submitted", "Reported", "Manager Approved", "Rejected", "Returned for Correction"])
         if is_admin or is_it or is_exec:
-            statuses.extend(["Submitted", "Manager Approved", "Admin Approved", "Waiting for Procurement", "Approved", "Resolved", "Resolved / Completed", "Rejected", "Returned for Correction"])
+            statuses.extend(["Submitted", "Reported", "Manager Approved", "Admin Approved", "Waiting for Procurement", "Approved", "Resolved", "Resolved / Completed", "Rejected", "Returned for Correction"])
         statuses = list(set(statuses))
             
         stmt = (
@@ -113,7 +114,7 @@ async def get_pending_approvals(
 
             # Self-approval prevented
             if incident.reporter_id != current_user.user_id:
-                if incident.status == "Submitted":
+                if incident.status in ["Submitted", "Reported"]:
                     if reporter.manager_id == current_user.user_id and not is_higher_level:
                         # Employee -> Manager
                         can_approve = True
@@ -128,14 +129,14 @@ async def get_pending_approvals(
                 elif incident.status in ["Admin Approved", "Waiting for Procurement"] and (is_admin or is_it):
                     can_approve = True
 
-            workflow_step = "Manager Review" if incident.status == "Submitted" else ("Admin Review" if incident.status == "Manager Approved" else "Fulfillment")
+            workflow_step = "Manager Review" if incident.status in ["Submitted", "Reported"] else ("Admin Review" if incident.status == "Manager Approved" else "Fulfillment")
             asset_name_str = asset.model if asset.model else "Asset"
             primary_role = reporter_roles[0] if reporter_roles else "Employee"
             pending_workflows.append({
                 "workflow_id": incident.incident_id,
                 "entity_type": "AssetIncident",
                 "entity_id": incident.incident_id,
-                "current_step_sequence": 1 if incident.status == "Submitted" else 2,
+                "current_step_sequence": 1 if incident.status in ["Submitted", "Reported"] else 2,
                 "workflow_step": workflow_step,
                 "status": incident.status,
                 "created_at": incident.created_at,
@@ -143,6 +144,7 @@ async def get_pending_approvals(
                 "requestor_id": incident.reporter_id,
                 "requestor_name": f"{reporter.first_name} {reporter.last_name}",
                 "requestor_role": primary_role,
+                "requestor_department": reporter.department_name,
                 "title": f"{incident.incident_type} Issue: {asset_name_str} ({asset.asset_tag})",
                 "justification": incident.description,
                 "past_approvers": [],
