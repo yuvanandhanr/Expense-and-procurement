@@ -8,7 +8,7 @@ import { formatDate, getErrorMessage, isValidText, resolveImageUrl } from "../ut
 import { Check, X as XIcon, Eye } from "lucide-react";
 import { ReimbursementDetailModal } from "../components/expenses/ReimbursementDetailModal";
 
-type TabType = "Reimbursements" | "Requisitions" | "Asset Incidents" | "Resignations";
+type TabType = "Reimbursements" | "Requisitions" | "Asset Incidents";
 
 export const Approvals: React.FC = () => {
   const { user } = useAuth();
@@ -144,7 +144,6 @@ export const Approvals: React.FC = () => {
       if (activeTab === "Requisitions") return wf.entity_type === "PurchaseRequisition";
       if (activeTab === "Reimbursements") return wf.entity_type === "ExpenseReport";
       if (activeTab === "Asset Incidents") return wf.entity_type === "AssetIncident";
-      if (activeTab === "Resignations") return wf.entity_type === "Resignation";
       return false;
     });
   };
@@ -219,7 +218,7 @@ export const Approvals: React.FC = () => {
 
       {/* Tabs */}
       <div className="flex space-x-2 border-b border-border">
-        {(["Reimbursements", "Requisitions", "Asset Incidents", "Resignations"] as TabType[]).map((tab) => (
+        {(["Reimbursements", "Requisitions", "Asset Incidents"] as TabType[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
