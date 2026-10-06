@@ -130,6 +130,7 @@ async def get_pending_approvals(
 
             workflow_step = "Manager Review" if incident.status == "Submitted" else ("Admin Review" if incident.status == "Manager Approved" else "Fulfillment")
             asset_name_str = asset.model if asset.model else "Asset"
+            primary_role = reporter_roles[0] if reporter_roles else "Employee"
             pending_workflows.append({
                 "workflow_id": incident.incident_id,
                 "entity_type": "AssetIncident",
@@ -141,6 +142,7 @@ async def get_pending_approvals(
                 "updated_at": incident.updated_at,
                 "requestor_id": incident.reporter_id,
                 "requestor_name": f"{reporter.first_name} {reporter.last_name}",
+                "requestor_role": primary_role,
                 "title": f"{incident.incident_type} Issue: {asset_name_str} ({asset.asset_tag})",
                 "justification": incident.description,
                 "past_approvers": [],

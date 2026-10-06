@@ -349,7 +349,7 @@ export const Approvals: React.FC = () => {
                 <tr key={wf.workflow_id} className="hover:bg-muted/50 transition-colors">
                   <td className="p-4 font-semibold">INC-{wf.entity_id}</td>
                   <td className="p-4 font-medium">
-                    {wf.requestor_name}
+                    {wf.requestor_name} <span className="text-muted-foreground text-xs font-normal">({(wf as any).requestor_role || 'Employee'})</span>
                   </td>
                   <td className="p-4 font-medium max-w-[250px] truncate" title={wf.title}>{wf.title}</td>
                   <td className="p-4 text-xs text-muted-foreground">{new Date(wf.created_at || Date.now()).toLocaleDateString()}</td>
