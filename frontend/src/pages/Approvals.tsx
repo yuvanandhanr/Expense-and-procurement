@@ -339,7 +339,7 @@ export const Approvals: React.FC = () => {
                 <th className="p-4">ID</th>
                 <th className="p-4">Reported By</th>
                 <th className="p-4">Issue</th>
-                <th className="p-4">Submission Date</th>
+                <th className="p-4">Reported Date</th>
                 <th className="p-4">Status</th>
                 <th className="p-4">Actions</th>
               </tr>
@@ -673,7 +673,7 @@ export const Approvals: React.FC = () => {
                 <span className="font-semibold">{selectedIncident.requestor_name}</span>
               </div>
               <div className="p-3 bg-muted/40 rounded-lg border">
-                <span className="text-muted-foreground block">Submitted:</span>
+                <span className="text-muted-foreground block">Reported Date:</span>
                 <span>{formatDate(selectedIncident.created_at)}</span>
               </div>
             </div>

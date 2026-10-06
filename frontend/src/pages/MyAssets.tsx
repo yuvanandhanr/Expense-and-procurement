@@ -165,7 +165,7 @@ export const MyAssets: React.FC = () => {
   const subTabCounts: Record<string, number> = {
     All: incidents.length,
     Drafts: incidents.filter((i: any) => i.status === "Draft").length,
-    Submitted: incidents.filter((i: any) => isSubmittedStatus(i.status)).length,
+    Reported: incidents.filter((i: any) => isSubmittedStatus(i.status)).length,
     Approved: incidents.filter((i: any) => isApprovedStatus(i.status)).length,
     Rejected: incidents.filter((i: any) => i.status === "Rejected").length,
     "Returned for Correction": incidents.filter((i: any) => i.status === "Returned for Correction").length,
@@ -174,7 +174,7 @@ export const MyAssets: React.FC = () => {
   const filteredIncidents = incidents.filter((i: any) => {
     if (statusFilter === "All") return true;
     if (statusFilter === "Drafts") return i.status === "Draft";
-    if (statusFilter === "Submitted") return isSubmittedStatus(i.status);
+    if (statusFilter === "Reported") return isSubmittedStatus(i.status);
     if (statusFilter === "Approved") return isApprovedStatus(i.status);
     if (statusFilter === "Rejected") return i.status === "Rejected";
     if (statusFilter === "Returned for Correction") return i.status === "Returned for Correction";
@@ -270,7 +270,7 @@ export const MyAssets: React.FC = () => {
         {activeTab === "Incidents" && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center space-x-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50 gap-y-2">
-            {["All", "Drafts", "Submitted", "Approved", "Rejected", "Returned for Correction"].map((status) => (
+            {["All", "Drafts", "Reported", "Approved", "Rejected", "Returned for Correction"].map((status) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
@@ -304,7 +304,7 @@ export const MyAssets: React.FC = () => {
                       <th className="p-4">Asset Name</th>
                       <th className="p-4">Incident Type</th>
                       <th className="p-4">Description</th>
-                      <th className="p-4">Submitted Date</th>
+                      <th className="p-4">Reported Date</th>
                       <th className="p-4">Status</th>
                       <th className="p-4 text-right">Actions</th>
                     </tr>

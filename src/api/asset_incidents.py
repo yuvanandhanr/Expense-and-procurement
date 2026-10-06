@@ -169,10 +169,10 @@ async def update_incident(
     if data.incident_date is not None:
         incident.incident_date = data.incident_date
 
-    # If returned for correction, resubmitting sets it back to Submitted
+    # If returned for correction, resubmitting sets it back to Reported
     was_returned = incident.status == "Returned for Correction"
     if was_returned:
-        incident.status = "Submitted"
+        incident.status = "Reported"
         history = AssetHistory(
             asset_id=incident.asset_id,
             action_type="Incident Resubmitted",
