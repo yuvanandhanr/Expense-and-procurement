@@ -61,6 +61,8 @@ class InboxApprovalWorkflowSchema(BaseModel):
     updated_at: Optional[datetime] = None
     requestor_id: Optional[int] = None
     requestor_name: str
+    requestor_role: Optional[str] = None
+    requestor_department: Optional[str] = None
     title: Optional[str] = None
     justification: Optional[str] = None
     total_amount: Optional[Decimal] = None

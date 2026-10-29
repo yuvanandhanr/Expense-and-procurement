@@ -47,6 +47,9 @@ async def get_pending_approvals(
             elif report.status in ["Payment Requested", "Approved for Payment"] and bool(user_roles_set & {"Finance Manager", "CFO"}):
                 can_approve = True
                 
+            req_roles = [r.role_name for r in report.employee.roles] if report.employee and report.employee.roles else []
+            primary_role = req_roles[0] if req_roles else "Employee"
+            
             pending_workflows.append({
                 "workflow_id": pending_app.approval_id if pending_app else report.expense_report_id,
                 "entity_type": "ExpenseReport",
@@ -58,6 +61,8 @@ async def get_pending_approvals(
                 "updated_at": report.updated_at,
                 "requestor_id": report.employee_id,
                 "requestor_name": f"{report.employee.first_name} {report.employee.last_name}",
+                "requestor_role": primary_role,
+                "requestor_department": report.employee.department_name,
                 "title": f"Expense: {report.purpose}",
                 "justification": report.justification,
                 "amount": float(report.total_amount) if report.total_amount else 0.0,
@@ -69,68 +74,89 @@ async def get_pending_approvals(
     
     # Also fetch pending Asset Incidents for Admin/Manager
     user_roles = [r.role_name for r in current_user.roles]
-    if any(r in user_roles for r in ["Admin", "Manager", "IT"]):
+    is_admin = any(r in ["Admin", "SuperAdmin"] for r in user_roles)
+    is_it = "IT" in user_roles
+    is_manager = any(r in ["Manager", "Finance Manager", "CFO", "CEO"] for r in user_roles)
+
+    if is_admin or is_manager or is_it:
         from sqlalchemy import select
+        from sqlalchemy.orm import selectinload
         from src.models.assets import AssetIncident, Asset
         from src.models.auth import User as UserModel
         
+        is_exec = any(r in ["Finance Manager", "CFO", "CEO"] for r in user_roles)
         # Determine status filter based on role
         statuses = []
-        if "Manager" in user_roles:
-            statuses.extend(["Submitted", "Manager Approved", "Rejected", "Returned for Correction"])
-        if "Admin" in user_roles or "IT" in user_roles:
-            statuses.extend(["Submitted", "Manager Approved", "Admin Approved", "Waiting for Procurement", "Approved", "Resolved", "Resolved / Completed", "Rejected", "Returned for Correction"])
+        if is_manager and not is_exec:
+            statuses.extend(["Submitted", "Reported", "Manager Approved", "Rejected", "Returned for Correction"])
+        if is_admin or is_it or is_exec:
+            statuses.extend(["Submitted", "Reported", "Manager Approved", "Admin Approved", "Waiting for Procurement", "Approved", "Resolved", "Resolved / Completed", "Rejected", "Returned for Correction"])
         statuses = list(set(statuses))
             
         stmt = (
             select(AssetIncident, Asset, UserModel)
             .join(Asset, AssetIncident.asset_id == Asset.asset_id)
             .join(UserModel, AssetIncident.reporter_id == UserModel.user_id)
+            .options(selectinload(UserModel.roles))
             .where(AssetIncident.status.in_(statuses))
             .order_by(AssetIncident.created_at.desc())
         )
         
-        # If just a Manager, only see incidents in their department and not their own
-        if "Manager" in user_roles and "Admin" not in user_roles and "IT" not in user_roles:
-            stmt = stmt.where(Asset.department_id == current_user.department_id)
+        # Ensure that non-admins/IT/execs only see incidents for their direct reports
+        if not (is_admin or is_it or is_exec):
+            stmt = stmt.where(UserModel.manager_id == current_user.user_id)
             
         result = await db.execute(stmt)
         for incident, asset, reporter in result.all():
             can_approve = False
+            reporter_roles = [r.role_name for r in reporter.roles]
+            is_higher_level = any(r in ["Manager", "Finance Manager", "Finance", "CFO", "CEO", "Admin", "SuperAdmin"] for r in reporter_roles)
+
             # Self-approval prevented
             if incident.reporter_id != current_user.user_id:
-                if incident.status == "Submitted" and ("Manager" in user_roles or "Admin" in user_roles):
+                if incident.status in ["Submitted", "Reported"]:
+                    if reporter.manager_id == current_user.user_id and not is_higher_level:
+                        # Employee -> Manager
+                        can_approve = True
+                    elif (is_admin or is_it) and (is_higher_level or not reporter.manager_id):
+                        # High level -> Admin
+                        can_approve = True
+                    elif (is_admin or is_it) and reporter.manager_id == current_user.user_id:
+                        # Admin is their direct manager
+                        can_approve = True
+                elif incident.status == "Manager Approved" and (is_admin or is_it):
                     can_approve = True
-                elif incident.status == "Manager Approved" and ("Admin" in user_roles or "IT" in user_roles):
-                    can_approve = True
-                elif incident.status in ["Admin Approved", "Waiting for Procurement"] and ("Admin" in user_roles or "IT" in user_roles):
+                elif incident.status in ["Admin Approved", "Waiting for Procurement"] and (is_admin or is_it):
                     can_approve = True
 
-            workflow_step = "Manager Review" if incident.status == "Submitted" else ("Admin Review" if incident.status == "Manager Approved" else "Fulfillment")
+            workflow_step = "Manager Review" if incident.status in ["Submitted", "Reported"] else ("Admin Review" if incident.status == "Manager Approved" else "Fulfillment")
             asset_name_str = asset.model if asset.model else "Asset"
+            primary_role = reporter_roles[0] if reporter_roles else "Employee"
             pending_workflows.append({
                 "workflow_id": incident.incident_id,
                 "entity_type": "AssetIncident",
                 "entity_id": incident.incident_id,
-                "current_step_sequence": 1 if incident.status == "Submitted" else 2,
+                "current_step_sequence": 1 if incident.status in ["Submitted", "Reported"] else 2,
                 "workflow_step": workflow_step,
                 "status": incident.status,
                 "created_at": incident.created_at,
                 "updated_at": incident.updated_at,
                 "requestor_id": incident.reporter_id,
                 "requestor_name": f"{reporter.first_name} {reporter.last_name}",
+                "requestor_role": primary_role,
+                "requestor_department": reporter.department_name,
                 "title": f"{incident.incident_type} Issue: {asset_name_str} ({asset.asset_tag})",
                 "justification": incident.description,
                 "past_approvers": [],
                 "pending_approvers": ["Admin/Manager"],
                 "steps": [],
                 "can_approve": can_approve,
-                "reason": incident.reason,
+                "reason": incident.resolution,
                 "incident_type": incident.incident_type,
                 "asset_tag": asset.asset_tag,
                 "asset_name": asset.model,
                 "serial_number": asset.serial_number,
-                "attachment_url": incident.attachment_url,
+                "attachment_url": incident.image_url,
                 "incident_date": str(incident.incident_date) if incident.incident_date else None,
                 "manager_inspection_assessment": incident.manager_inspection_assessment,
                 "manager_inspection_comments": incident.manager_inspection_comments,

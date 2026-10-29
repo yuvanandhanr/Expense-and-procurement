@@ -360,58 +360,73 @@ class ExecutiveReportService:
         filename = f"Dataeko_Executive_Report_{doc_id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.pdf"
         file_path = os.path.join(self.report_dir, filename)
 
-        # Generate structured, high-contrast Dataeko branded text/PDF artifact
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write("=" * 90 + "\n")
-            f.write(f"                      {report_data['company_name'].upper()}\n")
-            f.write(f"                 {report_data['tagline']}\n")
-            f.write("=" * 90 + "\n\n")
+        text_lines = []
+        text_lines.append("=" * 90)
+        text_lines.append(f"                      {report_data['company_name'].upper()}")
+        text_lines.append(f"                 {report_data['tagline']}")
+        text_lines.append("=" * 90 + "\n")
 
-            f.write("1. DOCUMENT METADATA & IDENTIFICATION\n")
-            f.write("-" * 90 + "\n")
-            for k, v in report_data["document_metadata"].items():
-                f.write(f"  * {k.replace('_', ' ').title():<28}: {v}\n")
-            f.write("\n")
+        text_lines.append("1. DOCUMENT METADATA & IDENTIFICATION")
+        text_lines.append("-" * 90)
+        for k, v in report_data["document_metadata"].items():
+            text_lines.append(f"  * {k.replace('_', ' ').title():<28}: {v}")
+        text_lines.append("\n")
 
-            f.write("2. EXECUTIVE SUMMARY\n")
-            f.write("-" * 90 + "\n")
-            f.write(f"  * Core Takeaway:\n    {report_data['executive_summary']['core_takeaway']}\n\n")
-            f.write(f"  * Risk Score & Outlook:\n    {report_data['executive_summary']['risk_score_outlook']}\n\n")
+        text_lines.append("2. EXECUTIVE SUMMARY")
+        text_lines.append("-" * 90)
+        text_lines.append(f"  * Core Takeaway:\n    {report_data['executive_summary']['core_takeaway']}\n")
+        text_lines.append(f"  * Risk Score & Outlook:\n    {report_data['executive_summary']['risk_score_outlook']}\n")
 
-            f.write("3. KEY FINANCIAL METRICS (KPI DASHBOARD)\n")
-            f.write("-" * 90 + "\n")
-            f.write(f"  {'Metric':<34} | {'Current Period':<16} | {'Prior Period':<16} | {'YoY Variance':<12} | {'Status'}\n")
-            f.write("-" * 90 + "\n")
-            for item in report_data["key_financial_metrics"]:
-                f.write(f"  {item['metric']:<34} | ₹{item['current_period']:>14,.2f} | ₹{item['prior_period']:>14,.2f} | {item['yoy_variance_pct']:>+10.1f}% | {item['status']}\n")
-            f.write("\n")
+        text_lines.append("3. KEY FINANCIAL METRICS (KPI DASHBOARD)")
+        text_lines.append("-" * 90)
+        text_lines.append(f"  {'Metric':<34} | {'Current Period':<16} | {'Prior Period':<16} | {'YoY Variance':<12} | {'Status'}")
+        text_lines.append("-" * 90)
+        for item in report_data["key_financial_metrics"]:
+            text_lines.append(f"  {item['metric']:<34} | ₹{item['current_period']:>14,.2f} | ₹{item['prior_period']:>14,.2f} | {item['yoy_variance_pct']:>+10.1f}% | {item['status']}")
+        text_lines.append("\n")
 
-            f.write("4. INCOME & EXPENSE BREAKDOWN\n")
-            f.write("-" * 90 + "\n")
-            f.write("  Cost Structure Analysis:\n")
-            for cost_k, cost_v in report_data["income_expense_breakdown"]["cost_structure_analysis"].items():
-                f.write(f"    - {cost_k:<42}: ₹{cost_v:>14,.2f}\n")
-            f.write("\n")
+        text_lines.append("4. INCOME & EXPENSE BREAKDOWN")
+        text_lines.append("-" * 90)
+        text_lines.append("  Cost Structure Analysis:")
+        for cost_k, cost_v in report_data["income_expense_breakdown"]["cost_structure_analysis"].items():
+            text_lines.append(f"    - {cost_k:<42}: ₹{cost_v:>14,.2f}")
+        text_lines.append("\n")
 
-            f.write("5. BALANCE SHEET SNAPSHOT\n")
-            f.write("-" * 90 + "\n")
-            bs = report_data["balance_sheet_snapshot"]
-            f.write(f"  * Total Assets       : ₹{bs['total_assets']:>14,.2f}  (Current: ₹{bs['current_assets']:,.2f} | Non-Current: ₹{bs['non_current_assets']:,.2f})\n")
-            f.write(f"  * Total Liabilities  : ₹{bs['total_liabilities']:>14,.2f}  (Current: ₹{bs['current_liabilities']:,.2f} | Long-term: ₹{bs['long_term_obligations']:,.2f})\n")
-            f.write(f"  * Total Equity       : ₹{bs['total_equity']:>14,.2f}\n\n")
+        text_lines.append("5. BALANCE SHEET SNAPSHOT")
+        text_lines.append("-" * 90)
+        bs = report_data["balance_sheet_snapshot"]
+        text_lines.append(f"  * Total Assets       : ₹{bs['total_assets']:>14,.2f}  (Current: ₹{bs['current_assets']:,.2f} | Non-Current: ₹{bs['non_current_assets']:,.2f})")
+        text_lines.append(f"  * Total Liabilities  : ₹{bs['total_liabilities']:>14,.2f}  (Current: ₹{bs['current_liabilities']:,.2f} | Long-term: ₹{bs['long_term_obligations']:,.2f})")
+        text_lines.append(f"  * Total Equity       : ₹{bs['total_equity']:>14,.2f}\n")
 
-            f.write("6. DATARKO PREDICTIVE & FINANCIAL INSIGHTS\n")
-            f.write("-" * 90 + "\n")
-            f.write(f"  * Trend Analysis:\n    {report_data['predictive_insights']['trend_analysis']}\n\n")
-            f.write(f"  * AI Forecast Model:\n    {report_data['predictive_insights']['ai_forecast_model']}\n\n")
-            f.write(f"  * Anomaly & Risk Detection:\n    {report_data['predictive_insights']['anomaly_risk_detection']}\n\n")
+        text_lines.append("6. DATARKO PREDICTIVE & FINANCIAL INSIGHTS")
+        text_lines.append("-" * 90)
+        text_lines.append(f"  * Trend Analysis:\n    {report_data['predictive_insights']['trend_analysis']}\n")
+        text_lines.append(f"  * AI Forecast Model:\n    {report_data['predictive_insights']['ai_forecast_model']}\n")
+        text_lines.append(f"  * Anomaly & Risk Detection:\n    {report_data['predictive_insights']['anomaly_risk_detection']}\n")
 
-            f.write("7. SIGN-OFF & VERIFICATION\n")
-            f.write("-" * 90 + "\n")
-            so = report_data["sign_off"]
-            f.write(f"  Prepared By : {so['prepared_by_name']} ({so['prepared_by_title']})\n")
-            f.write(f"  Approved By : {so['approved_by_name']} ({so['approved_by_title']})\n")
-            f.write("  Signature   : [DIGITALLY SEALED - DATARKO BLOCKCHAIN / HSM AUDIT TOKEN]\n")
-            f.write("=" * 90 + "\n")
+        text_lines.append("7. SIGN-OFF & VERIFICATION")
+        text_lines.append("-" * 90)
+        so = report_data["sign_off"]
+        text_lines.append(f"  Prepared By : {so['prepared_by_name']} ({so['prepared_by_title']})")
+        text_lines.append(f"  Approved By : {so['approved_by_name']} ({so['approved_by_title']})")
+        text_lines.append("  Signature   : [DIGITALLY SEALED - DATARKO BLOCKCHAIN / HSM AUDIT TOKEN]")
+        text_lines.append("=" * 90)
+
+        full_text = "\n".join(text_lines)
+
+        from reportlab.platypus import SimpleDocTemplate, Preformatted
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.pagesizes import letter
+
+        doc = SimpleDocTemplate(file_path, pagesize=letter)
+        styles = getSampleStyleSheet()
+        style = styles["Code"]
+        style.wordWrap = 'CJK'
+        style.fontSize = 8
+        style.leading = 10
+        
+        story = [Preformatted(full_text, style)]
+        doc.build(story)
 
         return file_path

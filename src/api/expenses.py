@@ -68,26 +68,14 @@ def _can_access_report(report: ExpenseReport, user: User) -> bool:
         return True
 
     user_roles = [r.role_name for r in getattr(user, 'roles', [])]
-    is_admin_or_exec = any(r in user_roles for r in ["Admin", "SuperAdmin", "CEO", "CFO"])
+    is_admin_or_exec = any(r in user_roles for r in ["Admin", "SuperAdmin", "CEO", "CFO", "Finance Manager", "Finance"])
     
-    # Admin, CFO, CEO can see all non-draft claims globally
+    # Admin, CFO, CEO, Finance Manager can see all non-draft claims globally
     if is_admin_or_exec:
         return True
         
-    has_finance_mgr = "Finance Manager" in user_roles or "Finance" in user_roles
-    creator_roles = [r.role_name for r in getattr(report.employee, 'roles', [])]
-    
-    # Finance Managers can see claims pending manager approval or their stages, except from Admin/Execs
-    if has_finance_mgr:
-        if not any(r in creator_roles for r in ["Admin", "CEO", "CFO", "SuperAdmin"]):
-            if report.status in ["Pending Manager Approval", "Pending Finance Manager Approval", "Payment Requested", "Approved for Payment", "Finance Rejected", "Approved"]:
-                return True
-
     # If user is the manager of the creator
     if getattr(report.employee, "manager_id", None) == user.user_id:
-        if not is_admin_or_exec:
-            if any(r in creator_roles for r in ["Admin", "CFO", "CEO", "Finance Manager"]):
-                return False
         return True
 
     return False
@@ -597,7 +585,9 @@ async def approve_expense(
         "Pending Finance Verification",
         "Pending Approval",
         "Corrected Claim",
-        "Pending CFO Approval"
+        "Pending CFO Approval",
+        "Payment Requested",
+        "Approved for Payment"
     ]
     if report.status not in valid_statuses:
         raise HTTPException(status_code=400, detail="Report is not pending approval")
@@ -612,7 +602,7 @@ async def approve_expense(
         ExpenseApproval.status == "Pending"
     )
     result = await db.execute(query)
-    approval = None
+    
     try:
         approval = result.scalar_one_or_none()
     except Exception:
@@ -621,16 +611,33 @@ async def approve_expense(
         except Exception:
             approval = None
             
-    if not approval:
+    is_payment = report.status in ["Payment Requested", "Approved for Payment"]
+    
+    if not approval and not is_payment:
         raise HTTPException(status_code=403, detail="No matching pending approval step found for your user.")
             
-    if not _can_act_on_pending_report(report, current_user, approval):
+    if not is_payment and not _can_act_on_pending_report(report, current_user, approval):
         _log_action(current_user, "expense_approval_denied", report_id, level=logging.WARNING)
         raise HTTPException(status_code=403, detail="Not authorized to approve this report")
         
-    approval.status = "Approved"
-    approval.comments = payload.comments
-    approval.actioned_at = datetime.utcnow()
+    if is_payment and not bool(_roles(current_user) & {"Finance Manager", "CFO"}):
+        raise HTTPException(status_code=403, detail="Not authorized to authorize payment")
+        
+    if approval:
+        approval.status = "Approved"
+        approval.comments = payload.comments
+        approval.actioned_at = datetime.utcnow()
+    else:
+        any_app_q = select(ExpenseApproval).where(
+            ExpenseApproval.expense_report_id == report_id,
+            ExpenseApproval.status == "Pending"
+        )
+        any_app_res = await db.execute(any_app_q)
+        any_app = any_app_res.scalars().first()
+        if any_app:
+            any_app.status = "Approved"
+            any_app.comments = payload.comments
+            any_app.actioned_at = datetime.utcnow()
         
     roles = _roles(current_user)
     if report.status in ["Pending Manager Approval", "Corrected Claim", "Pending Approval"]:
@@ -685,6 +692,11 @@ async def approve_expense(
                 approver_id=fin_exec.user_id,
                 status="Pending"
             ))
+    elif report.status in ["Payment Requested", "Approved for Payment"]:
+        import uuid
+        report.status = "Approved"
+        report.payment_status = "Paid"
+        report.payment_reference = f"PAY-EXP-{report_id}-{uuid.uuid4().hex[:6]}"
     else:
         report.status = "Payment Requested"
         report.payment_status = "Pending Payment"

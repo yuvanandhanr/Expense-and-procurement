@@ -41,7 +41,7 @@ async def report_incident(
     if data.comments:
         full_desc += f"\nComments: {data.comments}"
 
-    incident_status = "Draft" if data.is_draft else "Submitted"
+    incident_status = "Draft" if data.is_draft else "Reported"
 
     incident = AssetIncident(
         asset_id=data.asset_id,
@@ -169,10 +169,10 @@ async def update_incident(
     if data.incident_date is not None:
         incident.incident_date = data.incident_date
 
-    # If returned for correction, resubmitting sets it back to Submitted
+    # If returned for correction, resubmitting sets it back to Reported
     was_returned = incident.status == "Returned for Correction"
     if was_returned:
-        incident.status = "Submitted"
+        incident.status = "Reported"
         history = AssetHistory(
             asset_id=incident.asset_id,
             action_type="Incident Resubmitted",

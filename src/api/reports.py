@@ -176,8 +176,18 @@ async def download_report_file(
     if report.file_path and os.path.exists(report.file_path):
         with open(report.file_path, "rb") as f:
             file_bytes = f.read()
-        filename = os.path.basename(report.file_path)
+        
+        is_pdf = getattr(report, "file_type", "PDF") == "PDF"
+        if is_pdf and file_bytes and not file_bytes.startswith(b"%PDF-"):
+            # File is a corrupted plain text file. Delete it and force regeneration.
+            os.remove(report.file_path)
+            file_bytes = None
+        else:
+            filename = os.path.basename(report.file_path)
     else:
+        file_bytes = None
+
+    if not file_bytes:
         # Generate on-demand fallback content
         service = ExecutiveReportService(db)
         filters = ExecutiveReportFilterRequest()
