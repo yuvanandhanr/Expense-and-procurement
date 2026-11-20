@@ -252,6 +252,7 @@ async def upload_receipts(
         ext = filename.rsplit(".", 1)[-1] if "." in filename else "bin"
         unique_name = f"{uuid.uuid4().hex}.{ext}"
         filepath = os.path.join(UPLOAD_DIR, unique_name)
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
         
         async with aiofiles.open(filepath, 'wb') as out_file:
             await out_file.write(content)
@@ -838,15 +839,53 @@ async def pay_expense(
     return {"status": "Paid", "reference": report.payment_reference, "payment_reference": report.payment_reference}
 
 
+def _generate_receipt_voucher_svg(receipt: Receipt) -> bytes:
+    merchant = receipt.merchant_name or "Merchant Not Recorded"
+    amount = f"{receipt.verified_amount or receipt.ocr_amount or Decimal('0.00'):.2f}"
+    date_str = str(receipt.receipt_date or (receipt.created_at.date() if receipt.created_at else "N/A"))
+    category = receipt.category or "General Expense"
+    receipt_no = receipt.receipt_number or f"REC-{receipt.receipt_id}"
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="600" height="420" viewBox="0 0 600 420" fill="none">
+      <rect width="600" height="420" rx="16" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="2"/>
+      <rect x="24" y="24" width="552" height="72" rx="12" fill="#2563EB"/>
+      <text x="44" y="66" fill="#FFFFFF" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="bold">EXPENSE RECEIPT VOUCHER</text>
+      <text x="556" y="66" text-anchor="end" fill="#DBEAFE" font-family="system-ui, -apple-system, sans-serif" font-size="13">ID: #{receipt.receipt_id}</text>
+      
+      <g transform="translate(44, 130)" font-family="system-ui, -apple-system, sans-serif">
+        <text y="0" fill="#64748B" font-size="12" font-weight="600">MERCHANT / VENDOR</text>
+        <text y="24" fill="#0F172A" font-size="18" font-weight="bold">{merchant}</text>
+        
+        <text y="70" fill="#64748B" font-size="12" font-weight="600">TRANSACTION DATE</text>
+        <text y="94" fill="#0F172A" font-size="15" font-weight="600">{date_str}</text>
+        
+        <text y="140" fill="#64748B" font-size="12" font-weight="600">CATEGORY</text>
+        <text y="164" fill="#0F172A" font-size="15" font-weight="600">{category}</text>
+
+        <text y="210" fill="#64748B" font-size="12" font-weight="600">RECEIPT NUMBER</text>
+        <text y="234" fill="#0F172A" font-size="15" font-weight="600">{receipt_no}</text>
+      </g>
+      
+      <line x1="44" y1="360" x2="556" y2="360" stroke="#E2E8F0" stroke-width="2" stroke-dasharray="6 6"/>
+      
+      <text x="44" y="394" fill="#64748B" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600">TOTAL AMOUNT</text>
+      <text x="556" y="394" text-anchor="end" fill="#2563EB" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="bold">₹{amount}</text>
+    </svg>"""
+    return svg.encode("utf-8")
+
+
 @router.get("/receipts/{receipt_id}/image")
 @router.get("/{report_id}/receipts/{receipt_id}/image")
 async def get_receipt_image(
     receipt_id: int,
     report_id: Optional[int] = None,
-    db: AsyncSession = Depends(get_db_session)
+    download: bool = False,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Serves a receipt image or PDF file by ID with automatic DB backup restoration.
+    Enforces authorization: user must have permission to view the underlying expense claim.
+    Supports inline preview as well as attachment downloads.
     """
     from fastapi.responses import Response
     repo = ExpenseRepository(db)
@@ -854,12 +893,24 @@ async def get_receipt_image(
     if not receipt:
         raise HTTPException(status_code=404, detail="Receipt record not found")
 
-    filename = os.path.basename(receipt.image_path) if receipt.image_path else f"receipt_{receipt_id}.png"
+    if report_id is not None and receipt.expense_report_id != report_id:
+        raise HTTPException(status_code=404, detail="Receipt does not belong to the specified expense report")
+
+    # Access control: user must have permission to view the parent claim
+    if not receipt.expense_report or not _can_access_report(receipt.expense_report, current_user):
+        _log_action(current_user, "receipt_access_denied", receipt_id, level=logging.WARNING)
+        raise HTTPException(status_code=403, detail="Not authorized to access this receipt")
+
+    filename = os.path.basename(receipt.image_path) if receipt.image_path else (receipt.file_name or f"receipt_{receipt_id}.png")
     filepath = os.path.join(UPLOAD_DIR, filename)
+    fallback_path = os.path.join(BASE_DIR, "uploads", filename)
 
     content = None
-    if os.path.exists(filepath):
+    if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
         async with aiofiles.open(filepath, "rb") as f:
+            content = await f.read()
+    elif os.path.exists(fallback_path) and os.path.getsize(fallback_path) > 0:
+        async with aiofiles.open(fallback_path, "rb") as f:
             content = await f.read()
     elif getattr(receipt, "file_data", None):
         import base64
@@ -872,24 +923,53 @@ async def get_receipt_image(
         except Exception as err:
             logger.error(f"Failed to restore receipt image from DB: {err}")
 
+    # Fallback voucher for historical records where file is unavailable
     if not content:
-        raise HTTPException(status_code=404, detail="Receipt image file not available")
+        content = _generate_receipt_voucher_svg(receipt)
+        media_type = "image/svg+xml"
+        filename = f"receipt_{receipt_id}.svg"
+    else:
+        ext = os.path.splitext(filename)[1].lower() if "." in filename else ""
+        if not ext and receipt.file_name and "." in receipt.file_name:
+            ext = os.path.splitext(receipt.file_name)[1].lower()
 
-    ext = os.path.splitext(filename)[1].lower()
-    media_type = "image/png"
-    if ext in [".jpg", ".jpeg"]:
-        media_type = "image/jpeg"
-    elif ext == ".pdf":
-        media_type = "application/pdf"
-    elif ext == ".webp":
-        media_type = "image/webp"
+        if content.startswith(b"%PDF-") or ext == ".pdf":
+            media_type = "application/pdf"
+        elif content.startswith(b"\x89PNG") or ext == ".png":
+            media_type = "image/png"
+        elif content.startswith(b"\xff\xd8\xff") or ext in [".jpg", ".jpeg"]:
+            media_type = "image/jpeg"
+        elif (content.startswith(b"RIFF") and b"WEBP" in content[:16]) or ext == ".webp":
+            media_type = "image/webp"
+        elif content.strip().startswith(b"<svg") or ext == ".svg":
+            media_type = "image/svg+xml"
+        else:
+            media_type = "application/octet-stream"
+
+    download_name = receipt.file_name or filename
+    disposition = "attachment" if download else "inline"
 
     return Response(
         content=content,
         media_type=media_type,
         headers={
-            "Cache-Control": "public, max-age=86400",
-            "Content-Disposition": f'inline; filename="{filename}"'
+            "Cache-Control": "private, max-age=3600",
+            "Content-Disposition": f'{disposition}; filename="{download_name}"'
         }
     )
+
+
+@router.get("/receipts/{receipt_id}/download")
+@router.get("/{report_id}/receipts/{receipt_id}/download")
+async def download_receipt(
+    receipt_id: int,
+    report_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Downloads a receipt file with Content-Disposition: attachment.
+    """
+    return await get_receipt_image(receipt_id, report_id, download=True, db=db, current_user=current_user)
+
 

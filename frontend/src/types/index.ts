@@ -327,6 +327,8 @@ export interface Receipt {
   ocr_confidence?: number;
   image_path: string;
   file_name: string;
+  file_url?: string;
+  is_pdf?: boolean;
   created_at: string;
 }
 
