@@ -57,7 +57,12 @@ class ExpenseRepository:
         return receipt
 
     async def get_receipt_by_id(self, receipt_id: int) -> Optional[Receipt]:
-        stmt = select(Receipt).where(Receipt.receipt_id == receipt_id)
+        stmt = select(Receipt).options(
+            selectinload(Receipt.expense_report).options(
+                selectinload(ExpenseReport.approvals),
+                selectinload(ExpenseReport.employee).selectinload(User.roles)
+            )
+        ).where(Receipt.receipt_id == receipt_id)
         result = await self.db.execute(stmt)
         return result.scalars().first()
 

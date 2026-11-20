@@ -18,20 +18,29 @@ class JWTBearer(HTTPBearer):
     """
     FastAPI Dependency that extracts and validates the Supabase JWT.
     Checks the local database to verify if the session is still Active (not revoked).
+    Supports token from Authorization header or 'token' query parameter (for direct browser file views).
     """
 
-    def __init__(self, auto_error: bool = True):
+    def __init__(self, auto_error: bool = False):
         super().__init__(auto_error=auto_error)
 
     async def __call__(self, request: Request, db: AsyncSession = Depends(get_db_session)) -> dict:
+        token: Optional[str] = None
+
+        # 1. Check Authorization header
         credentials: Optional[HTTPAuthorizationCredentials] = await super().__call__(request)
-        if not credentials:
+        if credentials and credentials.credentials:
+            token = credentials.credentials
+
+        # 2. Check query parameter fallback
+        if not token:
+            token = request.query_params.get("token")
+
+        if not token:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Authentication credentials missing"
             )
-
-        token = credentials.credentials
 
         # Verify active session in local database
         session_repo = SessionRepository(db)

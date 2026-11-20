@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Building, Briefcase, FileText } from "lucide-react";
+import { Building, Briefcase, FileText, Eye, Download, ExternalLink, Paperclip } from "lucide-react";
 import { Dialog, StatusBadge, Button } from "../ui";
-import { formatDate, resolveImageUrl } from "../../utils/helpers";
+import { formatDate, resolveImageUrl, isPdfReceipt, downloadReceiptFile } from "../../utils/helpers";
 
 interface ReimbursementDetailModalProps {
   isOpen: boolean;
@@ -20,7 +20,12 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
   onAction,
   loading = false,
 }) => {
-  const [previewReceipt, setPreviewReceipt] = useState<string | null>(null);
+  const [previewReceipt, setPreviewReceipt] = useState<{
+    url: string;
+    isPdf: boolean;
+    fileName: string;
+    receiptId: number;
+  } | null>(null);
 
   if (!isOpen) return null;
 
@@ -172,9 +177,7 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                     <span className="text-blue-500">📄</span> Attached Receipts ({receiptDetails.receipts.length})
                   </h4>
                   {receiptDetails.receipts.map((receipt: any, idx: number) => {
-                    
                     const conf = receipt.ocr_confidence != null ? Number(receipt.ocr_confidence) : null;
-                    
                     const extractedAmount = (receipt.ocr_amount && Number(receipt.ocr_amount) > 0) 
                       ? `₹${Number(receipt.ocr_amount).toFixed(2)}` 
                       : (receipt.total_amount && Number(receipt.total_amount) > 0) 
@@ -183,38 +186,52 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                     
                     const rawUrl = receipt.file_url || receipt.image_path;
                     const finalUrl = resolveImageUrl(rawUrl, receipt.receipt_id);
+                    const isPdf = isPdfReceipt(receipt, finalUrl);
+                    const fileName = receipt.file_name || (isPdf ? `receipt_${receipt.receipt_id}.pdf` : `receipt_${receipt.receipt_id}.png`);
                     
                     return (
-                      <div key={idx} className="flex gap-6 p-5 bg-card border border-border rounded-2xl items-start hover:shadow-md transition-shadow shadow-sm">
-                        <div className="w-32 h-32 bg-card rounded-xl flex items-center justify-center shrink-0 border border-border/80 overflow-hidden p-1 shadow-sm">
+                      <div key={idx} className="flex flex-col sm:flex-row gap-5 p-5 bg-card border border-border rounded-2xl items-start hover:shadow-md transition-shadow shadow-sm">
+                        <div className="w-28 h-28 bg-muted/20 rounded-xl flex items-center justify-center shrink-0 border border-border/80 overflow-hidden shadow-sm relative group">
                           {finalUrl ? (
                              <button 
-                               onClick={() => setPreviewReceipt(finalUrl)} 
-                               className="w-full h-full block bg-muted/20 cursor-pointer flex items-center justify-center relative group"
+                               onClick={() => setPreviewReceipt({ url: finalUrl, isPdf, fileName, receiptId: receipt.receipt_id })} 
+                               className="w-full h-full block cursor-pointer relative"
+                               title="Click to preview receipt"
                              >
-                               {finalUrl.toLowerCase().endsWith('.pdf') ? (
-                                 <div className="flex flex-col items-center justify-center gap-2 text-red-500 group-hover:scale-105 transition-transform">
-                                   <FileText className="w-12 h-12" />
-                                   <span className="text-[10px] font-bold">PDF</span>
+                               {isPdf ? (
+                                 <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-red-500/10 text-red-500 group-hover:scale-105 transition-transform p-2">
+                                   <FileText className="w-9 h-9" />
+                                   <span className="text-[10px] font-extrabold uppercase tracking-wider bg-red-500 text-white px-2 py-0.5 rounded-full">PDF</span>
+                                   <span className="text-[9px] text-muted-foreground truncate max-w-full px-1">{fileName}</span>
                                  </div>
                                ) : (
-                                 <img 
-                                   src={finalUrl} 
-                                   alt="Receipt" 
-                                   className="w-full h-full object-cover rounded-lg hover:opacity-80 transition-opacity" 
-                                   onError={(e) => {
-                                     (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5NDkzYjgiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cmVjdCB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHg9IjMiIHk9IjMiIHJ4PSIyIiByeT0iMiIvPjxjaXJjbGUgY3g9IjkuIiBjeT0iOSIgcj0iMiIvPjxwYXRoIGQ9Im0yMSAxNS0zLjA4Ni0zLjA4NmEtMiAyIDAgMCAwLTIuODI4IDBsLTUuNzg2IDUuNzg2Ii8+PC9zdmc+'; // fallback icon
-                                     (e.target as HTMLImageElement).className = "w-10 h-10 object-contain mx-auto mt-10 opacity-50";
-                                   }}
-                                 />
+                                 <>
+                                   <img 
+                                     src={finalUrl} 
+                                     alt={fileName} 
+                                     className="w-full h-full object-cover rounded-lg group-hover:opacity-85 transition-opacity" 
+                                     onError={(e) => {
+                                       (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5NDkzYjgiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cmVjdCB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHg9IjMiIHk9IjMiIHJ4PSIyIiByeT0iMiIvPjxjaXJjbGUgY3g9IjkuIiBjeT0iOSIgcj0iMiIvPjxwYXRoIGQ9Im0yMSAxNS0zLjA4Ni0zLjA4NmEtMiAyIDAgMCAwLTIuODI4IDBsLTUuNzg2IDUuNzg2Ii8+PC9zdmc+';
+                                       (e.target as HTMLImageElement).className = "w-10 h-10 object-contain mx-auto mt-9 opacity-50";
+                                     }}
+                                   />
+                                   <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
+                                     <Eye className="w-6 h-6 text-white" />
+                                   </div>
+                                 </>
                                )}
                              </button>
                           ) : (
                              <span className="text-xs font-semibold text-muted-foreground flex flex-col items-center gap-2"><FileText className="w-8 h-8 text-muted-foreground/50" />No File</span>
                           )}
                         </div>
-                        <div className="flex-1 text-xs space-y-2 pt-1">
-                          <p className="font-bold text-base text-foreground">{receipt.merchant_name || "Unknown Merchant"}</p>
+                        
+                        <div className="flex-1 text-xs space-y-2 pt-0.5 min-w-0">
+                          <div className="flex items-center gap-1.5 text-blue-600 font-bold truncate">
+                            <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">{fileName}</span>
+                          </div>
+                          <p className="font-bold text-base text-foreground truncate">{receipt.merchant_name || "Unknown Merchant"}</p>
                           <p className="text-muted-foreground font-medium text-xs">Date: <span className="text-foreground">{formatDate(receipt.transaction_date || receipt.receipt_date)}</span> • Category: <span className="text-foreground">{receipt.category || "Uncategorized"}</span></p>
                           {conf !== null && conf > 0 ? (
                             <p className="text-emerald-600 font-semibold text-[11px]">OCR Confidence: {conf.toFixed(2)}%</p>
@@ -223,9 +240,44 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
                           )}
                           <p className="text-muted-foreground text-xs mt-1">OCR Extracted Amount: <span className="font-bold text-foreground">{extractedAmount}</span></p>
                         </div>
-                        <div className="text-right pt-1">
-                          <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Receipt Total</div>
-                          <div className="font-bold text-xl text-foreground">₹{Number(receipt.verified_amount || receipt.total_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                        
+                        <div className="text-right pt-0.5 shrink-0 flex flex-col items-end gap-3">
+                          <div>
+                            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Receipt Total</div>
+                            <div className="font-bold text-xl text-foreground">₹{Number(receipt.verified_amount || receipt.total_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                          </div>
+                          {finalUrl && (
+                            <div className="flex items-center gap-1.5 pt-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2.5 text-xs flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                                onClick={() => setPreviewReceipt({ url: finalUrl, isPdf, fileName, receiptId: receipt.receipt_id })}
+                                title="Preview Receipt"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                Preview
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2 text-xs flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                                onClick={() => window.open(finalUrl, "_blank")}
+                                title="Open in New Tab"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2 text-xs flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                                onClick={() => downloadReceiptFile(receipt.receipt_id, fileName)}
+                                title="Download Receipt"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -243,24 +295,63 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
     {/* Receipt Preview Overlay */}
     {previewReceipt && (
       <div 
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" 
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" 
         onClick={() => setPreviewReceipt(null)}
       >
-        <div className="relative max-w-4xl max-h-[95vh] bg-card p-2 rounded-xl shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
-           <button 
-             onClick={() => setPreviewReceipt(null)} 
-             className="absolute -top-4 -right-4 w-10 h-10 bg-card rounded-full flex items-center justify-center text-foreground font-bold shadow-md hover:bg-muted transition-colors z-10 text-xl"
-           >
-             ✕
-           </button>
-           <div className="flex-1 overflow-auto rounded-lg bg-muted/10 flex items-center justify-center p-4">
-             {previewReceipt.toLowerCase().endsWith('.pdf') ? (
-               <iframe src={previewReceipt} className="w-full h-[85vh] rounded-lg border-none" title="PDF Preview" />
+        <div className="relative max-w-4xl w-full max-h-[95vh] bg-card p-4 rounded-2xl shadow-2xl flex flex-col border border-border" onClick={e => e.stopPropagation()}>
+           {/* Modal Top Bar */}
+           <div className="flex items-center justify-between pb-3 border-b border-border mb-3">
+             <div className="flex items-center gap-2 min-w-0">
+               <FileText className="w-5 h-5 text-blue-500 shrink-0" />
+               <span className="font-bold text-sm truncate text-foreground">{previewReceipt.fileName}</span>
+             </div>
+             <div className="flex items-center gap-2">
+               <Button 
+                 size="sm" 
+                 variant="outline" 
+                 onClick={() => window.open(previewReceipt.url, "_blank")}
+                 className="flex items-center gap-1.5 text-xs h-8 px-3"
+               >
+                 <ExternalLink className="w-3.5 h-3.5" />
+                 Open in New Tab
+               </Button>
+               <Button 
+                 size="sm" 
+                 variant="outline" 
+                 onClick={() => downloadReceiptFile(previewReceipt.receiptId, previewReceipt.fileName)}
+                 className="flex items-center gap-1.5 text-xs h-8 px-3"
+               >
+                 <Download className="w-3.5 h-3.5" />
+                 Download
+               </Button>
+               <button 
+                 onClick={() => setPreviewReceipt(null)} 
+                 className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors ml-1 font-bold text-lg"
+                 title="Close Preview"
+               >
+                 ✕
+               </button>
+             </div>
+           </div>
+
+           {/* Preview Body */}
+           <div className="flex-1 overflow-auto rounded-xl bg-muted/10 flex flex-col items-center justify-center p-2 min-h-[60vh]">
+             {previewReceipt.isPdf ? (
+               <div className="w-full h-[75vh] flex flex-col">
+                 <iframe 
+                   src={previewReceipt.url} 
+                   className="w-full flex-1 rounded-xl border border-border bg-white" 
+                   title={previewReceipt.fileName} 
+                 />
+                 <div className="text-center text-xs text-muted-foreground pt-2">
+                   Having trouble viewing this PDF? <button type="button" onClick={() => window.open(previewReceipt.url, "_blank")} className="text-blue-500 hover:underline font-semibold">Open in New Tab</button> or <button type="button" onClick={() => downloadReceiptFile(previewReceipt.receiptId, previewReceipt.fileName)} className="text-blue-500 hover:underline font-semibold">Download</button>.
+                 </div>
+               </div>
              ) : (
                <img 
-                 src={previewReceipt} 
-                 className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-sm" 
-                 alt="Preview" 
+                 src={previewReceipt.url} 
+                 className="max-w-full max-h-[75vh] object-contain rounded-xl shadow-sm" 
+                 alt={previewReceipt.fileName} 
                  onError={(e) => {
                    (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5NDkzYjgiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cmVjdCB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHg9IjMiIHk9IjMiIHJ4PSIyIiByeT0iMiIvPjxjaXJjbGUgY3g9IjkuIiBjeT0iOSIgcj0iMiIvPjxwYXRoIGQ9Im0yMSAxNS0zLjA4Ni0zLjA4NmEtMiAyIDAgMCAwLTIuODI4IDBsLTUuNzg2IDUuNzg2Ii8+PC9zdmc+';
                    (e.target as HTMLImageElement).className = "max-w-xs max-h-xs object-contain mx-auto opacity-50";

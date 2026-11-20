@@ -24,12 +24,19 @@ export const isValidText = (text?: string | null): boolean => {
   return /[a-zA-Z0-9]/.test(text);
 };
 
+export const isPdfReceipt = (receipt?: any, url?: string | null): boolean => {
+  if (receipt?.is_pdf) return true;
+  const fileName = (receipt?.file_name || "").toLowerCase();
+  const imagePath = (receipt?.image_path || "").toLowerCase();
+  const rawUrl = (url || receipt?.file_url || "").toLowerCase();
+
+  if (fileName.endsWith(".pdf") || imagePath.endsWith(".pdf")) return true;
+  if (rawUrl.split("?")[0].endsWith(".pdf")) return true;
+  return false;
+};
+
 export const resolveImageUrl = (rawUrl?: string | null, fallbackId?: number | null): string => {
   if (!rawUrl && !fallbackId) return "";
-
-  if (rawUrl && (rawUrl.startsWith("http://") || rawUrl.startsWith("https://") || rawUrl.startsWith("data:"))) {
-    return rawUrl;
-  }
 
   // Derive origin from VITE_API_URL or relative
   const envApi = import.meta.env.VITE_API_URL || "";
@@ -38,17 +45,53 @@ export const resolveImageUrl = (rawUrl?: string | null, fallbackId?: number | nu
     baseOrigin = envApi.replace(/\/api\/v1\/?$/, "").replace(/\/$/, "");
   }
 
-  if (fallbackId && (!rawUrl || rawUrl === "N/A" || rawUrl === "None" || rawUrl === "null")) {
-    return `${baseOrigin}/api/v1/expenses/receipts/${fallbackId}/image`;
+  let finalPath = "";
+
+  // If fallback receipt ID is provided, route directly to the persistent, access-controlled endpoint
+  if (fallbackId) {
+    finalPath = `/api/v1/expenses/receipts/${fallbackId}/image`;
+  } else if (rawUrl && (rawUrl.startsWith("http://") || rawUrl.startsWith("https://") || rawUrl.startsWith("data:"))) {
+    finalPath = rawUrl;
+  } else if (rawUrl) {
+    let path = rawUrl.trim();
+    if (!path.startsWith("/")) path = `/${path}`;
+    // If it points to /uploads/receipts/, replace with api route if ID is embedded
+    finalPath = path;
   }
 
-  if (!rawUrl) return "";
+  if (!finalPath) return "";
 
-  let path = rawUrl.trim();
-  if (!path.startsWith("/")) {
-    path = `/${path}`;
+  let fullUrl = (finalPath.startsWith("http://") || finalPath.startsWith("https://") || finalPath.startsWith("data:"))
+    ? finalPath
+    : `${baseOrigin}${finalPath}`;
+
+  // Attach token for authenticated viewing in <img>, <iframe>, and new tabs
+  const token = localStorage.getItem("access_token");
+  if (token && fullUrl.includes("/expenses/receipts/") && !fullUrl.includes("token=")) {
+    fullUrl += (fullUrl.includes("?") ? "&" : "?") + `token=${encodeURIComponent(token)}`;
   }
 
-  return `${baseOrigin}${path}`;
+  return fullUrl;
+};
+
+export const downloadReceiptFile = async (receiptId: number, fileName: string = "receipt"): Promise<void> => {
+  const url = resolveImageUrl("", receiptId) + (resolveImageUrl("", receiptId).includes("?") ? "&" : "?") + "download=true";
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to download (${response.statusText})`);
+    }
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(blobUrl);
+  } catch (err) {
+    window.open(url, "_blank");
+  }
 };
 

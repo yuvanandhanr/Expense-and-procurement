@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, computed_field
 from typing import Optional, List, Any
 from datetime import datetime, date
 from decimal import Decimal
@@ -47,6 +47,18 @@ class ReceiptResponse(ReceiptBase):
     created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
+
+    @computed_field
+    @property
+    def file_url(self) -> str:
+        return f"/api/v1/expenses/receipts/{self.receipt_id}/image"
+
+    @computed_field
+    @property
+    def is_pdf(self) -> bool:
+        name = (self.file_name or "").lower()
+        path = (self.image_path or "").lower()
+        return name.endswith(".pdf") or path.endswith(".pdf")
 
 # Expense Report Schemas
 class ExpenseReportBase(BaseModel):
