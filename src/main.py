@@ -83,8 +83,10 @@ async def lifespan(app: FastAPI):
         )
         # Avoid crashing startup so the health-check system can report failure properly
 
-    # 2.5 Initialize Cache, Seed Databases, and Start Background Scheduler
+    # 2.5 Non-blocking background initialization: run schema patches, seeding, cache, and scheduler asynchronously
+    # This enables the HTTP server to bind ports and respond to healthchecks in < 50ms, eliminating cold-start 502/503 timeouts
     import asyncio
+    from sqlalchemy import text
     from src.cache.factory import initialize_cache
     from src.database.session import async_session
     from src.services.setting_service import SettingService
@@ -92,60 +94,62 @@ async def lifespan(app: FastAPI):
     from src.services.notification_service import NotificationService
     from src.services.job_service import run_scheduler_loop
 
-    await initialize_cache()
-    
-    # 2.6 Run raw SQL patches for missing columns (robust fallback for SQLite/Render)
-    from sqlalchemy import text
-    try:
-        async with async_engine.begin() as conn:
-            try:
-                await conn.execute(text("ALTER TABLE purchase_requisitions ADD COLUMN is_inventory_allocation BOOLEAN;"))
-            except Exception:
-                pass
-            try:
-                await conn.execute(text("ALTER TABLE purchase_requisitions ADD COLUMN allocated_asset_id BIGINT;"))
-            except Exception:
-                pass
-            try:
-                await conn.execute(text("ALTER TABLE receipts ADD COLUMN file_data TEXT;"))
-            except Exception:
-                pass
-        logger.info("Database schema patch applied successfully.")
-    except Exception as e:
-        logger.error(f"Error applying database schema patch on startup: {e}")
+    async def _async_background_init():
+        try:
+            await initialize_cache()
+        except Exception as e:
+            logger.warning(f"Cache init warning: {e}")
 
-    try:
-        async with async_session() as session:
-            # Seed Settings
-            setting_service = SettingService(session)
-            await setting_service.seed_default_settings()
+        try:
+            async with async_engine.begin() as conn:
+                for patch_sql in [
+                    "ALTER TABLE purchase_requisitions ADD COLUMN is_inventory_allocation BOOLEAN;",
+                    "ALTER TABLE purchase_requisitions ADD COLUMN allocated_asset_id BIGINT;",
+                    "ALTER TABLE receipts ADD COLUMN file_data TEXT;",
+                ]:
+                    try:
+                        await conn.execute(text(patch_sql))
+                    except Exception:
+                        pass
+            logger.info("Database schema patch applied successfully.")
+        except Exception as e:
+            logger.error(f"Error applying database schema patch: {e}")
 
-            # Seed Email Templates
-            email_service = EmailService(session)
-            await email_service.seed_templates()
+        try:
+            async with async_session() as session:
+                setting_service = SettingService(session)
+                await setting_service.seed_default_settings()
 
-            # Seed Notification Templates
-            notification_service = NotificationService(session)
-            await notification_service.seed_templates()
+                email_service = EmailService(session)
+                await email_service.seed_templates()
 
-            await session.commit()
-        logger.info("Successfully seeded settings, email templates, and notification templates on startup.")
-    except Exception as e:
-        logger.error(f"Error seeding default settings/templates on startup: {e}")
+                notification_service = NotificationService(session)
+                await notification_service.seed_templates()
 
-    # Launch background scheduler task
-    scheduler_task = asyncio.create_task(run_scheduler_loop(async_session))
-    app.state.scheduler_task = scheduler_task
+                await session.commit()
+            logger.info("Successfully seeded settings, email templates, and notification templates.")
+        except Exception as e:
+            logger.error(f"Error seeding default settings/templates: {e}")
+
+        try:
+            await run_scheduler_loop(async_session)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.error(f"Background scheduler error: {e}")
+
+    init_task = asyncio.create_task(_async_background_init())
+    app.state.init_task = init_task
 
     yield
 
     # 3. Clean up database connections on application termination
     logger.info("Terminating FastAPI Application. Disposing database engine...")
-    if hasattr(app.state, "scheduler_task"):
-        logger.info("Cancelling background scheduler task...")
-        app.state.scheduler_task.cancel()
+    if hasattr(app.state, "init_task"):
+        logger.info("Cancelling background initialization and scheduler task...")
+        app.state.init_task.cancel()
         try:
-            await app.state.scheduler_task
+            await app.state.init_task
         except asyncio.CancelledError:
             pass
     await async_engine.dispose()

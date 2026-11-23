@@ -9,8 +9,9 @@ import multiprocessing
 import os
 
 # Port and binding IP configuration
-port = os.getenv("PORT", "8000")
-bind = f"0.0.0.0:{port}"
+# Bind to Render's dynamic PORT as well as fallback ports 8000 and 10000 so reverse proxy connects immediately
+port = os.getenv("PORT", "10000")
+bind = list({f"0.0.0.0:{port}", "0.0.0.0:8000", "0.0.0.0:10000"})
 
 # Determine worker count based on CPU allocation or setting
 # Set conservative default of 1 worker for container environments (Render/ECS) to prevent memory exhaustion (512MB limit)
