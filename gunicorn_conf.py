@@ -13,8 +13,8 @@ port = os.getenv("PORT", "8000")
 bind = f"0.0.0.0:{port}"
 
 # Determine worker count based on CPU allocation or setting
-cores = multiprocessing.cpu_count()
-workers = int(os.getenv("WEB_CONCURRENCY", str((cores * 2) + 1)))
+# Set conservative default of 1 worker for container environments (Render/ECS) to prevent memory exhaustion (512MB limit)
+workers = int(os.getenv("WEB_CONCURRENCY", "1"))
 
 # Uvicorn worker class for ASGI application serving
 worker_class = "uvicorn.workers.UvicornWorker"

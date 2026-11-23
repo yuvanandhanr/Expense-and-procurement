@@ -242,7 +242,7 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 app.mount("/api/v1/uploads", StaticFiles(directory=UPLOAD_DIR), name="api_uploads")
 
 
-@app.get("/health", tags=["system"])
+@app.api_route("/health", methods=["GET", "HEAD"], tags=["system"])
 async def get_health():
     """
     Liveness probe returning HTTP 200 to confirm application process is running.
@@ -252,7 +252,7 @@ async def get_health():
     }
 
 
-@app.get("/ready", tags=["system"])
+@app.api_route("/ready", methods=["GET", "HEAD"], tags=["system"])
 async def get_readiness(db: AsyncSession = Depends(get_db_session)):
     """
     Readiness probe to verify database connectivity.
