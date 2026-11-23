@@ -1,8 +1,10 @@
 from typing import List
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.dependency import get_db_session
 from src.auth.dependencies import get_current_user
+from src.auth.authorization import is_amount_visible
 from src.models.auth import User
 from src.schemas.purchase_order import POCreate, POUpdate, POSchema, POApproveRequest, ItemDeliveryRequest, ItemVerificationRequest, POItemSchema
 from src.services.po_service import POService
@@ -47,25 +49,38 @@ async def list_pos(
     service = POService(db)
     user_roles = [role.role_name for role in current_user.roles]
     
-    if "Vendor Portal" in user_roles and not any(role in ("Admin", "Procurement Officer", "Procurement Manager", "Finance", "CFO") for role in user_roles):
+    if any(role in ("Vendor Portal", "Vendor") for role in user_roles) and not any(role in ("Admin", "Finance Manager", "SuperAdmin") for role in user_roles):
         from sqlalchemy import select
         from src.models.vendor import Vendor
         stmt = select(Vendor.vendor_id).where(Vendor.email == current_user.email)
         result = await db.execute(stmt)
         vendor_id = result.scalar_one_or_none()
         if vendor_id:
-            # Vendors should not see Draft POs
             pos = await service.po_repo.list_by_vendor(vendor_id)
-            return [po for po in pos if po.status != "Draft"]
-        return []
+            visible_pos = [po for po in pos if po.status != "Draft"]
+        else:
+            visible_pos = []
+    else:
+        # If the user is just an Employee or Manager, restrict to their PRs
+        has_global_access = any(role in ("Admin", "Procurement Officer", "Procurement Manager", "Finance", "Finance Manager", "CFO") for role in user_roles)
+        if not has_global_access:
+            visible_pos = await service.po_repo.list_by_requestor(current_user.user_id)
+        else:
+            visible_pos = await service.po_repo.list_all()
 
-    # If the user is just an Employee or Manager, restrict to their PRs
-    # (Assuming Procurement, Admin, Finance, CFO can see all POs)
-    has_global_access = any(role in ("Admin", "Procurement Officer", "Procurement Manager", "Finance", "Finance Manager", "CFO") for role in user_roles)
-    if not has_global_access:
-        return await service.po_repo.list_by_requestor(current_user.user_id)
+    # Hide monetary amounts if user is not Admin or Finance Manager
+    if not is_amount_visible(current_user):
+        for po in visible_pos:
+            po.total_amount = Decimal("0.00")
+            po.tax_amount = Decimal("0.00")
+            po.discount_amount = Decimal("0.00")
+            po.grand_total = Decimal("0.00")
+            if getattr(po, "items", None):
+                for item in po.items:
+                    item.unit_price = Decimal("0.00")
+                    item.total_price = Decimal("0.00")
 
-    return await service.po_repo.list_all()
+    return visible_pos
 
 
 @router.get("/{id}", response_model=POSchema)
@@ -81,7 +96,7 @@ async def get_po(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Purchase Order not found")
         
     user_roles = [role.role_name for role in current_user.roles]
-    if "Vendor Portal" in user_roles and not any(role in ("Admin", "Procurement Officer", "Procurement Manager", "Finance", "CFO") for role in user_roles):
+    if any(role in ("Vendor Portal", "Vendor") for role in user_roles) and not any(role in ("Admin", "Finance Manager", "SuperAdmin") for role in user_roles):
         from sqlalchemy import select
         from src.models.vendor import Vendor
         stmt = select(Vendor.vendor_id).where(Vendor.email == current_user.email)
@@ -90,6 +105,17 @@ async def get_po(
         if po.vendor_id != vendor_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only access your own Purchase Orders")
             
+    # Hide monetary amounts if user is not Admin or Finance Manager
+    if not is_amount_visible(current_user):
+        po.total_amount = Decimal("0.00")
+        po.tax_amount = Decimal("0.00")
+        po.discount_amount = Decimal("0.00")
+        po.grand_total = Decimal("0.00")
+        if getattr(po, "items", None):
+            for item in po.items:
+                item.unit_price = Decimal("0.00")
+                item.total_price = Decimal("0.00")
+
     return po
 
 

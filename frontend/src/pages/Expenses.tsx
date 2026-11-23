@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { api } from "../services/api";
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Skeleton, Badge, StatusBadge, Dialog, HeroTimestamp, EmptyState } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
-import { isValidText, resolveImageUrl, isPdfReceipt, downloadReceiptFile } from "../utils/helpers";
+import { isValidText, resolveImageUrl, isPdfReceipt, downloadReceiptFile, canViewAmount } from "../utils/helpers";
 import { ReimbursementDetailModal } from "../components/expenses/ReimbursementDetailModal";
 
 const Expenses: React.FC = () => {
@@ -380,7 +380,7 @@ const Expenses: React.FC = () => {
                   <tr className="border-b border-border bg-accent/40 text-xs font-bold text-muted-foreground uppercase tracking-wider">
                     <th className="p-4">Report ID</th>
                     <th className="p-4">Purpose</th>
-                    <th className="p-4">Total Amount</th>
+                    {canViewAmount(user) && <th className="p-4">Total Amount</th>}
                     <th className="p-4">Status</th>
                     <th className="p-4">Date Created</th>
                     <th className="p-4">Action</th>
@@ -394,9 +394,11 @@ const Expenses: React.FC = () => {
                         <div className="font-semibold">{report.purpose}</div>
                         <div className="text-xs text-muted-foreground truncate max-w-[200px]">{report.justification}</div>
                       </td>
-                      <td className="p-4 font-bold text-foreground">
-                        ₹{Number(report.total_amount).toFixed(2)}
-                      </td>
+                      {canViewAmount(user) && (
+                        <td className="p-4 font-bold text-foreground">
+                          ₹{Number(report.total_amount).toFixed(2)}
+                        </td>
+                      )}
                       <td className="p-4">
                         {getStatusBadge(report.status)}
                       </td>

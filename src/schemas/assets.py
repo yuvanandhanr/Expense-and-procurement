@@ -69,7 +69,7 @@ class AssetDocumentSchema(AssetDocumentCreate):
 
 
 class AssetCreate(BaseModel):
-    asset_number: str
+    asset_number: Optional[str] = None
     asset_tag: str
     category_id: Optional[int] = None
     status: Optional[str] = None
@@ -84,7 +84,6 @@ class AssetCreate(BaseModel):
     amc_expiry: Optional[date] = None
     cost: Optional[float] = None
     location: Optional[str] = None
-    cost: Optional[float] = None
 
 
 class AssetUpdate(BaseModel):

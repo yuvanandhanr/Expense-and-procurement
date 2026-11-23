@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.dependency import get_db_session
 from src.auth.dependencies import get_current_user
+from src.auth.authorization import is_amount_visible
 from src.models.auth import User
 from src.schemas.approval import InboxApprovalWorkflowSchema
 from src.services.approval_service import ApprovalService
@@ -164,6 +165,13 @@ async def get_pending_approvals(
                 "admin_comments": incident.admin_comments,
                 "linked_pr_id": incident.linked_pr_id
             })
+
+    if not is_amount_visible(current_user):
+        for wf in pending_workflows:
+            if isinstance(wf, dict):
+                wf["amount"] = 0.0
+            elif hasattr(wf, "amount"):
+                wf.amount = 0.0
 
     return pending_workflows
 

@@ -63,7 +63,27 @@ class PRUpdate(BaseModel):
     items: Optional[List[PRItemCreate]] = None
 
 class PRAllocateInventoryRequest(BaseModel):
-    asset_id: int = Field(..., description="ID of the asset to allocate")
+    asset_id: Optional[int] = Field(None, description="Optional ID of the asset to allocate. If omitted, first available asset is used.")
+
+
+class PRInventoryItemCheck(BaseModel):
+    pr_item_id: Optional[int] = None
+    item_name: str
+    category: Optional[str] = None
+    quantity: int
+    available_count: int
+    available_assets: List[dict] = []
+
+
+class PRInventoryCheckResponse(BaseModel):
+    pr_id: int
+    pr_number: str
+    pr_title: str
+    available_count: int
+    case: str # "A" (> 4) or "B" (<= 4)
+    can_allocate_directly: bool
+    requires_procurement_prompt: bool
+    items: List[PRInventoryItemCheck] = []
 
 
 class PRSchema(PRBase):
@@ -74,7 +94,7 @@ class PRSchema(PRBase):
     requestor_id: Optional[int] = None
     requestor_name: Optional[str] = None
     status: str
-    total_estimated_amount: Decimal
+    total_estimated_amount: Optional[Decimal] = None
     technical_spec_signoff: Optional[bool] = None
     technical_spec_signoff_by: Optional[int] = None
     technical_spec_signoff_at: Optional[datetime] = None

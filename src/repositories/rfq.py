@@ -16,7 +16,8 @@ class RFQRepository(BaseRepository[RequestForQuotation]):
             .options(
                 selectinload(self.model.items),
                 selectinload(self.model.rfq_vendors),
-                selectinload(self.model.quotations)
+                selectinload(self.model.quotations),
+                selectinload(self.model.pr)
             )
             .offset(skip)
             .limit(limit)
@@ -31,7 +32,8 @@ class RFQRepository(BaseRepository[RequestForQuotation]):
             .options(
                 selectinload(self.model.items),
                 selectinload(self.model.rfq_vendors),
-                selectinload(self.model.quotations)
+                selectinload(self.model.quotations),
+                selectinload(self.model.pr)
             )
         )
         result = await self.session.execute(query)

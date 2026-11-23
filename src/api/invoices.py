@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 
 from src.database.dependency import get_db_session
 from src.auth.dependencies import get_current_user
+from src.auth.authorization import is_amount_visible
 from src.models.auth import User, Role
 from src.models.invoice import VendorInvoice, InvoiceDocument, InvoiceApproval
 from src.schemas.invoice import InvoiceSchema, InvoiceUpdate
@@ -87,6 +88,17 @@ async def get_invoices(
         else:
             filtered_invoices.append(inv)
             
+    if not is_amount_visible(current_user):
+        for inv in filtered_invoices:
+            inv.subtotal = Decimal("0.00")
+            inv.taxes = Decimal("0.00")
+            inv.discount = Decimal("0.00")
+            inv.grand_total = Decimal("0.00")
+            if getattr(inv, "items", None):
+                for item in inv.items:
+                    item.unit_price = Decimal("0.00")
+                    item.total_price = Decimal("0.00")
+
     return filtered_invoices
 
 @router.post("/upload-batch", response_model=List[InvoiceSchema])

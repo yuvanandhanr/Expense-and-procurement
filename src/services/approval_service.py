@@ -188,13 +188,25 @@ class ApprovalService:
         # Step 2: Admin Approval (Inventory Check)
         steps_to_create.append({"step_number": step_counter, "approver_role_id": admin_role_id, "approver_id": None})
 
-        # Create overall workflow
-        workflow = ApprovalWorkflow(
-            pr_id=pr.pr_id,
-            status="Under Review",
-            created_at=datetime.utcnow()
-        )
-        workflow = await self.workflow_repo.create(workflow)
+        # Reuse existing workflow or create new
+        existing_wf = await self.workflow_repo.get_by_pr_id(pr.pr_id)
+        if existing_wf:
+            workflow = existing_wf
+            workflow.status = "Under Review"
+            await self.workflow_repo.update(workflow)
+            # Remove previous steps to re-initialize cleanly
+            old_steps_query = select(ApprovalStep).where(ApprovalStep.workflow_id == workflow.workflow_id)
+            old_steps = (await self.db.execute(old_steps_query)).scalars().all()
+            for st in old_steps:
+                await self.db.delete(st)
+            await self.db.flush()
+        else:
+            workflow = ApprovalWorkflow(
+                pr_id=pr.pr_id,
+                status="Under Review",
+                created_at=datetime.utcnow()
+            )
+            workflow = await self.workflow_repo.create(workflow)
 
         # Create step records
         for s in steps_to_create:
@@ -255,9 +267,6 @@ class ApprovalService:
             .options(selectinload(UserModel.roles))
             .join(PurchaseRequisition, ApprovalWorkflow.pr_id == PurchaseRequisition.pr_id)
             .join(UserModel, PurchaseRequisition.requestor_id == UserModel.user_id)
-            .where(
-                PurchaseRequisition.total_estimated_amount > 0
-            )
             .order_by(ApprovalWorkflow.created_at.desc())
         )
 
@@ -475,7 +484,15 @@ class ApprovalService:
             )
         return active_step
 
-    async def approve_step(self, pr_id: int, user_id: int, comments: Optional[str] = None, physical_inspection_done: bool = False) -> PurchaseRequisition:
+    async def approve_step(
+        self,
+        pr_id: int,
+        user_id: int,
+        comments: Optional[str] = None,
+        physical_inspection_done: bool = False,
+        initiate_procurement: Optional[bool] = None,
+        allocate_asset_id: Optional[int] = None
+    ) -> PurchaseRequisition:
         pr = await self.pr_repo.get_by_id(pr_id)
         if not pr:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
@@ -489,16 +506,44 @@ class ApprovalService:
                 detail="Users cannot approve their own requests."
             )
 
-        # Physical inspection enforcement for Managers
+        # Resolve active step role
         from src.models.auth import Role
         role_result = await self.db.execute(select(Role).where(Role.role_id == active_step.approver_role_id))
         step_role = role_result.scalar_one_or_none()
-        if step_role and step_role.role_name == "Manager":
+        step_role_name = step_role.role_name if step_role else ""
+
+        # Step 1: Physical inspection enforcement for Managers
+        if step_role_name == "Manager":
             if not physical_inspection_done:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Physical inspection must be completed to approve this request."
                 )
+
+        # Step 2: Admin Inventory Verification
+        if step_role_name in ["Admin", "SuperAdmin"]:
+            from src.services.pr_service import PRService
+            pr_service = PRService(self.db)
+            inv_check = await pr_service.check_inventory(pr_id)
+            if inv_check["case"] == "A":
+                # Case A: Asset availability > 4 -> Direct inventory assignment to employee, requisition ends here
+                return await pr_service.allocate_inventory(pr_id, allocate_asset_id, user_id)
+            else:
+                # Case B: Asset availability <= 4, or unavailable
+                # If Admin selects Yes, forward procurement request to Finance Manager
+                # If Admin selects No, do not initiate procurement
+                if initiate_procurement is True:
+                    return await pr_service.initiate_procurement(pr_id, user_id)
+                elif initiate_procurement is False:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Procurement was not initiated as Admin selected No. Requisition remains unforwarded."
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Inventory is low (<= 4) or unavailable. Admin confirmation (Yes/No) is required to initiate procurement."
+                    )
 
         # Duplicate approval prevention
         existing_approval_query = select(ApprovalHistory).where(
@@ -585,41 +630,6 @@ class ApprovalService:
                 created_at=datetime.utcnow()
             )
             await self.workflow_history_repo.create(w_hist)
-            
-            # Notify Procurement Team
-            # Auto-generate RFQ and invite active vendors
-            from src.services.rfq_service import RFQService
-            from src.schemas.rfq import RFQCreate, RFQItemCreate
-            from src.models.vendor import Vendor
-            from datetime import timedelta
-            
-            # Fetch all active vendors
-            query_vendors = select(Vendor.vendor_id).where(Vendor.status == "Active", Vendor.blacklist_status == False)
-            active_vendor_ids = (await self.db.execute(query_vendors)).scalars().all()
-            
-            # Create RFQ payload
-            rfq_items = []
-            for item in pr.items:
-                rfq_items.append(RFQItemCreate(
-                    pr_item_id=item.pr_item_id,
-                    item_name=item.item_name,
-                    specification=item.specification,
-                    quantity=item.quantity
-                ))
-            
-            rfq_payload = RFQCreate(
-                title=f"RFQ for PR: {pr.title}",
-                description=pr.justification,
-                pr_id=pr.pr_id,
-                submission_deadline=datetime.utcnow() + timedelta(days=7),
-                invited_vendor_ids=list(active_vendor_ids)[:3],
-                items=rfq_items
-            )
-            try:
-                rfq_service = RFQService(self.db)
-                await rfq_service.create_rfq(rfq_payload, user_id)
-            except Exception:
-                pass
 
         return await self.pr_repo.get_by_id(pr_id)
 
@@ -696,7 +706,7 @@ class ApprovalService:
 
         # Return workflow
         workflow = await self.workflow_repo.get_by_pr_id(pr_id)
-        workflow.status = "Returned for Modification"
+        workflow.status = "Returned for Correction"
         await self.workflow_repo.update(workflow)
 
         # Release budget reservation on return
@@ -704,7 +714,7 @@ class ApprovalService:
             await self.budget_service.release_budget(pr.pr_id)
 
         old_status = pr.status
-        pr.status = "Returned for Modification"
+        pr.status = "Returned for Correction"
         await self.pr_repo.update(pr)
 
         # Log approval history
@@ -723,7 +733,7 @@ class ApprovalService:
             action="Returned",
             performed_by=user_id,
             from_status=old_status,
-            to_status="Returned for Modification",
+            to_status="Returned for Correction",
             comments=comments,
             created_at=datetime.utcnow()
         )
@@ -734,7 +744,7 @@ class ApprovalService:
             await self.notification_service.send_notification(
                 user_id=pr.requestor_id,
                 template_name="ApprovalCompletedAlert",
-                context={"pr_number": pr.pr_number, "status": "Returned for Modification"}
+                context={"pr_number": pr.pr_number, "status": "Returned for Correction"}
             )
 
         return pr
@@ -847,7 +857,9 @@ class ApprovalService:
         role = result.scalar_one_or_none()
         
         if role:
-            if role.role_name in ["Finance", "Finance Manager"]:
+            if role.role_name == "Finance Manager":
+                return "Pending Finance Manager Approval"
+            if role.role_name == "Finance":
                 return "Pending Finance Approval"
             return f"Pending {role.role_name} Approval"
         return "Under Review"

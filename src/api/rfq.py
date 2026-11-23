@@ -13,7 +13,7 @@ router = APIRouter(prefix="/rfq", tags=["RFQ Management"])
 
 def enforce_procurement_officer_or_creator(rfq, current_user: User) -> None:
     user_roles = [role.role_name for role in current_user.roles]
-    if any(role in ("Admin", "Procurement Officer", "Procurement Manager", "Finance Manager", "CFO", "CEO") for role in user_roles):
+    if any(role in ("Admin", "Procurement Officer", "Procurement Manager", "Finance Manager", "CFO", "CEO", "Vendor Portal") for role in user_roles):
         return
     
     if rfq.created_by != current_user.user_id:
@@ -29,12 +29,12 @@ async def create_rfq(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
-    # Restrict creation to Procurement Officers, Managers, or Admin
+    # Restrict creation to Procurement Officers, Managers, Admin, or Finance Manager
     user_roles = [role.role_name for role in current_user.roles]
-    if not any(role in ("Admin", "Procurement Officer", "Procurement Manager") for role in user_roles):
+    if not any(role in ("Admin", "Procurement Officer", "Procurement Manager", "Finance Manager") for role in user_roles):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only procurement officers or administrators are permitted to create RFQs"
+            detail="Only procurement officers, finance managers, or administrators are permitted to create RFQs"
         )
     service = RFQService(db)
     return await service.create_rfq(data, current_user.user_id)
@@ -54,24 +54,27 @@ async def list_rfqs(
         from sqlalchemy import select
         from sqlalchemy.orm import selectinload
         from src.models.vendor import Vendor
-        from src.models.rfq import RFQVendor
         
-        # Get vendor ID
-        stmt = select(Vendor.vendor_id).where(Vendor.email == current_user.email)
+        # Get vendor record
+        stmt = select(Vendor).where(Vendor.email == current_user.email)
         result = await db.execute(stmt)
-        vendor_id = result.scalar_one_or_none()
+        vendor = result.scalar_one_or_none()
         
-        if vendor_id:
-            # Get RFQs where this vendor is invited
+        if vendor:
+            # Blacklisted or inactive vendors cannot access RFQs
+            if vendor.blacklist_status or vendor.status == "Inactive":
+                return []
+            
+            # Active vendors can see all RFQs in the portal to submit bids
             query = (
                 select(service.rfq_repo.model)
-                .join(RFQVendor, RFQVendor.rfq_id == service.rfq_repo.model.rfq_id)
-                .where(RFQVendor.vendor_id == vendor_id)
                 .options(
                     selectinload(service.rfq_repo.model.items),
                     selectinload(service.rfq_repo.model.rfq_vendors),
-                    selectinload(service.rfq_repo.model.quotations)
+                    selectinload(service.rfq_repo.model.quotations),
+                    selectinload(service.rfq_repo.model.pr)
                 )
+                .order_by(service.rfq_repo.model.created_at.desc())
             )
             result = await db.execute(query)
             return list(result.scalars().all())
@@ -120,7 +123,13 @@ async def update_rfq(
     if not rfq:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="RFQ not found")
 
-    enforce_procurement_officer_or_creator(rfq, current_user)
+    user_roles = [role.role_name for role in current_user.roles]
+    if not any(role in ("Admin", "Procurement Officer", "Procurement Manager", "Finance Manager") for role in user_roles):
+        if rfq.created_by != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only procurement officers, finance managers, or administrators are permitted to update RFQs"
+            )
     return await service.update_rfq(id, data)
 
 
@@ -135,7 +144,13 @@ async def publish_rfq(
     if not rfq:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="RFQ not found")
 
-    enforce_procurement_officer_or_creator(rfq, current_user)
+    user_roles = [role.role_name for role in current_user.roles]
+    if not any(role in ("Admin", "Procurement Officer", "Procurement Manager", "Finance Manager") for role in user_roles):
+        if rfq.created_by != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only procurement officers, finance managers, or administrators are permitted to publish RFQs"
+            )
     return await service.publish_rfq(id)
 
 

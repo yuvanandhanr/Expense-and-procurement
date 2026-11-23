@@ -2,10 +2,12 @@ import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { PurchaseOrder } from "../types";
 import { Card, CardHeader, CardTitle, CardContent, Badge, StatusBadge, Skeleton, EmptyState, Button, Dialog, Input } from "../components/ui";
-import { formatDate } from "../utils/helpers";
+import { formatDate, canViewAmount } from "../utils/helpers";
+import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
 
 export const PurchaseOrders: React.FC = () => {
+  const { user } = useAuth();
   const [pos, setPos] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedPo, setExpandedPo] = useState<number | null>(null);
@@ -79,7 +81,7 @@ export const PurchaseOrders: React.FC = () => {
                     <th className="p-4 w-8 whitespace-nowrap"></th>
                     <th className="p-4 whitespace-nowrap">PO Number</th>
                     <th className="p-4 whitespace-nowrap">PR Reference</th>
-                    <th className="p-4 whitespace-nowrap">Total Amount</th>
+                    {canViewAmount(user) && <th className="p-4 whitespace-nowrap">Total Amount</th>}
                     <th className="p-4 whitespace-nowrap">Status</th>
                     <th className="p-4 whitespace-nowrap">Date Created</th>
                   </tr>
@@ -92,8 +94,8 @@ export const PurchaseOrders: React.FC = () => {
                           {expandedPo === p.po_id ? "▼" : "▶"}
                         </td>
                         <td className="p-4 font-bold text-xs tracking-wider text-primary whitespace-nowrap">{p.po_number}</td>
-                        <td className="p-4 whitespace-nowrap">#PR-{p.pr_id}</td>
-                        <td className="p-4 font-bold whitespace-nowrap">₹{p.total_amount?.toLocaleString()}</td>
+                        <td className="p-4 whitespace-nowrap font-medium">{(p as any).pr_number || (p.pr_id ? `#PR-${p.pr_id}` : "—")}</td>
+                        {canViewAmount(user) && <td className="p-4 font-bold whitespace-nowrap">₹{p.total_amount?.toLocaleString()}</td>}
                         <td className="p-4 whitespace-nowrap">
                           <StatusBadge status={p.status} />
                         </td>
@@ -112,7 +114,7 @@ export const PurchaseOrders: React.FC = () => {
                                     <div>
                                       <span className="font-semibold text-sm block text-foreground/90">{item.item_name}</span>
                                       <span className="text-[10px] text-muted-foreground block mt-0.5">
-                                        Qty: {item.quantity} | Total: ₹{item.total_price?.toLocaleString()}
+                                        Qty: {item.quantity}{canViewAmount(user) && ` | Total: ₹${item.total_price?.toLocaleString()}`}
                                       </span>
                                     </div>
                                     <div className="flex items-center gap-3">

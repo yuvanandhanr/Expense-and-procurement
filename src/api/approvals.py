@@ -91,7 +91,14 @@ async def approve_pr(
     service = ApprovalService(db)
     active_step = await service.get_active_step(id)
     await verify_approver_role(active_step, current_user, db)
-    return await service.approve_step(id, current_user.user_id, data.comments, getattr(data, "physical_inspection_done", False))
+    return await service.approve_step(
+        id, 
+        current_user.user_id, 
+        data.comments, 
+        getattr(data, "physical_inspection_done", False),
+        getattr(data, "initiate_procurement", None),
+        getattr(data, "allocate_asset_id", None)
+    )
 
 
 @router.post("/{id}/reject", response_model=PRSchema)

@@ -71,8 +71,12 @@ class POSchema(BaseModel):
     po_id: int
     po_number: str
     vendor_id: int
+    vendor_name: Optional[str] = None
+    vendor_code: Optional[str] = None
     rfq_id: Optional[int] = None
     pr_id: Optional[int] = None
+    pr_number: Optional[str] = None
+    requisition_ref: Optional[str] = None
     department_id: Optional[int] = None
     total_amount: Decimal
     tax_amount: Decimal

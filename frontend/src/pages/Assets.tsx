@@ -3,6 +3,7 @@ import { api } from "../services/api";
 import { Asset, User } from "../types";
 import { Card, CardContent, Badge, Skeleton, Button, Dialog, EmptyState, Input, Select } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
+import { canViewAmount } from "../utils/helpers";
 import toast from "react-hot-toast";
 import { ArrowRightLeft, Filter, Plus, Search, Edit2, Layers, CheckCircle2, AlertCircle, Package, ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -94,7 +95,7 @@ export const Assets: React.FC = () => {
 
   const isAdmin = user?.roles?.some(r => r.role_name === "Admin") || false;
   const canViewAll = user?.roles?.some(r => ["Admin", "CFO", "Finance Manager"].includes(r.role_name)) || false;
-  const canViewCost = user?.roles?.some(r => ["Admin", "CFO"].includes(r.role_name)) || false;
+  const canViewCost = canViewAmount(user);
 
   const fetchData = async () => {
     setLoading(true);
@@ -422,7 +423,7 @@ export const Assets: React.FC = () => {
                   <table className="w-full text-left text-sm border-collapse">
                     <thead>
                       <tr className="border-b border-border bg-accent/30 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                        <th className="p-4">Asset Tag</th>
+                        <th className="p-4">Asset UID / Tag</th>
                         <th className="p-4">Name</th>
                         <th className="p-4">Category</th>
                         {canViewAll && <th className="p-4">Assigned To</th>}
@@ -434,7 +435,7 @@ export const Assets: React.FC = () => {
                     <tbody className="divide-y divide-border">
                       {filteredAssets.map((a) => (
                         <tr key={a.asset_id} className="hover:bg-accent/10 transition-colors">
-                          <td className="p-4 font-bold text-xs tracking-wider text-primary">{a.asset_code}</td>
+                          <td className="p-4 font-bold text-xs tracking-wider text-primary">{a.asset_tag || a.asset_code}</td>
                           <td className="p-4 font-semibold">{a.asset_name}</td>
                           <td className="p-4 text-muted-foreground">
                             {(() => {

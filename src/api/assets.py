@@ -8,6 +8,7 @@ from datetime import date, datetime
 
 from src.database.dependency import get_db_session
 from src.auth.dependencies import get_current_user
+from src.auth.authorization import is_amount_visible
 from src.models.auth import User
 from src.models.assets import Asset, AssetAssignment, AssetHistory
 
@@ -50,12 +51,16 @@ async def get_my_assets(
     
     mapped_assets = []
     for a in assets:
+        uid_val = a.asset_tag or a.asset_number
         mapped_assets.append({
             "asset_id": a.asset_id,
-            "asset_code": a.asset_number,
+            "asset_code": uid_val,
+            "asset_tag": uid_val,
+            "uid": uid_val,
+            "asset_number": a.asset_number,
             "asset_name": a.model or "Hardware Asset",
             "category": resolve_category_name(a),
-            "serial_number": a.serial_number or a.asset_tag,
+            "serial_number": a.serial_number or "",
             "purchase_date": str(a.purchase_date) if a.purchase_date else "",
             "vendor_name": a.vendor.vendor_name if a.vendor else "Unknown",
             "status": a.status
@@ -96,15 +101,19 @@ async def get_assets(
     # Map to frontend expected shape
     mapped_assets = []
     for a in assets:
+        uid_val = a.asset_tag or a.asset_number
         mapped_assets.append({
             "asset_id": a.asset_id,
-            "asset_code": a.asset_number,
+            "asset_code": uid_val,
+            "asset_tag": uid_val,
+            "uid": uid_val,
+            "asset_number": a.asset_number,
             "asset_name": a.model or "Generic Asset",
             "category": resolve_category_name(a),
             "assigned_to_id": a.assigned_employee_id,
             "assigned_to_name": f"{a.assigned_employee.first_name} {a.assigned_employee.last_name}" if a.assigned_employee else "Unassigned",
-            "serial_number": a.serial_number or a.asset_tag,
-            "cost": float(a.cost) if a.cost else 0,
+            "serial_number": a.serial_number or "",
+            "cost": float(a.cost) if (a.cost and is_amount_visible(current_user)) else 0,
             "purchase_date": str(a.purchase_date) if a.purchase_date else "",
             "location": a.location or "HQ",
             "status": a.status
@@ -127,60 +136,52 @@ async def create_asset(
     if not any(r in ("Admin", "SuperAdmin") for r in user_roles):
         raise HTTPException(status_code=403, detail="Only Admins can create assets manually")
 
-    # Check if asset with this tag already exists
-    stmt = select(Asset).where(Asset.asset_tag == data.asset_tag)
+    uid = (data.asset_tag or data.asset_number or "").strip()
+    if not uid:
+        raise HTTPException(status_code=400, detail="Asset UID / Tag is required.")
+
+    # Check if asset with this UID already exists
+    from sqlalchemy import or_
+    stmt = select(Asset).where(or_(Asset.asset_tag == uid, Asset.asset_number == uid))
     res = await session.execute(stmt)
     existing_asset = res.scalar_one_or_none()
     
     if existing_asset:
-        existing_asset.model = data.model
-        if data.category_id is not None:
-            existing_asset.category_id = data.category_id
-        if data.cost is not None:
-            existing_asset.cost = data.cost
-        if data.status is not None:
-            existing_asset.status = data.status
-            
-        history = AssetHistory(
-            asset=existing_asset,
-            action_type="Manual Update",
-            action_by=current_user.user_id,
-            details="Asset updated via creation endpoint (tag already existed)."
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Duplicate UID: Asset with UID '{uid}' already exists in inventory."
         )
-        session.add(history)
-        await session.commit()
-        target_asset_id = existing_asset.asset_id
-    else:
-        new_asset = Asset(
-            asset_number=data.asset_number or str(uuid.uuid4())[:8].upper(),
-            asset_tag=data.asset_tag,
-            category_id=data.category_id,
-            po_id=data.po_id,
-            vendor_id=data.vendor_id,
-            serial_number=data.serial_number,
-            model=data.model,
-            manufacturer=data.manufacturer,
-            department_id=data.department_id,
-            purchase_date=data.purchase_date,
-            warranty_expiry=data.warranty_expiry,
-            amc_expiry=data.amc_expiry,
-            location=data.location,
-            cost=data.cost,
-            status=data.status or "Unassigned"
-        )
-        
-        session.add(new_asset)
-        
-        history = AssetHistory(
-            asset=new_asset,
-            action_type="Manual Creation",
-            action_by=current_user.user_id,
-            details="Asset manually created by Admin."
-        )
-        session.add(history)
-        
-        await session.commit()
-        target_asset_id = new_asset.asset_id
+
+    new_asset = Asset(
+        asset_number=uid,
+        asset_tag=uid,
+        category_id=data.category_id,
+        po_id=data.po_id,
+        vendor_id=data.vendor_id,
+        serial_number=data.serial_number,
+        model=data.model,
+        manufacturer=data.manufacturer,
+        department_id=data.department_id,
+        purchase_date=data.purchase_date,
+        warranty_expiry=data.warranty_expiry,
+        amc_expiry=data.amc_expiry,
+        location=data.location,
+        cost=data.cost,
+        status=data.status or "Unassigned"
+    )
+    
+    session.add(new_asset)
+    
+    history = AssetHistory(
+        asset=new_asset,
+        action_type="Manual Creation",
+        action_by=current_user.user_id,
+        details=f"Asset created with UID '{uid}'."
+    )
+    session.add(history)
+    
+    await session.commit()
+    target_asset_id = new_asset.asset_id
     
     # Reload with relationships
     stmt = select(Asset).options(
@@ -268,12 +269,25 @@ async def update_asset(
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
 
+    new_uid = (data.asset_tag or data.asset_number or "").strip()
+    if new_uid:
+        # Check conflict with any other asset
+        from sqlalchemy import or_
+        conflict_stmt = select(Asset).where(
+            Asset.asset_id != asset_id,
+            or_(Asset.asset_tag == new_uid, Asset.asset_number == new_uid)
+        )
+        conflict_res = await session.execute(conflict_stmt)
+        if conflict_res.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Duplicate UID: Asset with UID '{new_uid}' is already assigned to another asset."
+            )
+        asset.asset_tag = new_uid
+        asset.asset_number = new_uid
+
     if data.model is not None:
         asset.model = data.model
-    if data.asset_number is not None:
-        asset.asset_number = data.asset_number
-    if data.asset_tag is not None:
-        asset.asset_tag = data.asset_tag
     if data.category_id is not None:
         asset.category_id = data.category_id
     if data.status is not None:

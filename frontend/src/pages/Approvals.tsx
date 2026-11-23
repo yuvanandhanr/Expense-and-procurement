@@ -4,14 +4,14 @@ import { ApprovalWorkflow } from "../types";
 import { Button, Card, CardHeader, CardTitle, CardContent, Badge, StatusBadge, Skeleton, Dialog, Input, EmptyState } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
-import { formatDate, getErrorMessage, isValidText, resolveImageUrl } from "../utils/helpers";
-import { Check, X as XIcon, Eye } from "lucide-react";
+import { formatDate, getErrorMessage, isValidText, resolveImageUrl, canViewAmount } from "../utils/helpers";
+import { Check, X as XIcon, Eye, CheckCircle2, AlertTriangle } from "lucide-react";
 import { ReimbursementDetailModal } from "../components/expenses/ReimbursementDetailModal";
 
 type TabType = "Reimbursements" | "Requisitions" | "Asset Incidents";
 
 export const Approvals: React.FC = () => {
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
   const [workflows, setWorkflows] = useState<ApprovalWorkflow[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("Reimbursements");
@@ -30,11 +30,47 @@ export const Approvals: React.FC = () => {
   const [managerComments, setManagerComments] = useState("");
   const [adminResolution, setAdminResolution] = useState("");
   const [adminComments, setAdminComments] = useState("");
+  const [physicalInspectionDone, setPhysicalInspectionDone] = useState(true);
+
+  // Requisition inventory check state
+  const [inventoryCheck, setInventoryCheck] = useState<any>(null);
+  const [loadingInvCheck, setLoadingInvCheck] = useState(false);
+  const [initiateProcurementChoice, setInitiateProcurementChoice] = useState<boolean | null>(true);
+  const [selectedAllocateAssetId, setSelectedAllocateAssetId] = useState<number | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
   const [selectedReportDetails, setSelectedReportDetails] = useState<any>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+
+  const handleOpenPrReview = async (wf: any, preferredAction: "approve" | "reject" | "return" = "approve") => {
+    setSelectedWorkflow(wf);
+    setActionType(preferredAction);
+    setComment("");
+    setPhysicalInspectionDone(true);
+    setInventoryCheck(null);
+    setInitiateProcurementChoice(true);
+    setSelectedAllocateAssetId(null);
+
+    if (wf.entity_type === "PurchaseRequisition") {
+      setLoadingInvCheck(true);
+      try {
+        const res = await api.get(`/pr/${wf.entity_id}/inventory-check`);
+        setInventoryCheck(res.data);
+        if (res.data?.case === "A") {
+          const firstAsset = res.data.items?.[0]?.available_assets?.[0];
+          if (firstAsset) setSelectedAllocateAssetId(firstAsset.asset_id);
+          setInitiateProcurementChoice(null);
+        } else {
+          setInitiateProcurementChoice(true);
+        }
+      } catch (err) {
+        console.error("Failed to check inventory:", err);
+      } finally {
+        setLoadingInvCheck(false);
+      }
+    }
+  };
 
   const handleViewDetails = async (reportId: number) => {
     setSelectedReportId(reportId);
@@ -103,6 +139,12 @@ export const Approvals: React.FC = () => {
         };
       } else {
         endpoint = `/pr/${selectedWorkflow.entity_id}/${actionType}`;
+        payload = {
+          comments: comment,
+          physical_inspection_done: physicalInspectionDone,
+          initiate_procurement: initiateProcurementChoice,
+          allocate_asset_id: selectedAllocateAssetId
+        };
       }
 
       await api.post(endpoint, payload);
@@ -135,9 +177,9 @@ export const Approvals: React.FC = () => {
 
   const getWorkflowsForTab = () => {
     return workflows.filter((wf: any) => {
-      // Exclude 0.00 items from approval inbox
+      // Exclude 0.00 items from approval inbox for expenses and invoices
       const amt = Number(wf.amount || wf.total_amount || wf.estimated_cost || 0);
-      if (wf.entity_type === "ExpenseReport" || wf.entity_type === "PurchaseRequisition" || wf.entity_type === "VendorInvoice") {
+      if (wf.entity_type === "ExpenseReport" || wf.entity_type === "VendorInvoice") {
         if (amt <= 0) return false;
       }
       if (wf.status === "Draft") return false; // Exclude drafts from Approvals Inbox
@@ -276,7 +318,7 @@ export const Approvals: React.FC = () => {
                 <th className="p-4">ID</th>
                 <th className="p-4">Employee</th>
                 <th className="p-4">Purpose</th>
-                <th className="p-4">Total Amount</th>
+                {canViewAmount(user) && <th className="p-4">Total Amount</th>}
                 <th className="p-4">Status</th>
                 <th className="p-4">Date Created</th>
                 <th className="p-4">Actions</th>
@@ -290,27 +332,53 @@ export const Approvals: React.FC = () => {
                     {wf.requestor_name} <span className="text-muted-foreground text-xs font-normal">({[(wf as any).requestor_department, (wf as any).requestor_role].filter(Boolean).join(" - ") || 'Employee'})</span>
                   </td>
                   <td className="p-4 font-medium max-w-[200px] truncate" title={wf.title}>{wf.title?.replace('Expense: ', '')}</td>
-                  <td className="p-4 font-bold tracking-tight">₹{Number(wf.amount || 0).toFixed(2)}</td>
+                  {canViewAmount(user) && (
+                    <td className="p-4 font-bold tracking-tight">₹{Number(wf.amount || 0).toFixed(2)}</td>
+                  )}
                   <td className="p-4">
                     <StatusBadge status={wf.status} />
                   </td>
                   <td className="p-4 text-xs text-muted-foreground">{new Date(wf.created_at || Date.now()).toLocaleDateString()}</td>
                   <td className="p-4 flex items-center gap-2">
                     {wf.can_approve ? (
-                      <Button 
-                        size="sm" 
-                        variant="primary"
-                        onClick={() => {
-                           if (activeTab === "Reimbursements") {
-                             handleViewDetails(wf.entity_id);
-                           } else {
-                             setSelectedWorkflow(wf); setActionType("approve");
-                           }
-                        }}
-                        className="gap-1.5 bg-[#0f172a] text-white hover:bg-slate-800"
-                      >
-                        Need Approval
-                      </Button>
+                      <div className="flex items-center gap-1.5">
+                        <Button 
+                          size="sm" 
+                          variant="primary"
+                          onClick={() => {
+                             if (activeTab === "Reimbursements") {
+                               handleViewDetails(wf.entity_id);
+                             } else {
+                               handleOpenPrReview(wf, "approve");
+                             }
+                          }}
+                          className="gap-1.5 bg-[#0f172a] text-white hover:bg-slate-800"
+                        >
+                          Review & Action
+                        </Button>
+                        {activeTab === "Requisitions" && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleOpenPrReview(wf, "return")}
+                              className="text-amber-500 hover:text-amber-600 hover:bg-amber-500/10 px-2 text-xs"
+                              title="Return for Correction"
+                            >
+                              Return
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleOpenPrReview(wf, "reject")}
+                              className="text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 px-2 text-xs"
+                              title="Reject"
+                            >
+                              Reject
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     ) : (
                       <Button 
                         size="sm" 
@@ -318,6 +386,8 @@ export const Approvals: React.FC = () => {
                         onClick={() => {
                           if (activeTab === "Reimbursements") {
                             handleViewDetails(wf.entity_id);
+                          } else {
+                            handleOpenPrReview(wf, "approve");
                           }
                         }}
                         className="gap-1.5"
@@ -602,6 +672,209 @@ export const Approvals: React.FC = () => {
             </div>
           )}
 
+          {/* Requisition Workflow Review UI */}
+          {selectedWorkflow?.entity_type === "PurchaseRequisition" && (
+            <div className="space-y-4">
+              {/* Requisition Summary Card */}
+              <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60 text-xs space-y-1.5">
+                <div className="flex justify-between items-center font-bold">
+                  <span>PR #{selectedWorkflow.entity_id} — {selectedWorkflow.title}</span>
+                  <StatusBadge status={selectedWorkflow.status} />
+                </div>
+                <div className="text-muted-foreground flex justify-between">
+                  <span>Requestor: <strong className="text-foreground">{selectedWorkflow.requestor_name}</strong></span>
+                  {canViewAmount(user) && (
+                    <span>Estimated Total: <strong className="text-foreground">₹{Number(selectedWorkflow.amount || 0).toFixed(2)}</strong></span>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Mode Selector */}
+              <div className="flex rounded-lg bg-muted p-1 gap-1 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setActionType("approve")}
+                  className={`flex-1 py-1.5 px-3 rounded-md transition-all ${
+                    actionType === "approve"
+                      ? "bg-[#0071E3] text-white shadow-sm font-bold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Approve / Process
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActionType("return")}
+                  className={`flex-1 py-1.5 px-3 rounded-md transition-all ${
+                    actionType === "return"
+                      ? "bg-amber-600 text-white shadow-sm font-bold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Return for Correction
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActionType("reject")}
+                  className={`flex-1 py-1.5 px-3 rounded-md transition-all ${
+                    actionType === "reject"
+                      ? "bg-rose-600 text-white shadow-sm font-bold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Reject
+                </button>
+              </div>
+
+              {actionType === "approve" && (
+                <div className="space-y-3">
+                  {/* Step 1: Manager Review */}
+                  {(selectedWorkflow.status.includes("Manager") || hasRole("Manager")) && !selectedWorkflow.status.includes("Finance Manager") && !selectedWorkflow.status.includes("Admin") && (
+                    <div className="space-y-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                      <div className="flex items-center gap-2 text-xs font-bold text-amber-500">
+                        <CheckCircle2 className="w-4 h-4" /> Manager Review & Physical Inspection
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Approving forwards the requisition to Admin for inventory verification.
+                      </p>
+                      <div className="flex items-center gap-2.5 pt-1">
+                        <input
+                          type="checkbox"
+                          id="pr_physical_inspection_done"
+                          checked={physicalInspectionDone}
+                          onChange={(e) => setPhysicalInspectionDone(e.target.checked)}
+                          className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
+                        />
+                        <label htmlFor="pr_physical_inspection_done" className="text-xs font-semibold cursor-pointer text-foreground select-none">
+                          Physical inspection / requirement verification completed with employee
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 2: Admin Inventory Verification */}
+                  {(selectedWorkflow.status.includes("Admin") || hasRole("Admin")) && !selectedWorkflow.status.includes("Finance Manager") && (
+                    <div className="space-y-3">
+                      {loadingInvCheck ? (
+                        <div className="p-4 rounded-xl border border-border/60 bg-muted/30 text-xs text-muted-foreground animate-pulse text-center">
+                          Checking live inventory availability...
+                        </div>
+                      ) : inventoryCheck ? (
+                        inventoryCheck.case === "A" ? (
+                          /* Case A: Stock > 4 -> Direct Inventory Assignment */
+                          <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-emerald-500 flex items-center gap-1.5">
+                                <CheckCircle2 className="w-4 h-4" /> Case A: Asset Availability &gt; 4
+                              </span>
+                              <Badge variant="success">
+                                {inventoryCheck.available_count} Units Available
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                              Requested Asset: <strong className="text-foreground">{inventoryCheck.items?.[0]?.item_name || selectedWorkflow.title}</strong>.
+                              Because inventory availability is <strong>more than 4 units</strong>, Admin approval will <strong>assign the requested asset directly to the employee</strong> and the requisition process will end here (no procurement / RFQ needed).
+                            </p>
+                          </div>
+                        ) : (
+                          /* Case B: Stock <= 4 or unavailable -> Prompt Admin */
+                          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-amber-500 flex items-center gap-1.5">
+                                <AlertTriangle className="w-4 h-4" /> Case B: Inventory Low or Unavailable (≤ 4 units)
+                              </span>
+                              <Badge variant="warning">
+                                {inventoryCheck.available_count} Units Available
+                              </Badge>
+                            </div>
+                            <div className="p-3 bg-background/80 rounded-lg border border-border/60 space-y-2">
+                              <p className="text-xs font-semibold text-foreground">
+                                Asset: {inventoryCheck.items?.[0]?.item_name || selectedWorkflow.title} (Available: {inventoryCheck.available_count})
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Send a procurement request to the <strong>Finance Manager</strong>?
+                              </p>
+                              <div className="flex flex-col gap-2 pt-1">
+                                <label className="flex items-center gap-2 cursor-pointer text-xs font-medium">
+                                  <input
+                                    type="radio"
+                                    name="initiate_procurement"
+                                    checked={initiateProcurementChoice === true}
+                                    onChange={() => setInitiateProcurementChoice(true)}
+                                    className="text-primary focus:ring-primary"
+                                  />
+                                  <span><strong>Yes</strong> — Forward procurement request to Finance Manager</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer text-xs font-medium">
+                                  <input
+                                    type="radio"
+                                    name="initiate_procurement"
+                                    checked={initiateProcurementChoice === false}
+                                    onChange={() => setInitiateProcurementChoice(false)}
+                                    className="text-primary focus:ring-primary"
+                                  />
+                                  <span><strong>No</strong> — Do not initiate procurement</span>
+                                </label>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      ) : null}
+                    </div>
+                  )}
+
+                  {/* Step 3: Finance Manager Procurement Initiation */}
+                  {(selectedWorkflow.status.includes("Finance Manager") || hasRole("Finance Manager")) && (
+                    <div className="p-4 rounded-xl bg-teal-500/10 border border-teal-500/30 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-teal-500 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4" /> Finance Manager: Procurement Initiation
+                        </span>
+                        <Badge variant="info">Procurement Forwarded by Admin</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Admin verified inventory is low/unavailable and forwarded this purchase request for: <strong className="text-foreground">{selectedWorkflow.title}</strong>. Initiating approves the requisition for RFQ vendor bidding.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {actionType === "return" && (
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-muted-foreground space-y-1">
+                  <div className="font-bold text-amber-500 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4" /> Return for Correction
+                  </div>
+                  <p>Send the requisition back to the employee. Please provide mandatory instructions explaining what needs correction.</p>
+                </div>
+              )}
+
+              {actionType === "reject" && (
+                <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-muted-foreground space-y-1">
+                  <div className="font-bold text-rose-500 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4" /> Reject Requisition
+                  </div>
+                  <p>Requisition will be permanently rejected. Please provide a mandatory reason.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {actionType === "approve" && !["ExpenseReport", "VendorInvoice", "AssetIncident", "PurchaseRequisition"].includes(selectedWorkflow?.entity_type || "") && (
+            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-muted/40 border border-border/60">
+              <input
+                type="checkbox"
+                id="pr_physical_inspection_done"
+                checked={physicalInspectionDone}
+                onChange={(e) => setPhysicalInspectionDone(e.target.checked)}
+                className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
+              />
+              <label htmlFor="pr_physical_inspection_done" className="text-xs font-semibold cursor-pointer text-foreground select-none">
+                Physical inspection / requirement verification completed with employee
+              </label>
+            </div>
+          )}
+
           {(actionType === 'reject' || actionType === 'return' || actionType === 'approve' || actionType === 'complete_repair' || actionType === 'assign_replacement') && (
             <div>
               <label className="block text-sm font-semibold mb-1">
@@ -624,6 +897,7 @@ export const Approvals: React.FC = () => {
               setManagerComments("");
               setAdminResolution("");
               setAdminComments("");
+              setInventoryCheck(null);
             }}>
               Cancel
             </Button>
@@ -634,10 +908,21 @@ export const Approvals: React.FC = () => {
                 isSubmitting || 
                 ((actionType === "reject" || actionType === "return") && !comment.trim()) || 
                 (["Submitted", "Reported"].includes(selectedWorkflow?.status || "") && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && !managerAssessment) ||
-                (selectedWorkflow?.status === "Manager Approved" && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && !adminResolution)
+                (selectedWorkflow?.status === "Manager Approved" && actionType === "approve" && selectedWorkflow?.entity_type === "AssetIncident" && !adminResolution) ||
+                (selectedWorkflow?.entity_type === "PurchaseRequisition" && actionType === "approve" && selectedWorkflow?.status?.includes("Admin") && inventoryCheck?.case === "B" && initiateProcurementChoice === false)
               }
             >
-              {isSubmitting ? "Processing..." : `Confirm ${actionType === "approve" ? "Approval" : actionType === "reject" ? "Rejection" : actionType === "return" ? "Return" : "Action"}`}
+              {isSubmitting ? "Processing..." : 
+                selectedWorkflow?.entity_type === "PurchaseRequisition" && actionType === "approve" ? (
+                  selectedWorkflow.status.includes("Admin") ? (
+                    inventoryCheck?.case === "A" ? "Approve & Assign Asset Directly" :
+                    initiateProcurementChoice === false ? "Procurement Declined" :
+                    "Confirm & Forward to Finance Manager"
+                  ) : selectedWorkflow.status.includes("Finance Manager") ? (
+                    "Initiate Procurement Workflow"
+                  ) : "Approve & Forward to Admin"
+                ) : `Confirm ${actionType === "approve" ? "Approval" : actionType === "reject" ? "Rejection" : actionType === "return" ? "Return" : "Action"}`
+              }
             </Button>
           </div>
         </div>

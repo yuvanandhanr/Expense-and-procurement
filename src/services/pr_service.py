@@ -40,7 +40,8 @@ class PRService:
         items_to_create = []
 
         for item_data in data.items:
-            item_total = item_data.quantity * item_data.unit_price
+            unit_price_dec = Decimal(str(item_data.unit_price))
+            item_total = Decimal(str(item_data.quantity)) * unit_price_dec
             total_cost += item_total
             
             item = PRItem(
@@ -48,7 +49,7 @@ class PRService:
                 item_name=item_data.item_name,
                 specification=item_data.specification,
                 quantity=item_data.quantity,
-                unit_price=item_data.unit_price
+                unit_price=unit_price_dec
             )
             items_to_create.append(item)
 
@@ -99,7 +100,7 @@ class PRService:
         if not pr:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Purchase Requisition not found")
 
-        if pr.status not in ("Draft", "Returned for Modification"):
+        if pr.status not in ("Draft", "Returned for Modification", "Returned for Correction"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Requisitions cannot be edited once submitted for review"
@@ -148,7 +149,7 @@ class PRService:
         if not pr:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
 
-        if pr.status not in ("Draft", "Returned for Modification"):
+        if pr.status not in ("Draft", "Returned for Modification", "Returned for Correction"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"PR cannot be submitted from status: {pr.status}"
@@ -274,67 +275,270 @@ class PRService:
 
         return await self.pr_repo.get_by_id(cloned_pr.pr_id)
 
-    async def allocate_inventory(self, pr_id: int, asset_id: int, user_id: int) -> PurchaseRequisition:
+    async def check_inventory(self, pr_id: int) -> dict:
         """
-        Admin allocates an existing asset from inventory to fulfill the PR.
-        This resolves the PR without going to Procurement.
+        Admin Inventory Verification:
+        Case A: Asset availability is more than 4 (> 4)
+        Case B: Asset availability is 4 or fewer (<= 4), or the asset is unavailable
         """
         pr = await self.pr_repo.get_by_id(pr_id)
         if not pr:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
-        
-        # Approve the Admin step
+
+        from src.models.assets import Asset
+        from sqlalchemy.orm import selectinload
+
+        query = select(Asset).where(
+            Asset.status.in_(["Available", "Unassigned", "In Stock"])
+        ).options(selectinload(Asset.category))
+        res = await self.db.execute(query)
+        available_assets = res.scalars().all()
+
+        items_detail = []
+        min_available = 999999 if pr.items else 0
+
+        for item in pr.items:
+            req_name = item.item_name.strip().lower()
+            matching = []
+            for a in available_assets:
+                asset_model = (a.model or "").strip().lower()
+                cat_name = (a.category.category_name if a.category else "").strip().lower()
+                if (
+                    req_name in asset_model 
+                    or asset_model in req_name 
+                    or (item.category and item.category.strip().lower() in cat_name)
+                    or (a.asset_number and req_name in a.asset_number.strip().lower())
+                ):
+                    matching.append({
+                        "asset_id": a.asset_id,
+                        "asset_number": a.asset_number,
+                        "asset_tag": a.asset_tag,
+                        "model": a.model or a.asset_number,
+                        "serial_number": a.serial_number or a.asset_tag,
+                        "status": a.status,
+                        "category": cat_name
+                    })
+
+            count = len(matching)
+            if count < min_available:
+                min_available = count
+            items_detail.append({
+                "pr_item_id": item.pr_item_id,
+                "item_name": item.item_name,
+                "category": item.category,
+                "quantity": item.quantity,
+                "available_count": count,
+                "available_assets": matching
+            })
+
+        if not pr.items:
+            min_available = 0
+
+        is_case_a = min_available > 4
+        return {
+            "pr_id": pr.pr_id,
+            "pr_number": pr.pr_number,
+            "pr_title": pr.title,
+            "available_count": min_available,
+            "case": "A" if is_case_a else "B",
+            "can_allocate_directly": is_case_a,
+            "requires_procurement_prompt": not is_case_a,
+            "items": items_detail
+        }
+
+    async def allocate_inventory(self, pr_id: int, asset_id: Optional[int], user_id: int) -> PurchaseRequisition:
+        """
+        Case A (or explicit Admin allocation):
+        Admin approves the requisition. The requested asset is assigned to the employee.
+        The requisition process ends here without initiating procurement.
+        """
+        pr = await self.pr_repo.get_by_id(pr_id)
+        if not pr:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
+
         active_step = await self.approval_service.get_active_step(pr_id)
         from src.models.auth import Role
         role_result = await self.db.execute(select(Role).where(Role.role_id == active_step.approver_role_id))
         step_role = role_result.scalar_one_or_none()
-        if not step_role or step_role.role_name != "Admin":
+        if not step_role or step_role.role_name not in ["Admin", "SuperAdmin"]:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only Admin can allocate inventory at this step.")
-            
-        await self.approval_service.approve_step(pr_id, user_id, comments=f"Allocated Asset ID {asset_id} from inventory.")
-        
-        # Update PR
+
+        from src.models.assets import Asset, AssetAssignment
+        from src.models.approval import ApprovalHistory, WorkflowHistory
+        from datetime import date
+
+        selected_asset = None
+        if asset_id:
+            asset_res = await self.db.execute(select(Asset).where(Asset.asset_id == asset_id))
+            selected_asset = asset_res.scalar_one_or_none()
+            if not selected_asset or selected_asset.status not in ["Available", "Unassigned", "In Stock"]:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Selected asset is not available in inventory.")
+        else:
+            # Auto-pick first matching available asset
+            inv_info = await self.check_inventory(pr_id)
+            matching_assets = []
+            for itm in inv_info.get("items", []):
+                matching_assets.extend(itm.get("available_assets", []))
+            if not matching_assets:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No matching available asset found in inventory.")
+            first_match_id = matching_assets[0]["asset_id"]
+            asset_res = await self.db.execute(select(Asset).where(Asset.asset_id == first_match_id))
+            selected_asset = asset_res.scalar_one_or_none()
+
+        if not selected_asset:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to resolve an asset from inventory.")
+
+        # 1. Update Asset to Assigned to requestor
+        selected_asset.status = "Assigned"
+        selected_asset.assigned_employee_id = pr.requestor_id
+
+        # 2. Create AssetAssignment record
+        assignment = AssetAssignment(
+            asset_id=selected_asset.asset_id,
+            assigned_to=pr.requestor_id,
+            assigned_by=user_id,
+            assigned_date=date.today(),
+            status="Active",
+            notes=f"Allocated from inventory for Requisition #{pr.pr_number}"
+        )
+        self.db.add(assignment)
+
+        # 3. Mark Admin step approved
+        active_step.status = "Approved"
+        active_step.approver_id = user_id
+        active_step.actioned_at = datetime.utcnow()
+        await self.approval_service.step_repo.update(active_step)
+
+        # 3b. Record approval history for Admin
+        app_hist = ApprovalHistory(
+            step_id=active_step.step_id,
+            action="Approve",
+            performed_by=user_id,
+            comments=f"Direct Inventory Allocation: Assigned {selected_asset.model or selected_asset.asset_number} (ID: {selected_asset.asset_id}) to employee.",
+            created_at=datetime.utcnow()
+        )
+        await self.approval_service.approval_history_repo.create(app_hist)
+
+        # 4. Complete workflow (Requisition process ends here!)
+        workflow = await self.approval_service.workflow_repo.get_by_pr_id(pr_id)
+        workflow.status = "Approved"
+        await self.approval_service.workflow_repo.update(workflow)
+
         pr.is_inventory_allocation = True
-        pr.allocated_asset_id = asset_id
-        pr.status = "Inventory Allocated"
+        pr.allocated_asset_id = selected_asset.asset_id
+        pr.status = "Approved"
         await self.pr_repo.update(pr)
-        
-        # Update Asset status (e.g. to Reserved or pending assignment)
-        from src.models.assets import Asset
-        asset_result = await self.db.execute(select(Asset).where(Asset.asset_id == asset_id))
-        asset = asset_result.scalar_one_or_none()
-        if asset:
-            asset.status = "Assigned"
-            asset.assigned_to = pr.requestor_id
-        
+
+        # 5. Workflow history log
+        w_hist = WorkflowHistory(
+            pr_id=pr.pr_id,
+            action="Approved",
+            performed_by=user_id,
+            from_status="Pending Admin Approval",
+            to_status="Approved",
+            comments=f"Direct Inventory Allocation: Assigned {selected_asset.model or selected_asset.asset_number} (ID: {selected_asset.asset_id}) to employee. Requisition process completed.",
+            created_at=datetime.utcnow()
+        )
+        await self.approval_service.workflow_history_repo.create(w_hist)
+
+        # 6. Notify requestor
+        if pr.requestor_id:
+            await self.approval_service.notification_service.send_notification(
+                user_id=pr.requestor_id,
+                template_name="ApprovalCompletedAlert",
+                context={
+                    "pr_number": pr.pr_number,
+                    "status": "Approved - Asset Assigned from Inventory"
+                }
+            )
+
         return pr
 
     async def initiate_procurement(self, pr_id: int, user_id: int) -> PurchaseRequisition:
         """
-        Admin confirms no inventory available, escalates PR to Procurement/CFO.
+        Case B: Asset availability is 4 or fewer, or asset is unavailable.
+        Admin confirmed Yes to send procurement request to Finance Manager.
+        Forwards the procurement request to the Finance Manager with notification.
         """
         pr = await self.pr_repo.get_by_id(pr_id)
         if not pr:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
-            
-        # Add Step 3: CFO
+
+        active_step = await self.approval_service.get_active_step(pr_id)
+        from src.models.auth import Role, User
+        role_result = await self.db.execute(select(Role).where(Role.role_id == active_step.approver_role_id))
+        step_role = role_result.scalar_one_or_none()
+        if not step_role or step_role.role_name not in ["Admin", "SuperAdmin"]:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only Admin can forward procurement requests to Finance Manager.")
+
+        # Step 3: Add/route to Finance Manager
         workflow = await self.approval_service.workflow_repo.get_by_pr_id(pr_id)
-        cfo_role_id = await self.approval_service.get_role_id_by_name("CFO", 5)
-        
-        from src.models.approval import ApprovalStep
-        step = ApprovalStep(
-            workflow_id=workflow.workflow_id,
-            step_number=3,
-            approver_role_id=cfo_role_id,
-            approver_id=None,
-            status="Pending"
-        )
-        await self.approval_service.step_repo.create(step)
-        
+        fm_role_id = await self.approval_service.get_role_id_by_name("Finance Manager", 6)
+
+        from src.models.approval import ApprovalStep, WorkflowHistory, ApprovalHistory
+        existing_steps_query = select(ApprovalStep).where(ApprovalStep.workflow_id == workflow.workflow_id)
+        existing_steps = (await self.db.execute(existing_steps_query)).scalars().all()
+        max_step = max((s.step_number for s in existing_steps), default=2)
+
+        fm_step = next((s for s in existing_steps if s.approver_role_id == fm_role_id), None)
+        if not fm_step:
+            fm_step = ApprovalStep(
+                workflow_id=workflow.workflow_id,
+                step_number=max_step + 1,
+                approver_role_id=fm_role_id,
+                approver_id=None,
+                status="Pending"
+            )
+            await self.approval_service.step_repo.create(fm_step)
+        else:
+            fm_step.status = "Pending"
+            await self.approval_service.step_repo.update(fm_step)
+
         # Approve Admin step
-        await self.approval_service.approve_step(pr_id, user_id, comments="No inventory available. Initiating procurement.")
-        
-        pr.status = "Pending CFO Approval"
+        active_step.status = "Approved"
+        active_step.approver_id = user_id
+        active_step.actioned_at = datetime.utcnow()
+        await self.approval_service.step_repo.update(active_step)
+
+        # Record approval history for Admin
+        app_hist = ApprovalHistory(
+            step_id=active_step.step_id,
+            action="Approve",
+            performed_by=user_id,
+            comments="Inventory verification completed (stock <= 4). Procurement request forwarded to Finance Manager.",
+            created_at=datetime.utcnow()
+        )
+        await self.approval_service.approval_history_repo.create(app_hist)
+
+        # Update PR status
+        old_status = pr.status
+        pr.status = "Pending Finance Manager Approval"
         await self.pr_repo.update(pr)
-        
+
+        # Workflow history
+        w_hist = WorkflowHistory(
+            pr_id=pr.pr_id,
+            action="Procurement Requested",
+            performed_by=user_id,
+            from_status=old_status,
+            to_status=pr.status,
+            comments="Inventory verification completed (stock <= 4). Procurement request forwarded to Finance Manager.",
+            created_at=datetime.utcnow()
+        )
+        await self.approval_service.workflow_history_repo.create(w_hist)
+
+        # Notify Finance Manager explaining which asset needs to be purchased and required quantity
+        items_summary = ", ".join(f"{it.quantity}x {it.item_name}" for it in pr.items) if pr.items else pr.title
+        query_fm = select(User).join(User.roles).where(Role.role_name == "Finance Manager")
+        fm_users = (await self.db.execute(query_fm)).scalars().all()
+        for fm in fm_users:
+            await self.approval_service.notification_service.send_notification(
+                user_id=fm.user_id,
+                template_name="ApprovalRequestAlert",
+                context={
+                    "pr_number": pr.pr_number,
+                    "justification": f"Procurement required: {items_summary}. Admin confirmed low/unavailable inventory."
+                }
+            )
+
         return pr

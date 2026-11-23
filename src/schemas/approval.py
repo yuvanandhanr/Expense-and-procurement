@@ -133,6 +133,8 @@ class CommentSchema(CommentBase):
 class PRApproveRequest(BaseModel):
     comments: Optional[str] = Field(None, description="Optional approval comments")
     physical_inspection_done: Optional[bool] = Field(False, description="Whether physical inspection was completed by Manager")
+    initiate_procurement: Optional[bool] = Field(None, description="Whether Admin confirms procurement is required for low inventory (<= 4)")
+    allocate_asset_id: Optional[int] = Field(None, description="Optional Asset ID to allocate from inventory")
 
 
 class PRRejectRequest(BaseModel):

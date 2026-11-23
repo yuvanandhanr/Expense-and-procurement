@@ -1,8 +1,10 @@
 from typing import List
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.dependency import get_db_session
 from src.auth.dependencies import get_current_user
+from src.auth.authorization import is_amount_visible
 from src.models.auth import User
 from src.schemas.quotation import QuotationCreate, QuotationSchema
 from src.services.rfq_service import RFQService
@@ -49,16 +51,32 @@ async def list_quotations(
     user_roles = [role.role_name for role in current_user.roles]
     
     if any(role in ("Admin", "SuperAdmin", "Procurement Officer", "Procurement Manager", "Finance Manager", "Finance", "CFO", "CEO", "Manager") for role in user_roles):
-        return await service.quote_repo.list_all()
-    elif "Vendor Portal" in user_roles:
+        quotes = await service.quote_repo.list_all()
+    elif any(role in ("Vendor Portal", "Vendor") for role in user_roles):
         from sqlalchemy import select
         from src.models.vendor import Vendor
         stmt = select(Vendor.vendor_id).where(Vendor.email == current_user.email)
         result = await db.execute(stmt)
         vendor_id = result.scalar_one_or_none()
         if vendor_id:
-            return await service.quote_repo.list_by_vendor(vendor_id)
-    return []
+            quotes = await service.quote_repo.list_by_vendor(vendor_id)
+        else:
+            quotes = []
+    else:
+        quotes = []
+
+    # Hide monetary amounts if user is not Admin or Finance Manager
+    if not is_amount_visible(current_user):
+        for q in quotes:
+            q.total_amount = Decimal("0.00")
+            if getattr(q, "items", None):
+                for item in q.items:
+                    item.unit_price = Decimal("0.00")
+                    item.total_price = Decimal("0.00")
+                    item.tax_amount = Decimal("0.00")
+                    item.discount_amount = Decimal("0.00")
+
+    return quotes
 
 
 @router.post("/{id}/approve", response_model=QuotationSchema)
