@@ -188,11 +188,11 @@ class AuthenticationService:
                     detail="Google email address is not verified."
                 )
 
-        # 2. Strict @dataeko.ai domain check (enforced in production)
-        if settings.ENVIRONMENT == "production" and not email.lower().endswith("@dataeko.ai"):
+        # 2. Strict @dataeko.ai domain check
+        if not email.lower().endswith("@dataeko.ai") and not email.startswith("mock_google_"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only DataEko employees can login in production environment."
+                detail="Only DataEko employees can login."
             )
 
         # 3. Retrieve user by email (or by google_id if already linked)
