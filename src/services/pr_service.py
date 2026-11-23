@@ -115,7 +115,7 @@ class PRService:
             # Delete old items
             old_items = await self.item_repo.list_by_pr_id(pr_id)
             for item in old_items:
-                await self.item_repo.delete(item.pr_item_id)
+                await self.item_repo.delete(item)
 
             # Re-create new items
             total_cost = Decimal("0.00")

@@ -66,13 +66,18 @@ const processQueue = (error: Error | null, token: string | null = null) => {
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
+    // Suppress toasts for intentionally canceled or aborted requests
+    if (axios.isCancel(error) || error.code === 'ERR_CANCELED' || (error as any)?.name === 'CanceledError') {
+      return Promise.reject(error);
+    }
+
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
     
     if (!error.response) {
       if (error.code === 'ECONNABORTED') {
-        toast.error("Request timed out. The server might be processing a large file.");
+        toast.error("Request timed out. The server might be processing a large file.", { id: "request-timeout" });
       } else {
-        toast.error(`Network Error: ${error.message}. Please ensure the backend is running.`);
+        toast.error(`Network Error: ${error.message}. Please ensure the backend is running.`, { id: "network-error" });
       }
       return Promise.reject(error);
     }

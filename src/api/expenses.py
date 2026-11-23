@@ -68,10 +68,13 @@ def _can_access_report(report: ExpenseReport, user: User) -> bool:
         return True
 
     user_roles = [r.role_name for r in getattr(user, 'roles', [])]
-    is_admin_or_exec = any(r in user_roles for r in ["Admin", "SuperAdmin", "CEO", "CFO", "Finance Manager", "Finance"])
+    is_management_or_admin = any(
+        r in user_roles 
+        for r in ["Admin", "SuperAdmin", "CEO", "CFO", "Finance Manager", "Finance", "Manager"]
+    )
     
-    # Admin, CFO, CEO, Finance Manager can see all non-draft claims globally
-    if is_admin_or_exec:
+    # Manager, CEO, CFO, Finance Manager, Admin can view all non-draft claims and their receipts
+    if is_management_or_admin:
         return True
         
     # If user is the manager of the creator
@@ -133,6 +136,7 @@ def _present_report(report: ExpenseReport) -> ExpenseReport:
 
 @router.get("", response_model=List[ExpenseReportResponse])
 async def list_expenses(
+    status: Optional[str] = None,
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
@@ -151,7 +155,26 @@ async def list_expenses(
 
     # Strict isolation: Employees only see their own reimbursements.
     # Approvals are handled via the /approvals endpoint.
-    stmt = stmt.where(ExpenseReport.employee_id == current_user.user_id).order_by(ExpenseReport.created_at.desc())
+    stmt = stmt.where(ExpenseReport.employee_id == current_user.user_id)
+    if status:
+        st_lower = status.strip().lower()
+        if st_lower in ["pending", "submitted"]:
+            stmt = stmt.where(
+                or_(
+                    ExpenseReport.status.ilike("%Pending%"),
+                    ExpenseReport.status.in_(["Submitted", "Corrected Claim", "Payment Requested", "Finance Verified"])
+                )
+            )
+        elif st_lower in ["draft", "drafts"]:
+            stmt = stmt.where(ExpenseReport.status == "Draft")
+        elif st_lower == "approved":
+            stmt = stmt.where(ExpenseReport.status.in_(["Approved", "Paid", "Closed"]))
+        elif st_lower == "rejected":
+            stmt = stmt.where(ExpenseReport.status == "Rejected")
+        elif st_lower in ["return for correction", "returned"]:
+            stmt = stmt.where(ExpenseReport.status == "Returned for Correction")
+
+    stmt = stmt.order_by(ExpenseReport.created_at.desc())
     result = await db.execute(stmt)
     
     # Deduplicate in case of multiple approvals
@@ -839,38 +862,7 @@ async def pay_expense(
     return {"status": "Paid", "reference": report.payment_reference, "payment_reference": report.payment_reference}
 
 
-def _generate_receipt_voucher_svg(receipt: Receipt) -> bytes:
-    merchant = receipt.merchant_name or "Merchant Not Recorded"
-    amount = f"{receipt.verified_amount or receipt.ocr_amount or Decimal('0.00'):.2f}"
-    date_str = str(receipt.receipt_date or (receipt.created_at.date() if receipt.created_at else "N/A"))
-    category = receipt.category or "General Expense"
-    receipt_no = receipt.receipt_number or f"REC-{receipt.receipt_id}"
-    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="600" height="420" viewBox="0 0 600 420" fill="none">
-      <rect width="600" height="420" rx="16" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="2"/>
-      <rect x="24" y="24" width="552" height="72" rx="12" fill="#2563EB"/>
-      <text x="44" y="66" fill="#FFFFFF" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="bold">EXPENSE RECEIPT VOUCHER</text>
-      <text x="556" y="66" text-anchor="end" fill="#DBEAFE" font-family="system-ui, -apple-system, sans-serif" font-size="13">ID: #{receipt.receipt_id}</text>
-      
-      <g transform="translate(44, 130)" font-family="system-ui, -apple-system, sans-serif">
-        <text y="0" fill="#64748B" font-size="12" font-weight="600">MERCHANT / VENDOR</text>
-        <text y="24" fill="#0F172A" font-size="18" font-weight="bold">{merchant}</text>
-        
-        <text y="70" fill="#64748B" font-size="12" font-weight="600">TRANSACTION DATE</text>
-        <text y="94" fill="#0F172A" font-size="15" font-weight="600">{date_str}</text>
-        
-        <text y="140" fill="#64748B" font-size="12" font-weight="600">CATEGORY</text>
-        <text y="164" fill="#0F172A" font-size="15" font-weight="600">{category}</text>
 
-        <text y="210" fill="#64748B" font-size="12" font-weight="600">RECEIPT NUMBER</text>
-        <text y="234" fill="#0F172A" font-size="15" font-weight="600">{receipt_no}</text>
-      </g>
-      
-      <line x1="44" y1="360" x2="556" y2="360" stroke="#E2E8F0" stroke-width="2" stroke-dasharray="6 6"/>
-      
-      <text x="44" y="394" fill="#64748B" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600">TOTAL AMOUNT</text>
-      <text x="556" y="394" text-anchor="end" fill="#2563EB" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="bold">₹{amount}</text>
-    </svg>"""
-    return svg.encode("utf-8")
 
 
 @router.get("/receipts/{receipt_id}/image")
@@ -883,7 +875,7 @@ async def get_receipt_image(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Serves a receipt image or PDF file by ID with automatic DB backup restoration.
+    Serves the actual uploaded receipt image or PDF file by ID with automatic DB backup restoration.
     Enforces authorization: user must have permission to view the underlying expense claim.
     Supports inline preview as well as attachment downloads.
     """
@@ -897,54 +889,92 @@ async def get_receipt_image(
         raise HTTPException(status_code=404, detail="Receipt does not belong to the specified expense report")
 
     # Access control: user must have permission to view the parent claim
+    if not receipt.expense_report and receipt.expense_report_id:
+        receipt.expense_report = await repo.get_report_by_id(receipt.expense_report_id)
+
     if not receipt.expense_report or not _can_access_report(receipt.expense_report, current_user):
         _log_action(current_user, "receipt_access_denied", receipt_id, level=logging.WARNING)
         raise HTTPException(status_code=403, detail="Not authorized to access this receipt")
 
     filename = os.path.basename(receipt.image_path) if receipt.image_path else (receipt.file_name or f"receipt_{receipt_id}.png")
-    filepath = os.path.join(UPLOAD_DIR, filename)
-    fallback_path = os.path.join(BASE_DIR, "uploads", filename)
 
-    content = None
-    if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
-        async with aiofiles.open(filepath, "rb") as f:
-            content = await f.read()
-    elif os.path.exists(fallback_path) and os.path.getsize(fallback_path) > 0:
-        async with aiofiles.open(fallback_path, "rb") as f:
-            content = await f.read()
-    elif getattr(receipt, "file_data", None):
+    content: Optional[bytes] = None
+
+    # 1. Primary: Retrieve actual original file from database binary backup
+    if getattr(receipt, "file_data", None):
         import base64
         try:
             content = base64.b64decode(receipt.file_data)
-            # Recreate on disk for future static requests
+            # Cache locally to UPLOAD_DIR for static performance
             os.makedirs(UPLOAD_DIR, exist_ok=True)
-            async with aiofiles.open(filepath, "wb") as f:
+            disk_save_path = os.path.join(UPLOAD_DIR, filename)
+            async with aiofiles.open(disk_save_path, "wb") as f:
                 await f.write(content)
         except Exception as err:
             logger.error(f"Failed to restore receipt image from DB: {err}")
 
-    # Fallback voucher for historical records where file is unavailable
+    # 2. Secondary: Search candidates on disk if not stored in DB
     if not content:
-        content = _generate_receipt_voucher_svg(receipt)
-        media_type = "image/svg+xml"
-        filename = f"receipt_{receipt_id}.svg"
-    else:
-        ext = os.path.splitext(filename)[1].lower() if "." in filename else ""
-        if not ext and receipt.file_name and "." in receipt.file_name:
-            ext = os.path.splitext(receipt.file_name)[1].lower()
+        candidates = []
+        if receipt.image_path:
+            base_name = os.path.basename(receipt.image_path)
+            candidates.append(os.path.join(UPLOAD_DIR, base_name))
+            candidates.append(os.path.join(BASE_DIR, "uploads", base_name))
+            candidates.append(os.path.join(BASE_DIR, receipt.image_path.lstrip("/")))
+        if receipt.file_name:
+            candidates.append(os.path.join(UPLOAD_DIR, receipt.file_name))
+            candidates.append(os.path.join(BASE_DIR, "uploads", receipt.file_name))
 
-        if content.startswith(b"%PDF-") or ext == ".pdf":
-            media_type = "application/pdf"
-        elif content.startswith(b"\x89PNG") or ext == ".png":
-            media_type = "image/png"
-        elif content.startswith(b"\xff\xd8\xff") or ext in [".jpg", ".jpeg"]:
-            media_type = "image/jpeg"
-        elif (content.startswith(b"RIFF") and b"WEBP" in content[:16]) or ext == ".webp":
-            media_type = "image/webp"
-        elif content.strip().startswith(b"<svg") or ext == ".svg":
-            media_type = "image/svg+xml"
-        else:
-            media_type = "application/octet-stream"
+        for p in candidates:
+            if os.path.exists(p) and os.path.isfile(p) and os.path.getsize(p) > 0:
+                async with aiofiles.open(p, "rb") as f:
+                    content = await f.read()
+                    filename = os.path.basename(p)
+                    break
+
+    # 3. Tertiary: Search by content_hash across stored files
+    if not content and receipt.content_hash:
+        target_hash = receipt.content_hash.strip().lower()
+        search_dirs = [UPLOAD_DIR, os.path.join(BASE_DIR, "uploads")]
+        for sdir in search_dirs:
+            if not os.path.exists(sdir):
+                continue
+            for entry in os.scandir(sdir):
+                if entry.is_file() and entry.stat().st_size > 0:
+                    try:
+                        with open(entry.path, "rb") as fp:
+                            fbytes = fp.read()
+                            if hashlib.sha256(fbytes).hexdigest().lower() == target_hash:
+                                content = fbytes
+                                filename = entry.name
+                                # Save / link to candidate path for future requests
+                                target_disk_path = os.path.join(UPLOAD_DIR, filename)
+                                if not os.path.exists(target_disk_path):
+                                    async with aiofiles.open(target_disk_path, "wb") as out_fp:
+                                        await out_fp.write(content)
+                                break
+                    except Exception:
+                        pass
+            if content:
+                break
+
+    if not content:
+        raise HTTPException(status_code=404, detail="Original receipt file not found on server")
+
+    ext = os.path.splitext(filename)[1].lower() if "." in filename else ""
+    if not ext and receipt.file_name and "." in receipt.file_name:
+        ext = os.path.splitext(receipt.file_name)[1].lower()
+
+    if content.startswith(b"%PDF-") or ext == ".pdf":
+        media_type = "application/pdf"
+    elif content.startswith(b"\x89PNG") or ext == ".png":
+        media_type = "image/png"
+    elif content.startswith(b"\xff\xd8\xff") or ext in [".jpg", ".jpeg"]:
+        media_type = "image/jpeg"
+    elif (content.startswith(b"RIFF") and b"WEBP" in content[:16]) or ext == ".webp":
+        media_type = "image/webp"
+    else:
+        media_type = "application/octet-stream"
 
     download_name = receipt.file_name or filename
     disposition = "attachment" if download else "inline"

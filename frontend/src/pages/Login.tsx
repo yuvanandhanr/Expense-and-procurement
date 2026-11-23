@@ -260,7 +260,27 @@ export const Login: React.FC = () => {
                 {/* Google SDK render container */}
                 <div id="google-signin-btn" className="w-full flex justify-center min-h-[44px]"></div>
 
-
+                {/* Corporate Google Workspace Email Input */}
+                <form onSubmit={handleCustomGoogleEmailSubmit} className="space-y-2 pt-1">
+                  <div className="flex gap-2">
+                    <Input
+                      id="employeeEmail"
+                      type="email"
+                      placeholder="name@dataeko.ai"
+                      value={employeeEmail}
+                      onChange={(e) => setEmployeeEmail(e.target.value)}
+                      disabled={isSubmitting}
+                      className="text-xs py-2 h-9"
+                    />
+                    <Button
+                      type="submit"
+                      disabled={isSubmitting || !employeeEmail.trim()}
+                      className="text-xs font-bold py-2 px-3 h-9 whitespace-nowrap bg-[#0071E3] hover:bg-[#0077ED] text-white shrink-0"
+                    >
+                      {isSubmitting ? "Signing in..." : "Sign In"}
+                    </Button>
+                  </div>
+                </form>
 
                 <div className="relative flex py-1 items-center">
                   <div className="flex-grow border-t border-border/60"></div>

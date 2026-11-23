@@ -3,7 +3,7 @@ import { api } from "../services/api";
 import { Card, CardContent, Badge, Skeleton, EmptyState, Dialog, Button, Input } from "../components/ui";
 import toast from "react-hot-toast";
 import { isValidText, resolveImageUrl } from "../utils/helpers";
-import { Eye, Edit3, AlertCircle } from "lucide-react";
+import { Eye, Edit3, AlertCircle, Trash2 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 
 export const MyAssets: React.FC = () => {
@@ -82,6 +82,17 @@ export const MyAssets: React.FC = () => {
     setIsViewModalOpen(true);
   };
 
+  const handleDeleteDraft = async (incidentId: number) => {
+    try {
+      await api.delete(`/asset-incidents/${incidentId}`);
+      toast.success("Draft incident report deleted successfully");
+      fetchIncidents();
+      fetchAssets();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to delete draft incident report");
+    }
+  };
+
   const submitIncident = async (e: React.FormEvent, isDraft = false) => {
     e.preventDefault();
     if (!selectedAsset || !incidentDescription.trim()) {
@@ -110,6 +121,8 @@ export const MyAssets: React.FC = () => {
       });
       toast.success(isDraft ? "Incident draft saved successfully" : "Asset incident report submitted successfully");
       setIsIncidentModalOpen(false);
+      setActiveTab("Incidents");
+      setStatusFilter(isDraft ? "Drafts" : "Reported");
       fetchAssets();
       fetchIncidents();
     } catch (err: any) {
@@ -119,7 +132,7 @@ export const MyAssets: React.FC = () => {
     }
   };
 
-  const submitEditIncident = async (e: React.FormEvent) => {
+  const submitEditIncident = async (e: React.FormEvent, isDraft = false) => {
     e.preventDefault();
     if (!selectedIncident || !incidentDescription.trim()) {
       toast.error("Please provide a description of the issue.");
@@ -139,14 +152,24 @@ export const MyAssets: React.FC = () => {
         reason: incidentReason.trim() || null,
         comments: incidentComments.trim() || null,
         incident_date: incidentDate || null,
-        image_url: imageUrl.trim() || null
+        image_url: imageUrl.trim() || null,
+        is_draft: isDraft
       });
-      toast.success("Incident corrected and resubmitted successfully");
+      toast.success(
+        isDraft
+          ? "Incident draft saved successfully"
+          : (selectedIncident.status === "Returned for Correction"
+              ? "Incident corrected and resubmitted successfully"
+              : "Asset incident report submitted successfully")
+      );
       setIsEditModalOpen(false);
+      if (!isDraft) {
+        setStatusFilter("Reported");
+      }
       fetchAssets();
       fetchIncidents();
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || "Failed to resubmit incident");
+      toast.error(err.response?.data?.detail || "Failed to submit incident report");
     } finally {
       setIsSubmitting(false);
     }
@@ -162,16 +185,23 @@ export const MyAssets: React.FC = () => {
     return s === "resolved / completed" || s === "completed" || s === "closed" || s === "resolved";
   };
 
+  const userFilteredIncidents = incidents.filter((i: any) => {
+    if (i.status === "Draft" && user && i.reporter_id && i.reporter_id !== user.user_id) {
+      return false;
+    }
+    return true;
+  });
+
   const subTabCounts: Record<string, number> = {
-    All: incidents.length,
-    Drafts: incidents.filter((i: any) => i.status === "Draft").length,
-    Reported: incidents.filter((i: any) => isSubmittedStatus(i.status)).length,
-    Approved: incidents.filter((i: any) => isApprovedStatus(i.status)).length,
-    Rejected: incidents.filter((i: any) => i.status === "Rejected").length,
-    "Returned for Correction": incidents.filter((i: any) => i.status === "Returned for Correction").length,
+    All: userFilteredIncidents.length,
+    Drafts: userFilteredIncidents.filter((i: any) => i.status === "Draft").length,
+    Reported: userFilteredIncidents.filter((i: any) => isSubmittedStatus(i.status)).length,
+    Approved: userFilteredIncidents.filter((i: any) => isApprovedStatus(i.status)).length,
+    Rejected: userFilteredIncidents.filter((i: any) => i.status === "Rejected").length,
+    "Returned for Correction": userFilteredIncidents.filter((i: any) => i.status === "Returned for Correction").length,
   };
 
-  const filteredIncidents = incidents.filter((i: any) => {
+  const filteredIncidents = userFilteredIncidents.filter((i: any) => {
     if (statusFilter === "All") return true;
     if (statusFilter === "Drafts") return i.status === "Draft";
     if (statusFilter === "Reported") return isSubmittedStatus(i.status);
@@ -326,13 +356,60 @@ export const MyAssets: React.FC = () => {
                               {inc.status}
                             </Badge>
                           </td>
-                          <td className="p-4 text-right flex justify-end gap-2">
-                            <Button variant="ghost" size="sm" onClick={() => openViewModal(inc)} title="View Complete Incident">
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            {(inc.status === "Returned for Correction" || inc.status === "Draft") && (
-                              <Button variant="outline" size="sm" onClick={() => openEditModal(inc)} className="gap-1">
-                                <Edit3 className="w-3.5 h-3.5" /> {inc.status === "Draft" ? "Edit Draft" : "Edit & Resubmit"}
+                          <td className="p-4 text-right flex justify-end items-center gap-2">
+                            {inc.status === "Draft" ? (
+                              <>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded shrink-0"
+                                  title="Delete Draft Report"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (window.confirm("Are you sure you want to delete this draft incident report?")) {
+                                      handleDeleteDraft(inc.incident_id);
+                                    }
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="primary"
+                                  onClick={() => openEditModal(inc)}
+                                  className="gap-1.5 shadow-apple-sm"
+                                >
+                                  Edit Draft
+                                </Button>
+                              </>
+                            ) : inc.status === "Returned for Correction" ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="primary"
+                                  onClick={() => openEditModal(inc)}
+                                  className="gap-1.5 shadow-apple-sm"
+                                >
+                                  Edit & Resubmit
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => openViewModal(inc)}
+                                  title="View Complete Incident"
+                                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                              </>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant={isApprovedStatus(inc.status) ? "view" : "primary"}
+                                onClick={() => openViewModal(inc)}
+                                className="gap-1.5 shadow-apple-sm"
+                              >
+                                <Eye className="w-3.5 h-3.5" /> View Details
                               </Button>
                             )}
                           </td>
@@ -433,8 +510,12 @@ export const MyAssets: React.FC = () => {
       </Dialog>
 
       {/* Edit & Resubmit Modal */}
-      <Dialog isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Correct & Resubmit Incident Report">
-        <form onSubmit={submitEditIncident} className="space-y-4">
+      <Dialog
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        title={selectedIncident?.status === "Draft" ? "Edit Asset Incident Draft" : "Correct & Resubmit Incident Report"}
+      >
+        <form onSubmit={(e) => submitEditIncident(e, false)} className="space-y-4">
           {selectedIncident?.resolution && (
             <div className="p-3.5 bg-yellow-500/10 border border-yellow-500/30 rounded-xl text-xs space-y-1 text-foreground">
               <div className="flex items-center gap-1.5 font-bold text-yellow-600 dark:text-yellow-400">
@@ -494,7 +575,21 @@ export const MyAssets: React.FC = () => {
 
           <div className="flex justify-end space-x-2 pt-4 border-t border-border">
             <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={isSubmitting || !incidentDescription.trim()}>Resubmit Report</Button>
+            {selectedIncident?.status === "Draft" && (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={isSubmitting || !incidentDescription.trim()}
+                onClick={(e) => submitEditIncident(e, true)}
+              >
+                {isSubmitting ? "Saving..." : "Save Draft Changes"}
+              </Button>
+            )}
+            <Button type="submit" disabled={isSubmitting || !incidentDescription.trim()}>
+              {isSubmitting
+                ? "Submitting..."
+                : (selectedIncident?.status === "Draft" ? "Submit Report" : "Resubmit Report")}
+            </Button>
           </div>
         </form>
       </Dialog>

@@ -127,6 +127,12 @@ async def update_pr(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Purchase Requisition not found")
 
     await check_pr_access(pr, current_user, db)
+    user_roles = {role.role_name for role in current_user.roles}
+    if pr.requestor_id != current_user.user_id and not (user_roles & {"Admin", "SuperAdmin"}):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the draft owner or an administrator can edit this requisition"
+        )
     return await service.update_pr(id, data, current_user.user_id)
 
 
@@ -147,7 +153,13 @@ async def delete_pr(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only draft or returned requisitions can be deleted"
         )
-    await service.pr_repo.delete(id)
+    user_roles = {role.role_name for role in current_user.roles}
+    if pr.requestor_id != current_user.user_id and not (user_roles & {"Admin", "SuperAdmin"}):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the draft owner or an administrator can delete this requisition"
+        )
+    await service.pr_repo.delete(pr)
 
 
 @router.post("/{id}/submit", response_model=PRSchema)
@@ -177,6 +189,14 @@ async def cancel_pr(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
 
     await check_pr_access(pr, current_user, db)
+    user_roles = {role.role_name for role in current_user.roles}
+    # Once a requisition has been submitted, the employee or original request owner
+    # must no longer have access to cancel it.
+    if pr.status != "Draft" and not (user_roles & {"Admin", "SuperAdmin"}):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Submitted requisitions cannot be cancelled by employees or request owners."
+        )
     return await service.cancel_pr(id, current_user.user_id)
 
 

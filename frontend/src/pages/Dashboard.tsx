@@ -111,11 +111,73 @@ export const Dashboard: React.FC = () => {
   const safeApprovals = Array.isArray(approvals) ? approvals : [];
   const safeMyAssetsList = Array.isArray(myAssetsList) ? myAssetsList : [];
 
+  // Strict personal filtering: Every user on My Dashboard sees only their own requests & claims
+  const userFilteredExpenses = safeExpenses.filter((e: any) => !user || e.employee_id === user.user_id);
+
+  const userFilteredPrs = safePrs.filter((p: any) => !user || p.requestor_id === user.user_id);
+
+  const userFilteredAssets = safeMyAssetsList.filter(
+    (a: any) => !user || a.assigned_employee_id === user.user_id || !a.assigned_employee_id
+  );
+
   const cadence = data?.widgets?.financial_cadence || {};
-  const monthlySpend = cadence.monthly_spend || 0;
-  const yearlySpend = cadence.yearly_spend || 0;
-  const totalExpenseSpend = safeExpenses.reduce((sum: number, e: any) => sum + (Number(e?.total_amount) || 0), 0);
+  const monthlySpend = cadence.monthly_spend;
+  const yearlySpend = cadence.yearly_spend;
+  const allTimeSpend = cadence.all_time_spend;
   const lowStockAlerts = data?.widgets?.low_stock_alerts;
+
+  // Real-time fallback financial calculations strictly using approved financial statuses
+  const APPROVED_STATUSES = ["Approved", "Finance Verified", "Paid", "Approved for Payment", "Payment Requested"];
+  const approvedExpenses = userFilteredExpenses.filter((e: any) => 
+    APPROVED_STATUSES.includes(e?.status)
+  );
+
+  const approvedPrs = safePrs.filter((p: any) => 
+    ["Approved", "Ordered", "Received", "Closed"].includes(p?.status)
+  );
+
+  const now = new Date();
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const currentYearStart = new Date(now.getFullYear(), 0, 1);
+
+  const fallbackMtd = approvedExpenses
+    .filter((e: any) => new Date(e?.created_at || e?.submission_date || e?.date || 0) >= currentMonthStart)
+    .reduce((sum: number, e: any) => sum + (Number(e?.total_amount) || 0), 0);
+
+  const fallbackYtd = approvedExpenses
+    .filter((e: any) => new Date(e?.created_at || e?.submission_date || e?.date || 0) >= currentYearStart)
+    .reduce((sum: number, e: any) => sum + (Number(e?.total_amount) || 0), 0);
+
+  const fallbackAllTime = approvedExpenses
+    .reduce((sum: number, e: any) => sum + (Number(e?.total_amount) || 0), 0);
+
+  const fallbackMtdPr = approvedPrs
+    .filter((p: any) => new Date(p?.created_at || 0) >= currentMonthStart)
+    .reduce((sum: number, p: any) => sum + (Number(p?.total_estimated_amount || p?.estimated_cost) || 0), 0);
+
+  const fallbackYtdPr = approvedPrs
+    .filter((p: any) => new Date(p?.created_at || 0) >= currentYearStart)
+    .reduce((sum: number, p: any) => sum + (Number(p?.total_estimated_amount || p?.estimated_cost) || 0), 0);
+
+  const fallbackAllTimePr = approvedPrs
+    .reduce((sum: number, p: any) => sum + (Number(p?.total_estimated_amount || p?.estimated_cost) || 0), 0);
+
+  const getDisplayedSpend = () => {
+    if (timeframe === "monthly") {
+      return cadence.reimbursements?.monthly_amount !== undefined 
+        ? Number(cadence.reimbursements.monthly_amount) 
+        : (monthlySpend !== undefined ? Number(monthlySpend) : fallbackMtd);
+    }
+    if (timeframe === "yearly") {
+      return cadence.reimbursements?.yearly_amount !== undefined 
+        ? Number(cadence.reimbursements.yearly_amount) 
+        : (yearlySpend !== undefined ? Number(yearlySpend) : fallbackYtd);
+    }
+    // "all"
+    return cadence.reimbursements?.all_time_amount !== undefined 
+      ? Number(cadence.reimbursements.all_time_amount) 
+      : (allTimeSpend !== undefined ? Number(allTimeSpend) : fallbackAllTime);
+  };
 
   const pendingApprovalsCount = isApprover 
     ? safeApprovals.filter((a: any) => {
@@ -125,13 +187,13 @@ export const Dashboard: React.FC = () => {
         }
         return a?.status === "Pending" || a?.status === "Under Review" || a?.status?.toLowerCase().includes("pending");
       }).length
-    : safeExpenses.filter((e: any) => (Number(e?.total_amount || 0) > 0) && e?.status?.includes("Pending")).length + 
-      safePrs.filter((p: any) => (Number(p?.total_estimated_amount || p?.estimated_cost || 0) > 0) && (p?.status?.includes("Pending") || p?.status === "Submitted")).length;
+    : userFilteredExpenses.filter((e: any) => (Number(e?.total_amount || 0) > 0) && (e?.status?.includes("Pending") || e?.status === "Submitted")).length + 
+      userFilteredPrs.filter((p: any) => (Number(p?.total_estimated_amount || p?.estimated_cost || 0) > 0) && (p?.status?.includes("Pending") || p?.status === "Submitted")).length;
   
-  const assignedAssetsCount = safeMyAssetsList.length || (Array.isArray(data?.widgets?.my_assets) ? data.widgets.my_assets.length : 0);
+  const assignedAssetsCount = userFilteredAssets.length || (Array.isArray(data?.widgets?.my_assets) ? data.widgets.my_assets.length : 0);
 
   // Real-time recent lists
-  const recentPRs = [...safePrs].sort((a: any, b: any) => {
+  const recentPRs = [...userFilteredPrs].sort((a: any, b: any) => {
     const isPendingA = (a.status?.toLowerCase().includes("pending") || a.status === "Submitted") && (Number(a.total_estimated_amount || a.estimated_cost || 0) > 0);
     const isPendingB = (b.status?.toLowerCase().includes("pending") || b.status === "Submitted") && (Number(b.total_estimated_amount || b.estimated_cost || 0) > 0);
     if (isPendingA && !isPendingB) return -1;
@@ -141,7 +203,7 @@ export const Dashboard: React.FC = () => {
     return timeB - timeA;
   }).slice(0, 5);
 
-  const recentExpenseList = [...safeExpenses].sort((a: any, b: any) => {
+  const recentExpenseList = [...userFilteredExpenses].sort((a: any, b: any) => {
     const isPendingA = (a.status?.toLowerCase().includes("pending") || a.status?.toLowerCase().includes("corrected")) && (Number(a.total_amount || 0) > 0);
     const isPendingB = (b.status?.toLowerCase().includes("pending") || b.status?.toLowerCase().includes("corrected")) && (Number(b.total_amount || 0) > 0);
     if (isPendingA && !isPendingB) return -1;
@@ -151,40 +213,21 @@ export const Dashboard: React.FC = () => {
     return timeB - timeA;
   }).slice(0, 5);
 
-  // Chart data for 12 months rolling
-  const monthsList = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const monthlyProcTrends = data?.widgets?.monthly_procurement || [];
-  const chartData = {
-    labels: monthsList,
-    datasets: [
-      {
-        label: "Procurement Spend (₹)",
-        data: monthsList.map((_, i) => {
-          const mStr = `${new Date().getFullYear()}-${String(i + 1).padStart(2, "0")}`;
-          const match = monthlyProcTrends.find((t: any) => t.month === mStr);
-          return match ? match.spend : 0;
-        }),
-        backgroundColor: "rgba(59, 130, 246, 0.75)",
-        borderRadius: 6,
-      }
-    ]
-  };
-
   return (
     <div className="space-y-7 animate-fade-in">
       {/* Hero Header & Timeframe Switcher */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
-              Good day, {user?.first_name || "Team Member"}
+              My Dashboard
             </h1>
-            <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+            <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping mr-0.5" /> Live Sync
             </span>
           </div>
           <p className="text-xs md:text-sm text-muted-foreground mt-1">
-            Enterprise spend intelligence & approval pipeline updating in real time.
+            Welcome back, <span className="font-semibold text-foreground">{user?.first_name ? `${user.first_name} ${user.last_name || ""}`.trim() : "Team Member"}</span> &bull; Your personal expenditure, claims, and assigned assets.
           </p>
         </div>
 
@@ -228,6 +271,36 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Management Financial Overview Link (CEO, CFO, Finance Manager, Admin) */}
+      {isFinanceOrAdmin && (
+        <div 
+          onClick={() => navigate("/analytics")}
+          className="p-4 rounded-2xl bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-blue-500/10 border border-blue-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 cursor-pointer hover:bg-blue-500/15 transition-all group shadow-apple-sm"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-500 flex items-center justify-center font-bold group-hover:scale-105 transition-transform">
+              <TrendingUp className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-widest bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30">
+                  Company-Wide Overview
+                </span>
+                <span className="text-xs font-bold text-foreground">
+                  Financial Analytics
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                View organization-wide expenditure (MTD/YTD), total & remaining budgets, and departmental summaries under Financial Operations.
+              </p>
+            </div>
+          </div>
+          <Button size="sm" className="gap-1 font-bold bg-blue-600 hover:bg-blue-700 text-white shrink-0">
+            <span>Open Financial Analytics</span> <ChevronRight className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      )}
+
       {/* Low Stock Replenishment Alert Banner (if applicable for Admin/Finance/IT) */}
       {lowStockAlerts?.has_low_stock && isFinanceOrAdmin && (
         <div 
@@ -253,52 +326,19 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Dataeko Executive Dossier Generator Card (CFO / Finance Admin Exclusive) */}
-      {isFinanceOrAdmin && (
-        <div 
-          onClick={() => navigate("/reports/executive")}
-          className="p-4 md:p-5 rounded-2xl bg-gradient-to-r from-[#0F172A] via-[#1E293B] to-[#0F172A] text-white border border-sky-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 cursor-pointer hover:border-sky-400/60 transition-all duration-300 group shadow-xl"
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-sky-500/20 border border-sky-500/40 text-sky-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Sparkles className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-sky-500/30 text-sky-300 border border-sky-500/40">
-                  Dataeko AI Intelligence
-                </span>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                  CFO & Executive Dossier
-                </span>
-              </div>
-              <h3 className="text-base font-extrabold text-white mt-1 group-hover:text-sky-300 transition-colors">
-                Generate 5-Year Longitudinal & Custom Executive Financial PDF
-              </h3>
-              <p className="text-xs text-slate-300 mt-0.5">
-                Multi-level cascading parameters (Employee / Department / Category) with live Dataeko 7-section financial report layout.
-              </p>
-            </div>
-          </div>
-          <Button size="sm" className="bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs gap-1.5 shadow-md self-end md:self-auto shrink-0">
-            <span>Launch Report Engine</span> <ChevronRight className="w-3.5 h-3.5" />
-          </Button>
-        </div>
-      )}
-
-      {/* Apple Metrics Overview Bento Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Apple Metrics Overview Bento Grid - 3 Columns strictly personal */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         
-        {/* Card 1: Differentiated Monthly vs. Yearly Spend */}
+        {/* Card 1: Differentiated Personal Monthly vs. Yearly vs. All Time Spend */}
         <div
-          onClick={() => navigate("/analytics")}
-          title="Click to view full Spend Analytics"
+          onClick={() => navigate("/expenses")}
+          title="Click to view your Expense Claims"
           className="apple-card p-5 rounded-2xl relative overflow-hidden group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-apple-md hover:border-primary/40 active:scale-[0.99] border border-border/80 flex flex-col justify-between"
         >
           <div>
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
-                {timeframe === "monthly" ? "Monthly Spend (MTD)" : timeframe === "yearly" ? "Yearly Spend (YTD)" : "Total Spend"}
+                {timeframe === "monthly" ? "My Monthly Spend (MTD)" : timeframe === "yearly" ? "My Yearly Spend (YTD)" : "My Total Spend (All Time)"}
               </span>
               <div className="flex items-center gap-1.5">
                 <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
@@ -309,15 +349,15 @@ export const Dashboard: React.FC = () => {
             </div>
             <div className="mt-3">
               <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-primary transition-colors">
-                ₹{timeframe === "monthly"
-                  ? (monthlySpend || totalExpenseSpend).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                  : timeframe === "yearly"
-                  ? (yearlySpend || totalExpenseSpend).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                  : totalExpenseSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ₹{getDisplayedSpend().toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-primary">
                 <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-primary/10">
-                  {timeframe === "monthly" ? (cadence.current_month_name || "Current Month") : (cadence.current_fiscal_year || "Current FY")}
+                  {timeframe === "monthly" 
+                    ? (cadence.current_month_name || "Current Month") 
+                    : timeframe === "yearly" 
+                    ? (cadence.current_fiscal_year || `FY ${now.getFullYear()}`) 
+                    : "All Time"}
                 </span>
                 {cadence.mom_growth_percent !== undefined && timeframe === "monthly" && (
                   <span className={`text-[10px] font-bold ${cadence.mom_growth_percent >= 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
@@ -329,22 +369,35 @@ export const Dashboard: React.FC = () => {
           </div>
           <div className="mt-3.5 pt-2.5 border-t border-border/40 text-[10px] text-muted-foreground/80 group-hover:text-primary flex items-center justify-between transition-colors">
             <span>
-              {timeframe === "monthly" ? `Claims: ₹${cadence.reimbursements?.monthly_amount || 0} | POs: ₹${cadence.procurement?.monthly_amount || 0}` : `YTD Claims + Open POs`}
+              {timeframe === "monthly"
+                ? `My Monthly Claims: ₹${(cadence.reimbursements?.monthly_amount !== undefined ? cadence.reimbursements.monthly_amount : fallbackMtd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : timeframe === "yearly"
+                ? `My YTD Claims: ₹${(cadence.reimbursements?.yearly_amount !== undefined ? cadence.reimbursements.yearly_amount : fallbackYtd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : `My All-Time Claims: ₹${(cadence.reimbursements?.all_time_amount !== undefined ? cadence.reimbursements.all_time_amount : fallbackAllTime).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              }
             </span>
-            <span className="font-bold flex items-center">Analytics <ChevronRight className="w-3 h-3 ml-0.5" /></span>
+            <span className="font-bold flex items-center">
+              My Expenses <ChevronRight className="w-3 h-3 ml-0.5" />
+            </span>
           </div>
         </div>
 
-        {/* Card 2: Pending Approvals */}
+        {/* Card 2: Pending Approvals / My Pending Claims */}
         <div
-          onClick={() => navigate(isApprover ? "/approvals" : "/expenses")}
-          title="Click to review Pending Approvals & Claims"
+          onClick={() => {
+            if (isApprover) {
+              navigate("/approvals");
+            } else {
+              navigate("/expenses?status=pending");
+            }
+          }}
+          title={isApprover ? "Click to review Pending Approvals" : "Click to review your Pending Claims"}
           className="apple-card p-5 rounded-2xl relative overflow-hidden group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-apple-md hover:border-amber-500/40 active:scale-[0.99] border border-border/80 flex flex-col justify-between"
         >
           <div>
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
-                {isApprover ? "Pending Approvals" : "Pending Claims"}
+                {isApprover ? "Pending Approvals" : "My Pending Claims"}
               </span>
               <div className="flex items-center gap-1.5">
                 <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-amber-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
@@ -359,54 +412,21 @@ export const Dashboard: React.FC = () => {
               </div>
               <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-amber-500">
                 <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-500/10">
-                  {pendingApprovalsCount > 0 ? "Action Required" : "All Caught Up"}
+                  {pendingApprovalsCount > 0 ? (isApprover ? "Action Required" : "Awaiting Review") : "All Caught Up"}
                 </span>
-                <span className="text-muted-foreground text-[10px]">in approval inbox</span>
+                <span className="text-muted-foreground text-[10px]">
+                  {isApprover ? "in approval inbox" : "awaiting approval"}
+                </span>
               </div>
             </div>
           </div>
           <div className="mt-3.5 pt-2.5 border-t border-border/40 text-[10px] text-muted-foreground/80 group-hover:text-amber-500 flex items-center justify-between transition-colors">
-            <span>Awaiting verification & signoff</span>
-            <span className="font-bold flex items-center">Open Queue <ChevronRight className="w-3 h-3 ml-0.5" /></span>
+            <span>{isApprover ? "Awaiting verification & signoff" : "Awaiting manager/finance approval"}</span>
+            <span className="font-bold flex items-center">{isApprover ? "Open Queue" : "My Claims"} <ChevronRight className="w-3 h-3 ml-0.5" /></span>
           </div>
         </div>
 
-        {/* Card 3: Annual Budget Utilization / Velocity */}
-        <div
-          onClick={() => navigate("/analytics")}
-          title="Click to view Budget & Velocity telemetry"
-          className="apple-card p-5 rounded-2xl relative overflow-hidden group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-apple-md hover:border-cyan-500/40 active:scale-[0.99] border border-border/80 flex flex-col justify-between"
-        >
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
-                {isFinanceOrAdmin ? "Annual Budget Burn" : "Approval Velocity"}
-              </span>
-              <div className="flex items-center gap-1.5">
-                <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-[#30B0C7] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
-                <div className="w-8 h-8 rounded-xl bg-[#30B0C7]/10 flex items-center justify-center text-[#30B0C7] group-hover:scale-110 transition-transform">
-                  <TrendingUp className="w-4 h-4" />
-                </div>
-              </div>
-            </div>
-            <div className="mt-3">
-              <div className="text-2xl font-extrabold tracking-tight text-foreground group-hover:text-[#30B0C7] transition-colors">
-                {isFinanceOrAdmin ? "42.8%" : "1.4 days"}
-              </div>
-              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-[#30B0C7]">
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-[#30B0C7]/10">
-                  {isFinanceOrAdmin ? "Within Healthy Cap" : "Fast Turnaround"}
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="mt-3.5 pt-2.5 border-t border-border/40 text-[10px] text-muted-foreground/80 group-hover:text-[#30B0C7] flex items-center justify-between transition-colors">
-            <span>{isFinanceOrAdmin ? "Fiscal year envelope" : "Average signoff timeline"}</span>
-            <span className="font-bold flex items-center">Budgets <ChevronRight className="w-3 h-3 ml-0.5" /></span>
-          </div>
-        </div>
-
-        {/* Card 4: Active Assets & Low Stock Pulse */}
+        {/* Card 3: Active Assigned Assets */}
         <div
           onClick={() => navigate("/my-assets")}
           title="Click to view and manage Assigned Assets"
@@ -447,33 +467,6 @@ export const Dashboard: React.FC = () => {
         
         {/* Left 2 Columns: Requisitions & Recent Expenses */}
         <div className="xl:col-span-2 space-y-6">
-          
-          {/* Spend Trend Chart (Rolling 12 Months) */}
-          {isFinanceOrAdmin && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">Procurement & Expense Trajectory ({new Date().getFullYear()})</CardTitle>
-                  <p className="text-xs text-muted-foreground">Monthly expenditure run rate across all department cost centers.</p>
-                </div>
-                <Badge variant="neutral">Monthly Cadence</Badge>
-              </CardHeader>
-              <CardContent className="h-64">
-                <Bar 
-                  data={chartData} 
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                      y: { grid: { color: "rgba(150, 150, 150, 0.1)" } },
-                      x: { grid: { display: false } }
-                    }
-                  }} 
-                />
-              </CardContent>
-            </Card>
-          )}
 
           {/* Recent Requisitions Table */}
           <Card>
@@ -482,7 +475,7 @@ export const Dashboard: React.FC = () => {
                 <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                   <FileText className="w-3.5 h-3.5" />
                 </div>
-                <CardTitle>Recent Requisitions</CardTitle>
+                <CardTitle>My Requisitions</CardTitle>
               </div>
               <Button size="sm" variant="ghost" onClick={() => navigate("/prs")} className="text-xs">
                 View All
@@ -502,7 +495,9 @@ export const Dashboard: React.FC = () => {
                   <tbody className="divide-y divide-border/40">
                     {recentPRs.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="py-6 text-center text-muted-foreground">No active requisitions.</td>
+                        <td colSpan={4} className="py-6 text-center text-muted-foreground">
+                          No requisitions submitted yet.
+                        </td>
                       </tr>
                     ) : (
                       recentPRs.map((req: any, idx: number) => (
@@ -529,7 +524,7 @@ export const Dashboard: React.FC = () => {
                 <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                   <Receipt className="w-3.5 h-3.5" />
                 </div>
-                <CardTitle>Recent Expense Claims</CardTitle>
+                <CardTitle>My Expense Claims</CardTitle>
               </div>
               <Button size="sm" variant="ghost" onClick={() => navigate("/expenses")} className="text-xs">
                 View Ledger
@@ -577,17 +572,17 @@ export const Dashboard: React.FC = () => {
                 <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                   <HardDrive className="w-3.5 h-3.5" />
                 </div>
-                <CardTitle>My Assets</CardTitle>
+                <CardTitle>My Assigned Assets</CardTitle>
               </div>
               <Button size="sm" variant="ghost" onClick={() => navigate("/my-assets")} className="text-xs">
                 Manage
               </Button>
             </CardHeader>
             <CardContent className="space-y-3.5">
-              {safeMyAssetsList.length === 0 ? (
+              {userFilteredAssets.length === 0 ? (
                 <div className="py-8 text-center text-xs text-muted-foreground">No assets currently assigned.</div>
               ) : (
-                safeMyAssetsList.map((asset: any, idx: number) => (
+                userFilteredAssets.map((asset: any, idx: number) => (
                   <div key={idx} className="p-4 rounded-xl border border-border/60 bg-card/60 backdrop-blur-sm shadow-apple-sm flex flex-col space-y-2.5 relative overflow-hidden group hover:border-primary/40 transition-all duration-200">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">
@@ -610,20 +605,24 @@ export const Dashboard: React.FC = () => {
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-primary" />
-                <CardTitle className="text-sm">Periodic Governance</CardTitle>
+                <CardTitle className="text-sm">{!isFinanceOrAdmin ? "Employee Reminders" : "Periodic Governance"}</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="space-y-3 text-xs">
               <div className="p-3 rounded-lg bg-background border border-border/60 space-y-1">
                 <span className="font-bold text-primary block">Monthly Checklist</span>
                 <p className="text-muted-foreground text-[11px]">
-                  Expense claim cutoff, batch payout releases, and low-stock replenishment review.
+                  {!isFinanceOrAdmin
+                    ? "Submit expense receipts before month-end cutoff and verify your claim statuses."
+                    : "Expense claim cutoff, batch payout releases, and low-stock replenishment review."}
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-background border border-border/60 space-y-1">
-                <span className="font-bold text-emerald-600 block">Annual Checklist</span>
+                <span className="font-bold text-emerald-600 block">{!isFinanceOrAdmin ? "Equipment Care" : "Annual Checklist"}</span>
                 <p className="text-muted-foreground text-[11px]">
-                  Fiscal budget renewal, vendor compliance review, asset wall-to-wall audit & depreciation.
+                  {!isFinanceOrAdmin
+                    ? "Keep assigned equipment updated and report any damaged assets promptly under My Assets."
+                    : "Fiscal budget renewal, vendor compliance review, asset wall-to-wall audit & depreciation."}
                 </p>
               </div>
             </CardContent>

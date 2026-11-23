@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import secrets
 import uuid
@@ -12,9 +13,17 @@ from sqlalchemy import select
 import pyotp
 from src.core.config import settings
 
+# Singleton cached JWK client for Google OAuth public keys (cached for 24 hours)
+_google_jwk_client = PyJWKClient(
+    "https://www.googleapis.com/oauth2/v3/certs",
+    cache_jwk_set=True,
+    lifespan=86400
+)
+
 async def verify_google_id_token(credential: str) -> dict:
     """
     Decodes and validates a Google ID Token against Google's public JWK keys.
+    Uses cached PyJWKClient executed asynchronously to meet strict SLA.
     """
     try:
         # Check if it looks like a mock token during testing
@@ -25,6 +34,9 @@ async def verify_google_id_token(credential: str) -> dict:
                 email = credential.replace("mock_google_", "") if "@" in credential else "test@dataeko.ai"
                 
                 name_map = {
+                    "c.anisetty@dataeko.ai": ("Chaitna Sree", "Anisetty"),
+                    "s.verma@dataeko.ai": ("Sumit", "Verma"),
+                    "s.gupta@dataeko.ai": ("Sneha", "Gupta"),
                     "y.raja@dataeko.ai": ("Alex", "Rivera"),
                     "ceo@dataeko.ai": ("Sarah", "Chen"),
                     "cfo@dataeko.ai": ("Marcus", "Johnson"),
@@ -32,7 +44,20 @@ async def verify_google_id_token(credential: str) -> dict:
                     "manager@dataeko.ai": ("David", "Kim"),
                     "employee@dataeko.ai": ("Rachel", "Foster"),
                 }
-                given_name, family_name = name_map.get(email, ("Test", "User"))
+                
+                if email in name_map:
+                    given_name, family_name = name_map[email]
+                else:
+                    parts = email.split("@")[0].split(".")
+                    if len(parts) >= 2:
+                        given_name = " ".join(p.capitalize() for p in parts[:-1])
+                        family_name = parts[-1].capitalize()
+                    elif len(parts) == 1:
+                        given_name = parts[0].capitalize()
+                        family_name = ""
+                    else:
+                        given_name = "Employee"
+                        family_name = ""
                 
                 return {
                     "email": email,
@@ -43,8 +68,7 @@ async def verify_google_id_token(credential: str) -> dict:
                     "picture": "https://example.com/photo.jpg"
                 }
 
-        jwk_client = PyJWKClient("https://www.googleapis.com/oauth2/v3/certs")
-        signing_key = jwk_client.get_signing_key_from_jwt(credential)
+        signing_key = await asyncio.to_thread(_google_jwk_client.get_signing_key_from_jwt, credential)
         payload = jwt.decode(
             credential,
             signing_key.key,
@@ -178,6 +202,14 @@ class AuthenticationService:
                 self.db.add(pending_role)
                 await self.db.flush()
 
+            # Find default active Manager if newly created
+            mgr_query = select(User).join(User.roles).where(
+                Role.role_name == "Manager",
+                User.status == "Active"
+            )
+            mgr_res = await self.db.execute(mgr_query)
+            default_mgr = mgr_res.scalars().first()
+
             user = User(
                 employee_code=f"DE-{secrets.token_hex(4).upper()}",
                 first_name=first_name,
@@ -186,24 +218,41 @@ class AuthenticationService:
                 google_id=google_id,
                 avatar_url=picture,
                 login_provider="GOOGLE",
-                status="Active"
+                status="Active",
+                manager_id=default_mgr.user_id if default_mgr else None
             )
             user.roles.append(pending_role)
-            await self.user_repo.create(user)
+            self.db.add(user)
+            await self.db.flush()
             logger.info(f"Auto-created employee user with 'Pending Assignment' role for: {email}")
         else:
             # Subsequent login: Update profile
             user.last_login = datetime.utcnow()
             user.avatar_url = picture
-            if first_name:
+            if first_name and (not user.first_name or user.first_name in ["Test", "Google"] or first_name != "Test"):
                 user.first_name = first_name
-            if last_name:
+            if last_name and (not user.last_name or user.last_name in ["User", ""] or last_name != "User"):
                 user.last_name = last_name
             if not user.google_id:
                 user.google_id = google_id
             if user.login_provider != "GOOGLE":
                 user.login_provider = "GOOGLE"
-            await self.user_repo.update(user)
+            
+            # Ensure non-executive employee has assigned manager
+            if not user.manager_id:
+                user_role_names = [r.role_name for r in user.roles] if user.roles else []
+                if not any(r in user_role_names for r in ["Manager", "Admin", "CFO", "CEO", "Finance Manager"]):
+                    mgr_query = select(User).join(User.roles).where(
+                        Role.role_name == "Manager",
+                        User.status == "Active",
+                        User.user_id != user.user_id
+                    )
+                    mgr_res = await self.db.execute(mgr_query)
+                    default_mgr = mgr_res.scalars().first()
+                    if default_mgr:
+                        user.manager_id = default_mgr.user_id
+
+            self.db.add(user)
 
         # Check account status
         if user.status != "Active":
@@ -222,7 +271,7 @@ class AuthenticationService:
                 user.is_locked = False
                 user.failed_login_attempts = 0
                 user.locked_until = None
-                await self.user_repo.update(user)
+                self.db.add(user)
 
         # Audit History
         history = LoginHistory(
@@ -232,7 +281,7 @@ class AuthenticationService:
             user_agent=user_agent,
             status="Success"
         )
-        await self.history_repo.create(history)
+        self.db.add(history)
 
         # Generate tokens
         access_token_expires = timedelta(minutes=30)
@@ -247,7 +296,7 @@ class AuthenticationService:
             token=refresh_token_str,
             expires_at=datetime.utcnow() + timedelta(days=7)
         )
-        await self.token_repo.create(refresh_token)
+        self.db.add(refresh_token)
 
         # Create active LoginSession
         session = LoginSession(
@@ -256,7 +305,14 @@ class AuthenticationService:
             ip_address=ip,
             status="Active"
         )
-        await self.session_repo.create(session)
+        self.db.add(session)
+
+        # Single batched commit for sub-second SLA compliance
+        await self.db.commit()
+
+        # Cache active token in memory
+        from src.auth.dependencies import cache_active_token
+        cache_active_token(access_token, ttl=1800.0)
 
         return TokenResponse(
             access_token=access_token,

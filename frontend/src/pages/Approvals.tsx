@@ -287,7 +287,9 @@ export const Approvals: React.FC = () => {
                 <tr key={wf.workflow_id} className="hover:bg-muted/50 transition-colors">
                   <td className="p-4 font-semibold">{activeTab === "Reimbursements" ? "EXP-" : "PR-"}{wf.entity_id}</td>
                   <td className="p-4 font-medium">
-                    {wf.requestor_name} <span className="text-muted-foreground text-xs font-normal">({[(wf as any).requestor_department, (wf as any).requestor_role].filter(Boolean).join(" - ") || 'Employee'})</span>
+                    {wf.requestor_name && wf.requestor_name !== "Test User" 
+                      ? wf.requestor_name 
+                      : (wf.requestor_email ? wf.requestor_email.split('@')[0].split('.').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ') : "Employee")} <span className="text-muted-foreground text-xs font-normal">({[(wf as any).requestor_department, (wf as any).requestor_role].filter(Boolean).join(" - ") || 'Employee'})</span>
                   </td>
                   <td className="p-4 font-medium max-w-[200px] truncate" title={wf.title}>{wf.title?.replace('Expense: ', '')}</td>
                   <td className="p-4 font-bold tracking-tight">₹{Number(wf.amount || 0).toFixed(2)}</td>
@@ -349,7 +351,9 @@ export const Approvals: React.FC = () => {
                 <tr key={wf.workflow_id} className="hover:bg-muted/50 transition-colors">
                   <td className="p-4 font-semibold">INC-{wf.entity_id}</td>
                   <td className="p-4 font-medium">
-                    {wf.requestor_name} <span className="text-muted-foreground text-xs font-normal">({[(wf as any).requestor_department, (wf as any).requestor_role].filter(Boolean).join(" - ") || 'Employee'})</span>
+                    {wf.requestor_name && wf.requestor_name !== "Test User" 
+                      ? wf.requestor_name 
+                      : (wf.requestor_email ? wf.requestor_email.split('@')[0].split('.').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ') : "Employee")} <span className="text-muted-foreground text-xs font-normal">({[(wf as any).requestor_department, (wf as any).requestor_role].filter(Boolean).join(" - ") || 'Employee'})</span>
                   </td>
                   <td className="p-4 font-medium max-w-[250px] truncate" title={wf.title}>{wf.title}</td>
                   <td className="p-4 text-xs text-muted-foreground">{new Date(wf.created_at || Date.now()).toLocaleDateString()}</td>

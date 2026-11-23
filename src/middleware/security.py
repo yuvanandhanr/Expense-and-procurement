@@ -21,8 +21,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         response = await call_next(request)
 
-        # 1. Prevent Clickjacking - do not allow framing this app
-        response.headers["X-Frame-Options"] = "DENY"
+        # 1. Prevent Clickjacking - allow framing for legitimate document/receipt previews within the app
+        if request.url.path.startswith("/api/v1/expenses/receipts") or request.url.path.startswith("/uploads"):
+            response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        else:
+            response.headers["X-Frame-Options"] = "DENY"
 
         # 2. Prevent MIME Sniffing - force browser to obey Content-Type header
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -42,8 +45,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            "img-src 'self' data: https://fastapi.tiangolo.com; "
-            "frame-src 'none';"
+            "img-src 'self' data: blob: https://fastapi.tiangolo.com; "
+            "frame-src 'self' data: blob:; "
+            "object-src 'self' data: blob:;"
         )
 
         return response

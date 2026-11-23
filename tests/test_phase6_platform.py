@@ -115,6 +115,41 @@ def test_analytics_spend_employee_forbidden(client: TestClient, override_db: Asy
     app.dependency_overrides.clear()
 
 
+def test_analytics_spending_employee_personal_data_only(client: TestClient, override_db: AsyncMock, mock_employee) -> None:
+    async def _current_user_override():
+        return mock_employee
+
+    app.dependency_overrides[get_current_user] = _current_user_override
+
+    with patch("src.services.dashboard_service.DashboardService.get_employee_spend_analytics", new_callable=AsyncMock) as mock_emp_analytics:
+        mock_emp_analytics.return_value = {
+            "timeframe": "monthly",
+            "financial_cadence": {
+                "monthly_spend": 1250.0,
+                "yearly_spend": 5000.0,
+                "reimbursements": {"monthly_amount": 1250.0, "yearly_amount": 5000.0},
+                "procurement": {"monthly_amount": 0.0, "yearly_amount": 0.0}
+            },
+            "department_spend": [],
+            "vendor_spend": [],
+            "category_spend": [{"category": "Reimbursements", "spend": 1250.0}],
+            "monthly_trends": [{"month": "2026-11", "spend": 1250.0}],
+            "yearly_trends": [],
+            "budget_consumption": []
+        }
+
+        response = client.get("/api/v1/analytics/spending?timeframe=monthly")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["financial_cadence"]["reimbursements"]["monthly_amount"] == 1250.0
+        assert data["financial_cadence"]["procurement"]["monthly_amount"] == 0.0
+        assert data["department_spend"] == []
+        assert data["vendor_spend"] == []
+        assert data["budget_consumption"] == []
+
+    app.dependency_overrides.clear()
+
+
 # --- Test Reports Router ---
 
 def test_generate_report_success(client: TestClient, override_db: AsyncMock, mock_employee) -> None:

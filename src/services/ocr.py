@@ -70,9 +70,17 @@ class OCRService:
     @staticmethod
     def _preprocess_image(image: Image.Image) -> Image.Image:
         """
-        Enhances image for OCR by converting to grayscale and increasing contrast.
+        Enhances image for OCR by downscaling oversized images, converting to grayscale,
+        and increasing contrast.
         """
         try:
+            # Downscale oversized images (above 1800px on any side) to prevent CPU starvation and long timeouts
+            max_dim = max(image.size)
+            if max_dim > 1800:
+                scale = 1800.0 / max_dim
+                new_size = (int(image.size[0] * scale), int(image.size[1] * scale))
+                image = image.resize(new_size, Image.Resampling.LANCZOS)
+
             # Convert to grayscale
             gray = image.convert('L')
             # Enhance contrast
@@ -92,10 +100,19 @@ class OCRService:
             raw_image = Image.open(io.BytesIO(image_bytes))
             processed_image = OCRService._preprocess_image(raw_image)
             
-            # Extract text
-            text = pytesseract.image_to_string(processed_image)
+            # Extract text with timeout safety
+            try:
+                text = pytesseract.image_to_string(processed_image, timeout=15)
+            except Exception as ocr_err:
+                logger.warning(f"OCR timeout or error on processed image: {ocr_err}")
+                text = ""
+
             if not text.strip():
-                text = pytesseract.image_to_string(raw_image)
+                try:
+                    text = pytesseract.image_to_string(raw_image, timeout=15)
+                except Exception as ocr_err:
+                    logger.warning(f"OCR timeout or error on raw image: {ocr_err}")
+                    text = ""
                 
             logger.info(f"Extracted OCR Text: {text}")
             
@@ -149,9 +166,18 @@ class OCRService:
             raw_image = Image.open(io.BytesIO(image_bytes))
             processed_image = OCRService._preprocess_image(raw_image)
             
-            text = pytesseract.image_to_string(processed_image)
+            try:
+                text = pytesseract.image_to_string(processed_image, timeout=15)
+            except Exception as ocr_err:
+                logger.warning(f"Receipt OCR timeout or error on processed image: {ocr_err}")
+                text = ""
+
             if not text.strip():
-                text = pytesseract.image_to_string(raw_image)
+                try:
+                    text = pytesseract.image_to_string(raw_image, timeout=15)
+                except Exception as ocr_err:
+                    logger.warning(f"Receipt OCR timeout or error on raw image: {ocr_err}")
+                    text = ""
                 
             logger.info(f"Extracted OCR Text for Receipt: {text}")
             

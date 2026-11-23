@@ -136,3 +136,9 @@ test-results/
 
 # Auth & local tokens
 token.json
+
+# Scratch and estimation scripts
+scratch/
+final_estimations.*
+generate_pdf.py
+

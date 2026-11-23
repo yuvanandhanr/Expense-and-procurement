@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Upload, CheckCircle, XCircle, FileText, AlertCircle, RefreshCw, IndianRupee, Clock, CheckSquare, XOctagon, Trash2, ClipboardList, Building, Briefcase, Eye, Download, ExternalLink, Paperclip } from "lucide-react";
 import toast from "react-hot-toast";
@@ -6,13 +7,23 @@ import { api } from "../services/api";
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Skeleton, Badge, StatusBadge, Dialog, HeroTimestamp, EmptyState } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
 import { isValidText, resolveImageUrl, isPdfReceipt, downloadReceiptFile } from "../utils/helpers";
-import { ReimbursementDetailModal } from "../components/expenses/ReimbursementDetailModal";
+import { ReimbursementDetailModal, ReceiptPreviewModalViewer } from "../components/expenses/ReimbursementDetailModal";
 
 const Expenses: React.FC = () => {
   const { hasRole, user } = useAuth();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlStatus = searchParams.get("status");
+  const initialFilter = (urlStatus?.toLowerCase() === "pending" || urlStatus?.toLowerCase() === "submitted") ? "Pending" : "All";
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
-  const [statusFilter, setStatusFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState(initialFilter);
+
+  useEffect(() => {
+    const s = searchParams.get("status");
+    if (s?.toLowerCase() === "pending" || s?.toLowerCase() === "submitted") {
+      setStatusFilter("Pending");
+    }
+  }, [searchParams]);
 
   // Create Modal State
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -298,19 +309,28 @@ const Expenses: React.FC = () => {
     return <StatusBadge status={status} />;
   };
 
-  const subTabCounts: Record<string, number> = {
-    All: expenses.length,
-    Drafts: expenses.filter((r: any) => r.status === "Draft").length,
-    Submitted: expenses.filter((r: any) => r.status.includes("Pending") || r.status === "Corrected Claim" || r.status === "Payment Requested" || r.status === "Finance Verified").length,
-    Approved: expenses.filter((r: any) => ["Approved", "Paid", "Closed"].includes(r.status)).length,
-    Rejected: expenses.filter((r: any) => r.status === "Rejected").length,
-    "Return for Correction": expenses.filter((r: any) => r.status === "Returned for Correction").length,
+  const isPendingStatus = (status: string) => {
+    const s = (status || "").toLowerCase();
+    return s.includes("pending") || s === "submitted" || s === "corrected claim" || s === "payment requested" || s === "finance verified";
   };
 
-  const filteredExpenses = expenses.filter((r: any) => {
+  const userFilteredExpenses = !isManagerOrAdmin
+    ? expenses.filter((r: any) => !user || r.employee_id === user.user_id)
+    : expenses;
+
+  const subTabCounts: Record<string, number> = {
+    All: userFilteredExpenses.length,
+    Drafts: userFilteredExpenses.filter((r: any) => r.status === "Draft").length,
+    Pending: userFilteredExpenses.filter((r: any) => isPendingStatus(r.status)).length,
+    Approved: userFilteredExpenses.filter((r: any) => ["Approved", "Paid", "Closed"].includes(r.status)).length,
+    Rejected: userFilteredExpenses.filter((r: any) => r.status === "Rejected").length,
+    "Return for Correction": userFilteredExpenses.filter((r: any) => r.status === "Returned for Correction").length,
+  };
+
+  const filteredExpenses = userFilteredExpenses.filter((r: any) => {
     if (statusFilter === "All") return true;
     if (statusFilter === "Drafts") return r.status === "Draft";
-    if (statusFilter === "Submitted") return r.status.includes("Pending") || r.status === "Corrected Claim" || r.status === "Payment Requested" || r.status === "Finance Verified";
+    if (statusFilter === "Pending" || statusFilter === "Submitted") return isPendingStatus(r.status);
     if (statusFilter === "Approved") return ["Approved", "Paid", "Closed"].includes(r.status);
     if (statusFilter === "Rejected") return r.status === "Rejected";
     if (statusFilter === "Return for Correction") return r.status === "Returned for Correction";
@@ -336,19 +356,26 @@ const Expenses: React.FC = () => {
 
       {/* Filters & Controls */}
       <div className="flex items-center space-x-2 bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50">
-        {["All", "Drafts", "Submitted", "Approved", "Rejected", "Return for Correction"].map((status) => (
+        {["All", "Drafts", "Pending", "Approved", "Rejected", "Return for Correction"].map((status) => (
           <button
             key={status}
-            onClick={() => setStatusFilter(status)}
+            onClick={() => {
+              setStatusFilter(status);
+              if (searchParams.has("status")) {
+                const nextParams = new URLSearchParams(searchParams);
+                nextParams.delete("status");
+                setSearchParams(nextParams, { replace: true });
+              }
+            }}
             className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
-              statusFilter === status
+              (statusFilter === status || (status === "Pending" && statusFilter === "Submitted"))
                 ? "bg-primary text-primary-foreground shadow-sm font-bold"
                 : "text-muted-foreground hover:text-foreground hover:bg-background/50"
             }`}
           >
             <span>{status}</span>
             <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-              statusFilter === status ? "bg-primary-foreground/20 text-primary-foreground font-bold" : "bg-muted text-muted-foreground"
+              (statusFilter === status || (status === "Pending" && statusFilter === "Submitted")) ? "bg-primary-foreground/20 text-primary-foreground font-bold" : "bg-muted text-muted-foreground"
             }`}>
               {subTabCounts[status]}
             </span>
@@ -798,7 +825,14 @@ const Expenses: React.FC = () => {
                                 alt={fileName}
                                 className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity"
                                 onError={(e) => {
-                                  (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5NDkzYjgiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cmVjdCB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHg9IjMiIHk9IjMiIHJ4PSIyIiByeT0iMiIvPjxjaXJjbGUgY3g9IjkuIiBjeT0iOSIgcj0iMiIvPjxwYXRoIGQ9Im0yMSAxNS0zLjA4Ni0zLjA4NmEtMiAyIDAgMCAwLTIuODI4IDBsLTUuNzg2IDUuNzg2Ii8+PC9zdmc+';
+                                  (e.target as HTMLElement).style.display = 'none';
+                                  const parent = (e.target as HTMLElement).parentElement;
+                                  if (parent && !parent.querySelector('.thumbnail-fallback')) {
+                                    const fallback = document.createElement('div');
+                                    fallback.className = 'thumbnail-fallback w-full h-full flex flex-col items-center justify-center p-1 text-center text-muted-foreground text-[9px] font-semibold bg-muted/30';
+                                    fallback.innerHTML = '<span class="text-xs">📄</span><span class="truncate max-w-full">' + (fileName || 'Receipt') + '</span>';
+                                    parent.appendChild(fallback);
+                                  }
                                 }}
                               />
                             )}
@@ -1090,44 +1124,12 @@ const Expenses: React.FC = () => {
     </div>
   </form>
 </Dialog>
-      <Dialog isOpen={!!previewReceipt} onClose={() => setPreviewReceipt(null)} title={previewReceipt?.fileName || "Receipt Preview"} maxWidthClass="max-w-4xl">
-        {previewReceipt && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-end gap-2 pb-2 border-b border-border">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => window.open(previewReceipt.url, "_blank")}
-                className="flex items-center gap-1.5 text-xs h-8 px-3"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                Open in New Tab
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => downloadReceiptFile(previewReceipt.receiptId, previewReceipt.fileName)}
-                className="flex items-center gap-1.5 text-xs h-8 px-3"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Download
-              </Button>
-            </div>
-            <div className="flex items-center justify-center bg-black/5 dark:bg-black/40 rounded-xl overflow-hidden p-2 min-h-[50vh]">
-              {previewReceipt.isPdf ? (
-                <div className="w-full h-[75vh] flex flex-col">
-                  <iframe src={previewReceipt.url} className="w-full flex-1 rounded-lg border border-border bg-white" title={previewReceipt.fileName} />
-                  <div className="text-center text-xs text-muted-foreground pt-2">
-                    Having trouble viewing this PDF? <button type="button" onClick={() => window.open(previewReceipt.url, "_blank")} className="text-blue-500 hover:underline font-semibold">Open in New Tab</button> or <button type="button" onClick={() => downloadReceiptFile(previewReceipt.receiptId, previewReceipt.fileName)} className="text-blue-500 hover:underline font-semibold">Download</button>.
-                  </div>
-                </div>
-              ) : (
-                <img src={previewReceipt.url} alt={previewReceipt.fileName} className="max-w-full max-h-[75vh] object-contain rounded-lg shadow-sm" />
-              )}
-            </div>
-          </div>
-        )}
-      </Dialog>
+      {previewReceipt && (
+        <ReceiptPreviewModalViewer
+          previewReceipt={previewReceipt}
+          onClose={() => setPreviewReceipt(null)}
+        />
+      )}
     </div>
   );
 };

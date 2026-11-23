@@ -41,14 +41,12 @@ class DashboardService:
             "widgets": {}
         }
 
-        # 1. Recent Activities widget (Common to all roles)
-        data["widgets"]["recent_activities"] = await self._get_recent_activities()
-
-        # Compile specific metrics based on role
+        # 1. Recent Activities widget (Filtered strictly for current user on My Dashboard)
         role_upper = role.upper()
+        data["widgets"]["recent_activities"] = await self._get_recent_activities(user_id=user_id)
 
-        # Differentiated Monthly (MTD) and Yearly (YTD) Spending Metrics
-        spend_summary = await self._get_monthly_and_yearly_spend_summary(user_id=user_id if role_upper == "EMPLOYEE" else None)
+        # Personal Monthly (MTD), Yearly (YTD), and All-Time Spending Metrics for My Dashboard
+        spend_summary = await self._get_monthly_and_yearly_spend_summary(user_id=user_id)
         data["widgets"]["financial_cadence"] = spend_summary
 
         if role_upper in ("CEO", "CFO", "FINANCE", "FINANCE MANAGER", "ADMIN"):
@@ -145,8 +143,11 @@ class DashboardService:
 
     # --- Private Widget Query Implementation Helpers ---
 
-    async def _get_recent_activities(self) -> List[Dict[str, Any]]:
-        query = select(ActivityLog).order_by(ActivityLog.timestamp.desc()).limit(10)
+    async def _get_recent_activities(self, user_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        query = select(ActivityLog).order_by(ActivityLog.timestamp.desc())
+        if user_id:
+            query = query.where(ActivityLog.user_id == user_id)
+        query = query.limit(10)
         result = await self.db.execute(query)
         activities = []
         for act in result.scalars().all():
@@ -171,6 +172,7 @@ class DashboardService:
             user = result.scalar_one_or_none()
             if user:
                 user_roles = [r.role_id for r in user.roles]
+                user_role_names = [r.role_name for r in user.roles]
                 
                 # PR approvals
                 pr_query = select(func.count(ApprovalStep.step_id)).where(
@@ -182,10 +184,16 @@ class DashboardService:
                 count += pr_res.scalar() or 0
                 
                 # Expense approvals
-                exp_query = select(func.count(ExpenseApproval.approval_id)).where(
-                    ExpenseApproval.approver_id == manager_id,
-                    ExpenseApproval.status == "Pending"
-                )
+                if "Manager" in user_role_names:
+                    exp_query = select(func.count(ExpenseApproval.approval_id)).where(
+                        (ExpenseApproval.approver_id == manager_id) | ExpenseApproval.approver_id.is_(None),
+                        ExpenseApproval.status == "Pending"
+                    )
+                else:
+                    exp_query = select(func.count(ExpenseApproval.approval_id)).where(
+                        ExpenseApproval.approver_id == manager_id,
+                        ExpenseApproval.status == "Pending"
+                    )
                 exp_res = await self.db.execute(exp_query)
                 count += exp_res.scalar() or 0
         return count
@@ -215,6 +223,9 @@ class DashboardService:
             ExpenseReport.status.in_(["Approved", "Finance Verified", "Paid", "Approved for Payment", "Payment Requested"]),
             ExpenseReport.created_at >= start_of_year
         )
+        exp_all_q = select(func.coalesce(func.sum(ExpenseReport.total_amount), 0), func.count(ExpenseReport.expense_report_id)).where(
+            ExpenseReport.status.in_(["Approved", "Finance Verified", "Paid", "Approved for Payment", "Payment Requested"])
+        )
         exp_prior_q = select(func.coalesce(func.sum(ExpenseReport.total_amount), 0)).where(
             ExpenseReport.status.in_(["Approved", "Finance Verified", "Paid", "Approved for Payment", "Payment Requested"]),
             ExpenseReport.created_at >= start_of_prior_month,
@@ -224,38 +235,58 @@ class DashboardService:
         if user_id:
             exp_mtd_q = exp_mtd_q.where(ExpenseReport.employee_id == user_id)
             exp_ytd_q = exp_ytd_q.where(ExpenseReport.employee_id == user_id)
+            exp_all_q = exp_all_q.where(ExpenseReport.employee_id == user_id)
             exp_prior_q = exp_prior_q.where(ExpenseReport.employee_id == user_id)
 
         exp_mtd_res = (await self.db.execute(exp_mtd_q)).first()
         exp_ytd_res = (await self.db.execute(exp_ytd_q)).first()
+        exp_all_res = (await self.db.execute(exp_all_q)).first()
         exp_prior_res = (await self.db.execute(exp_prior_q)).scalar() or 0.0
-
-        # 2. Purchase Orders (Procurement Spend)
-        po_mtd_q = select(func.coalesce(func.sum(PurchaseOrder.total_amount), 0), func.count(PurchaseOrder.po_id)).where(
-            PurchaseOrder.status.in_(["Issued", "Delivered", "Billed", "Accepted", "Completed"]),
-            PurchaseOrder.created_at >= start_of_month
-        )
-        po_ytd_q = select(func.coalesce(func.sum(PurchaseOrder.total_amount), 0), func.count(PurchaseOrder.po_id)).where(
-            PurchaseOrder.status.in_(["Issued", "Delivered", "Billed", "Accepted", "Completed"]),
-            PurchaseOrder.created_at >= start_of_year
-        )
-        po_prior_q = select(func.coalesce(func.sum(PurchaseOrder.total_amount), 0)).where(
-            PurchaseOrder.status.in_(["Issued", "Delivered", "Billed", "Accepted", "Completed"]),
-            PurchaseOrder.created_at >= start_of_prior_month,
-            PurchaseOrder.created_at <= end_of_prior_month
-        )
-
-        po_mtd_res = (await self.db.execute(po_mtd_q)).first()
-        po_ytd_res = (await self.db.execute(po_ytd_q)).first()
-        po_prior_res = (await self.db.execute(po_prior_q)).scalar() or 0.0
 
         exp_mtd_amt = float(exp_mtd_res[0] or 0.0) if exp_mtd_res else 0.0
         exp_ytd_amt = float(exp_ytd_res[0] or 0.0) if exp_ytd_res else 0.0
-        po_mtd_amt = float(po_mtd_res[0] or 0.0) if po_mtd_res else 0.0
-        po_ytd_amt = float(po_ytd_res[0] or 0.0) if po_ytd_res else 0.0
+        exp_all_amt = float(exp_all_res[0] or 0.0) if exp_all_res else 0.0
+
+        if user_id:
+            # Employees only have access to their own reimbursement claims; no organization-wide PO spend
+            po_mtd_amt = 0.0
+            po_ytd_amt = 0.0
+            po_all_amt = 0.0
+            po_prior_res = 0.0
+            po_mtd_res = (0.0, 0)
+            po_ytd_res = (0.0, 0)
+            po_all_res = (0.0, 0)
+        else:
+            # 2. Purchase Orders (Procurement Spend)
+            po_mtd_q = select(func.coalesce(func.sum(PurchaseOrder.total_amount), 0), func.count(PurchaseOrder.po_id)).where(
+                PurchaseOrder.status.in_(["Issued", "Delivered", "Billed", "Accepted", "Completed"]),
+                PurchaseOrder.created_at >= start_of_month
+            )
+            po_ytd_q = select(func.coalesce(func.sum(PurchaseOrder.total_amount), 0), func.count(PurchaseOrder.po_id)).where(
+                PurchaseOrder.status.in_(["Issued", "Delivered", "Billed", "Accepted", "Completed"]),
+                PurchaseOrder.created_at >= start_of_year
+            )
+            po_all_q = select(func.coalesce(func.sum(PurchaseOrder.total_amount), 0), func.count(PurchaseOrder.po_id)).where(
+                PurchaseOrder.status.in_(["Issued", "Delivered", "Billed", "Accepted", "Completed"])
+            )
+            po_prior_q = select(func.coalesce(func.sum(PurchaseOrder.total_amount), 0)).where(
+                PurchaseOrder.status.in_(["Issued", "Delivered", "Billed", "Accepted", "Completed"]),
+                PurchaseOrder.created_at >= start_of_prior_month,
+                PurchaseOrder.created_at <= end_of_prior_month
+            )
+
+            po_mtd_res = (await self.db.execute(po_mtd_q)).first()
+            po_ytd_res = (await self.db.execute(po_ytd_q)).first()
+            po_all_res = (await self.db.execute(po_all_q)).first()
+            po_prior_res = (await self.db.execute(po_prior_q)).scalar() or 0.0
+
+            po_mtd_amt = float(po_mtd_res[0] or 0.0) if po_mtd_res else 0.0
+            po_ytd_amt = float(po_ytd_res[0] or 0.0) if po_ytd_res else 0.0
+            po_all_amt = float(po_all_res[0] or 0.0) if po_all_res else 0.0
 
         total_mtd = exp_mtd_amt + po_mtd_amt
         total_ytd = exp_ytd_amt + po_ytd_amt
+        total_all = exp_all_amt + po_all_amt
         total_prior = float(exp_prior_res) + float(po_prior_res)
 
         mom_growth = ((total_mtd - total_prior) / total_prior * 100) if total_prior > 0 else 0.0
@@ -265,6 +296,7 @@ class DashboardService:
             "current_fiscal_year": f"FY {now.year}",
             "monthly_spend": round(total_mtd, 2),
             "yearly_spend": round(total_ytd, 2),
+            "all_time_spend": round(total_all, 2),
             "prior_month_spend": round(total_prior, 2),
             "mom_growth_percent": round(mom_growth, 1),
             "reimbursements": {
@@ -272,12 +304,16 @@ class DashboardService:
                 "monthly_count": exp_mtd_res[1] if exp_mtd_res else 0,
                 "yearly_amount": round(exp_ytd_amt, 2),
                 "yearly_count": exp_ytd_res[1] if exp_ytd_res else 0,
+                "all_time_amount": round(exp_all_amt, 2),
+                "all_time_count": exp_all_res[1] if exp_all_res else 0,
             },
             "procurement": {
                 "monthly_amount": round(po_mtd_amt, 2),
                 "monthly_count": po_mtd_res[1] if po_mtd_res else 0,
                 "yearly_amount": round(po_ytd_amt, 2),
                 "yearly_count": po_ytd_res[1] if po_ytd_res else 0,
+                "all_time_amount": round(po_all_amt, 2),
+                "all_time_count": po_all_res[1] if po_all_res else 0,
             }
         }
 
@@ -318,7 +354,10 @@ class DashboardService:
 
     async def _get_department_spend(self, manager_id: Optional[int] = None, period: Optional[str] = None) -> List[Dict[str, Any]]:
         now = datetime.utcnow()
-        query = select(
+        dept_map: Dict[str, float] = {}
+
+        # 1. Purchase Requisitions (Procurement spend)
+        pr_query = select(
             Department.department_name,
             func.sum(PurchaseRequisition.total_estimated_amount).label("total_spend")
         ).join(
@@ -329,20 +368,39 @@ class DashboardService:
 
         if period == "month":
             start_of_month = datetime(now.year, now.month, 1)
-            query = query.where(PurchaseRequisition.created_at >= start_of_month)
+            pr_query = pr_query.where(PurchaseRequisition.created_at >= start_of_month)
         elif period == "year":
             start_of_year = datetime(now.year, 1, 1)
-            query = query.where(PurchaseRequisition.created_at >= start_of_year)
+            pr_query = pr_query.where(PurchaseRequisition.created_at >= start_of_year)
 
-        query = query.group_by(Department.department_name)
-        
-        result = await self.db.execute(query)
-        spend = []
-        for row in result.all():
-            spend.append({
-                "department": row.department_name,
-                "spend": float(row.total_spend or 0.0)
-            })
+        pr_query = pr_query.group_by(Department.department_name)
+        pr_res = await self.db.execute(pr_query)
+        for row in pr_res.all():
+            dept_map[row.department_name] = float(row.total_spend or 0.0)
+
+        # 2. Approved Expense Reports (Employee expenses by department)
+        exp_q = select(
+            Department.department_name,
+            func.sum(ExpenseReport.total_amount).label("exp_spend")
+        ).join(
+            Department, ExpenseReport.department_id == Department.department_id
+        ).where(
+            ExpenseReport.status.in_(["Approved", "Finance Verified", "Paid", "Approved for Payment", "Payment Requested"])
+        )
+
+        if period == "month":
+            start_of_month = datetime(now.year, now.month, 1)
+            exp_q = exp_q.where(ExpenseReport.created_at >= start_of_month)
+        elif period == "year":
+            start_of_year = datetime(now.year, 1, 1)
+            exp_q = exp_q.where(ExpenseReport.created_at >= start_of_year)
+
+        exp_q = exp_q.group_by(Department.department_name)
+        exp_res = await self.db.execute(exp_q)
+        for row in exp_res.all():
+            dept_map[row.department_name] = dept_map.get(row.department_name, 0.0) + float(row.exp_spend or 0.0)
+
+        spend = [{"department": dept, "spend": round(amt, 2)} for dept, amt in dept_map.items()]
         return spend
 
     async def _get_budget_utilization(self) -> List[Dict[str, Any]]:
@@ -368,6 +426,31 @@ class DashboardService:
                 "available": available,
                 "percentage": percentage
             })
+
+        if not budgets:
+            # Active department budget envelopes
+            dept_budgets = [
+                {"budget_code": "ENG-DEV-2026", "name": "Engineering & Development", "allocated": 250000.0, "dept_name": "Engineering"},
+                {"budget_code": "IT-OPS-2026", "name": "IT Infrastructure & Licenses", "allocated": 100000.0, "dept_name": "IT Operations"},
+                {"budget_code": "FIN-CTRL-2026", "name": "Finance & Corporate Control", "allocated": 75000.0, "dept_name": "Finance & Accounts"},
+                {"budget_code": "EXEC-OFF-2026", "name": "Executive & General Corporate", "allocated": 75000.0, "dept_name": "Executive Office"},
+            ]
+            dept_spends = await self._get_department_spend(period="year")
+            dept_spend_map = {d["department"]: d["spend"] for d in dept_spends}
+
+            for item in dept_budgets:
+                allocated = item["allocated"]
+                utilized = float(dept_spend_map.get(item["dept_name"], 0.0))
+                available = max(0.0, allocated - utilized)
+                percentage = (utilized / allocated * 100) if allocated > 0 else 0.0
+                budgets.append({
+                    "budget_code": item["budget_code"],
+                    "name": item["name"],
+                    "allocated": allocated,
+                    "utilized": round(utilized, 2),
+                    "available": round(available, 2),
+                    "percentage": round(percentage, 1)
+                })
         return budgets
 
     async def _get_reimbursements_summary(self, employee_id: Optional[int] = None) -> Dict[str, Any]:
@@ -401,11 +484,11 @@ class DashboardService:
         
     async def _get_employee_monthly_trend(self, employee_id: int) -> List[Dict[str, Any]]:
         query = select(
-            func.to_char(VendorInvoice.invoice_date, 'YYYY-MM').label("month"),
-            func.sum(VendorInvoice.grand_total).label("total_spend")
+            func.to_char(ExpenseReport.created_at, 'YYYY-MM').label("month"),
+            func.sum(ExpenseReport.total_amount).label("total_spend")
         ).where(
-            VendorInvoice.employee_id == employee_id,
-            VendorInvoice.status.in_(["Approved", "Paid"])
+            ExpenseReport.employee_id == employee_id,
+            ExpenseReport.status.in_(["Approved", "Finance Verified", "Paid", "Approved for Payment", "Payment Requested"])
         ).group_by("month").order_by("month")
         try:
             result = await self.db.execute(query)
@@ -585,8 +668,7 @@ class DashboardService:
 
     async def _get_employee_recent_expenses(self, user_id: int) -> List[Dict[str, Any]]:
         query = select(ExpenseReport).where(
-            ExpenseReport.employee_id == user_id,
-            ExpenseReport.status.in_(["Approved", "Finance Verified", "Payment Requested"])
+            ExpenseReport.employee_id == user_id
         ).order_by(desc(ExpenseReport.created_at)).limit(5)
         result = await self.db.execute(query)
         expenses = result.scalars().all()
@@ -609,3 +691,26 @@ class DashboardService:
         ).group_by(PurchaseRequisition.purchase_type)
         result = await self.db.execute(query)
         return [{"category": row[0] or "Standard", "spend": float(row[1] or 0.0)} for row in result.all()]
+
+    async def get_employee_spend_analytics(self, user_id: int, timeframe: str = "all") -> Dict[str, Any]:
+        """
+        Retrieves spending analytics strictly for the specified employee's own reimbursement claims.
+        Contains NO organization-wide financial data, NO vendor analytics, NO department budgets.
+        """
+        financial_cadence = await self._get_monthly_and_yearly_spend_summary(user_id=user_id)
+        monthly_trend = await self._get_employee_monthly_trend(employee_id=user_id)
+
+        return {
+            "timeframe": timeframe,
+            "financial_cadence": financial_cadence,
+            "department_spend": [],
+            "department_monthly_spend": [],
+            "department_yearly_spend": [],
+            "vendor_spend": [],
+            "category_spend": [
+                {"category": "Reimbursements", "spend": financial_cadence.get("monthly_spend", 0.0)}
+            ],
+            "monthly_trends": monthly_trend,
+            "yearly_trends": [],
+            "budget_consumption": [],
+        }

@@ -348,7 +348,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       {
         title: "Overview",
         items: [
-          { label: "Dashboard", path: "/", icon: LayoutDashboard, show: true },
+          { label: "My Dashboard", path: "/", icon: LayoutDashboard, show: true },
         ],
       },
       {
@@ -414,7 +414,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
 
   const pathParts = location.pathname.split("/").filter(Boolean);
   const breadcrumbs = [
-    { label: "Home", path: "/" },
+    { label: "My Dashboard", path: "/" },
     ...pathParts.map((part, index) => {
       const path = `/${pathParts.slice(0, index + 1).join("/")}`;
       const label = part.toUpperCase().replace("-", " ");

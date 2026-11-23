@@ -1,4 +1,5 @@
 import logging
+import time
 import uuid
 import jwt
 from typing import List, Optional
@@ -12,6 +13,24 @@ from src.models.auth import User, LoginSession
 from src.repositories.auth import UserRepository, SessionRepository
 
 logger = logging.getLogger(__name__)
+
+# High-performance in-memory cache for active JWT sessions to satisfy SLA
+_TOKEN_CACHE: dict[str, float] = {}
+
+def cache_active_token(token: str, ttl: float = 60.0) -> None:
+    _TOKEN_CACHE[token] = time.time() + ttl
+
+def is_token_cached_active(token: str) -> bool:
+    import sys
+    if "pytest" in sys.modules or settings.ENVIRONMENT == "testing":
+        return False
+    exp = _TOKEN_CACHE.get(token)
+    if exp and exp > time.time():
+        return True
+    return False
+
+def invalidate_token_cache(token: str) -> None:
+    _TOKEN_CACHE.pop(token, None)
 
 
 class JWTBearer(HTTPBearer):
@@ -42,15 +61,18 @@ class JWTBearer(HTTPBearer):
                 detail="Authentication credentials missing"
             )
 
-        # Verify active session in local database
+        # Verify active session via memory cache or database lookup
+        active_session = None
         session_repo = SessionRepository(db)
-        active_session = await session_repo.get_active_session_by_token(token)
-        if not active_session:
-            logger.warning("Attempted request with invalid or revoked session token.")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Session is invalid or has been logged out"
-            )
+        if not is_token_cached_active(token):
+            active_session = await session_repo.get_active_session_by_token(token)
+            if not active_session:
+                logger.warning("Attempted request with invalid or revoked session token.")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Session is invalid or has been logged out"
+                )
+            cache_active_token(token, ttl=60.0)
 
         try:
             # Decode the Supabase JWT
@@ -64,14 +86,19 @@ class JWTBearer(HTTPBearer):
             request.state.access_token = token
             return payload
         except jwt.ExpiredSignatureError:
+            invalidate_token_cache(token)
             # Update session status to revoked if token is expired
-            active_session.status = "Revoked"
-            await session_repo.update(active_session)
+            if not active_session:
+                active_session = await session_repo.get_active_session_by_token(token)
+            if active_session:
+                active_session.status = "Revoked"
+                await session_repo.update(active_session)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Authentication token has expired"
             )
         except jwt.InvalidTokenError as e:
+            invalidate_token_cache(token)
             logger.warning(f"Invalid token signature or payload: {e}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

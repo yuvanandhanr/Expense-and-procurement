@@ -166,6 +166,7 @@ class AssetIncidentUpdate(BaseModel):
     comments: Optional[str] = None
     incident_date: Optional[date] = None
     image_url: Optional[str] = None
+    is_draft: Optional[bool] = None
 
 
 class AssetIncidentAction(BaseModel):

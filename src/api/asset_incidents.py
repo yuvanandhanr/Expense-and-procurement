@@ -104,7 +104,9 @@ async def list_incidents(
         
     stmt = stmt.where(or_(*conditions)).order_by(AssetIncident.created_at.desc())
     result = await session.execute(stmt)
-    return result.scalars().all()
+    incidents = result.scalars().all()
+    # Explicitly ensure drafts are only visible to the user who reported them
+    return [i for i in incidents if not (i.status == "Draft" and i.reporter_id != current_user.user_id)]
 
 @router.get("/{incident_id}", response_model=AssetIncidentSchema)
 async def get_incident(
@@ -121,6 +123,9 @@ async def get_incident(
 
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
+
+    if incident.status == "Draft" and incident.reporter_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Draft incident reports are only visible to the owner.")
 
     user_roles = [r.role_name for r in current_user.roles]
     is_admin = any(r in ("Admin", "SuperAdmin") for r in user_roles)
@@ -152,7 +157,7 @@ async def update_incident(
         raise HTTPException(status_code=403, detail="You can only edit your own incidents")
 
     if incident.status not in ["Draft", "Returned for Correction"]:
-        raise HTTPException(status_code=400, detail="Incident can only be edited when Draft or Returned for Correction")
+        raise HTTPException(status_code=400, detail="Incident reports cannot be edited once submitted")
 
     full_desc = data.description or incident.description
     if data.reason:
@@ -169,21 +174,87 @@ async def update_incident(
     if data.incident_date is not None:
         incident.incident_date = data.incident_date
 
-    # If returned for correction, resubmitting sets it back to Reported
+    # If submitted (is_draft=False) or returned for correction, transition status to Reported
     was_returned = incident.status == "Returned for Correction"
-    if was_returned:
+    is_submitting = data.is_draft is False or (data.is_draft is None and was_returned)
+
+    if is_submitting or was_returned:
         incident.status = "Reported"
         history = AssetHistory(
             asset_id=incident.asset_id,
-            action_type="Incident Resubmitted",
+            action_type="Incident Resubmitted" if was_returned else "Incident Reported",
             action_by=current_user.user_id,
-            details=f"Incident #{incident.incident_id} corrected and resubmitted."
+            details=f"Incident #{incident.incident_id} {'corrected and resubmitted' if was_returned else 'submitted from draft'}."
         )
         session.add(history)
+    elif data.is_draft is True:
+        incident.status = "Draft"
         
     await session.commit()
     await session.refresh(incident)
     return incident
+
+
+@router.post("/{incident_id}/submit", response_model=AssetIncidentSchema)
+async def submit_incident(
+    incident_id: int,
+    session: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    stmt = select(AssetIncident).options(
+        selectinload(AssetIncident.asset),
+        selectinload(AssetIncident.reporter)
+    ).where(AssetIncident.incident_id == incident_id)
+    result = await session.execute(stmt)
+    incident = result.scalar_one_or_none()
+
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    if incident.reporter_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="You can only submit your own incident reports")
+
+    if incident.status not in ["Draft", "Returned for Correction"]:
+        raise HTTPException(status_code=400, detail="Only draft or returned incident reports can be submitted")
+
+    was_returned = incident.status == "Returned for Correction"
+    incident.status = "Reported"
+    history = AssetHistory(
+        asset_id=incident.asset_id,
+        action_type="Incident Resubmitted" if was_returned else "Incident Reported",
+        action_by=current_user.user_id,
+        details=f"Incident #{incident.incident_id} {'corrected and resubmitted' if was_returned else 'submitted from draft'}."
+    )
+    session.add(history)
+    await session.commit()
+    await session.refresh(incident)
+    return incident
+
+
+@router.delete("/{incident_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_incident(
+    incident_id: int,
+    session: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    stmt = select(AssetIncident).where(AssetIncident.incident_id == incident_id)
+    result = await session.execute(stmt)
+    incident = result.scalar_one_or_none()
+
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    user_roles = {role.role_name for role in current_user.roles}
+    is_admin = bool(user_roles & {"Admin", "SuperAdmin"})
+
+    if incident.reporter_id != current_user.user_id and not is_admin:
+        raise HTTPException(status_code=403, detail="Only the draft owner or an administrator can delete this incident report")
+
+    if incident.status != "Draft":
+        raise HTTPException(status_code=400, detail="Only draft incident reports can be deleted")
+
+    await session.delete(incident)
+    await session.commit()
 
 @router.post("/{incident_id}/action", response_model=AssetIncidentSchema)
 async def action_incident(

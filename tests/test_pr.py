@@ -124,6 +124,27 @@ def authenticate_user(mock_employee):
 
 
 @pytest.fixture
+def authenticate_admin(mock_admin):
+    """
+    Override setup to act as admin.
+    """
+    async def _get_current_user_override():
+        return mock_admin
+
+    async def _jwt_bearer_override():
+        return {"sub": str(mock_admin.user_id), "email": mock_admin.email}
+
+    from src.main import app
+    from src.auth.dependencies import get_current_user, JWTBearer
+
+    app.dependency_overrides[get_current_user] = _get_current_user_override
+    app.dependency_overrides[JWTBearer] = _jwt_bearer_override
+    yield
+    app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides.pop(JWTBearer, None)
+
+
+@pytest.fixture
 def mock_pr() -> PurchaseRequisition:
     item = PRItem(
         pr_item_id=1,
@@ -282,6 +303,25 @@ async def test_submit_pr_success(
 
 @pytest.mark.anyio
 @patch.object(PRRepository, "get_by_id", new_callable=AsyncMock)
+async def test_employee_cannot_cancel_submitted_pr(
+    mock_get_pr,
+    authenticate_user,
+    async_client: AsyncClient,
+    override_db,
+    mock_pr
+):
+    # Employee cannot cancel a submitted PR once in approval routing
+    mock_pr.status = "Pending Manager Approval"
+    mock_pr.requestor_id = 1
+    mock_get_pr.return_value = mock_pr
+
+    response = await async_client.post("/api/v1/pr/1/cancel")
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert "Submitted requisitions cannot be cancelled" in response.json()["detail"]
+
+
+@pytest.mark.anyio
+@patch.object(PRRepository, "get_by_id", new_callable=AsyncMock)
 @patch.object(PRRepository, "update", new_callable=AsyncMock)
 @patch.object(BudgetReservationRepository, "get_by_pr_id", new_callable=AsyncMock)
 @patch.object(BudgetCodeRepository, "get_by_id", new_callable=AsyncMock)
@@ -292,7 +332,7 @@ async def test_submit_pr_success(
 @patch.object(ApprovalStepRepository, "get_active_step_for_workflow", new_callable=AsyncMock)
 @patch.object(ApprovalStepRepository, "update", new_callable=AsyncMock)
 @patch.object(WorkflowHistoryRepository, "create", new_callable=AsyncMock)
-async def test_cancel_pr(
+async def test_admin_can_cancel_submitted_pr(
     mock_wf_hist,
     mock_step_update,
     mock_active_step,
@@ -304,7 +344,7 @@ async def test_cancel_pr(
     mock_res_get,
     mock_pr_update,
     mock_get_pr,
-    authenticate_user,
+    authenticate_admin,
     async_client: AsyncClient,
     override_db,
     mock_pr,
@@ -328,6 +368,126 @@ async def test_cancel_pr(
     response = await async_client.post("/api/v1/pr/1/cancel")
     assert response.status_code == status.HTTP_200_OK
     assert response.json()["status"] == "Cancelled"
+
+
+@pytest.mark.anyio
+@patch.object(PRRepository, "get_by_id", new_callable=AsyncMock)
+@patch.object(PRRepository, "delete", new_callable=AsyncMock)
+async def test_delete_draft_pr_by_owner(
+    mock_pr_delete,
+    mock_get_pr,
+    authenticate_user,
+    async_client: AsyncClient,
+    override_db,
+    mock_pr
+):
+    mock_pr.status = "Draft"
+    mock_pr.requestor_id = 1
+    mock_get_pr.return_value = mock_pr
+
+    response = await async_client.delete("/api/v1/pr/1")
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    mock_pr_delete.assert_awaited_once_with(mock_pr)
+
+
+@pytest.mark.anyio
+@patch.object(PRRepository, "get_by_id", new_callable=AsyncMock)
+@patch.object(PRRepository, "delete", new_callable=AsyncMock)
+async def test_delete_draft_pr_by_non_owner(
+    mock_pr_delete,
+    mock_get_pr,
+    authenticate_user,
+    async_client: AsyncClient,
+    override_db,
+    mock_pr
+):
+    mock_pr.status = "Draft"
+    mock_pr.requestor_id = 999  # Different user
+    mock_get_pr.return_value = mock_pr
+
+    response = await async_client.delete("/api/v1/pr/1")
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    mock_pr_delete.assert_not_called()
+
+
+@pytest.mark.anyio
+@patch.object(PRRepository, "get_by_id", new_callable=AsyncMock)
+async def test_cannot_delete_submitted_pr(
+    mock_get_pr,
+    authenticate_user,
+    async_client: AsyncClient,
+    override_db,
+    mock_pr
+):
+    mock_pr.status = "Pending Manager Approval"
+    mock_pr.requestor_id = 1
+    mock_get_pr.return_value = mock_pr
+
+    response = await async_client.delete("/api/v1/pr/1")
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Only draft or returned requisitions can be deleted" in response.json()["detail"]
+
+
+@pytest.mark.anyio
+@patch.object(PRRepository, "get_by_id", new_callable=AsyncMock)
+@patch.object(PRRepository, "update", new_callable=AsyncMock)
+@patch.object(PRItemRepository, "list_by_pr_id", new_callable=AsyncMock)
+@patch.object(PRItemRepository, "delete", new_callable=AsyncMock)
+@patch.object(PRItemRepository, "create", new_callable=AsyncMock)
+async def test_edit_draft_pr_by_owner(
+    mock_item_create,
+    mock_item_delete,
+    mock_item_list,
+    mock_pr_update,
+    mock_get_pr,
+    authenticate_user,
+    async_client: AsyncClient,
+    override_db,
+    mock_pr
+):
+    mock_pr.status = "Draft"
+    mock_pr.requestor_id = 1
+    mock_get_pr.return_value = mock_pr
+    mock_item_list.return_value = []
+
+    response = await async_client.put(
+        "/api/v1/pr/1",
+        json={
+            "title": "Updated Laptop Spec",
+            "justification": "Updated business need",
+            "items": [
+                {
+                    "category": "IT",
+                    "item_name": "Updated MacBook Pro",
+                    "specification": "M3 Max, 128GB RAM",
+                    "quantity": 1,
+                    "unit_price": 4500.00
+                }
+            ]
+        }
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.anyio
+@patch.object(PRRepository, "get_by_id", new_callable=AsyncMock)
+async def test_cannot_edit_submitted_pr(
+    mock_get_pr,
+    authenticate_user,
+    async_client: AsyncClient,
+    override_db,
+    mock_pr
+):
+    mock_pr.status = "Pending Manager Approval"
+    mock_pr.requestor_id = 1
+    mock_get_pr.return_value = mock_pr
+
+    response = await async_client.put(
+        "/api/v1/pr/1",
+        json={"title": "Should Not Update"}
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Requisitions cannot be edited once submitted" in response.json()["detail"]
 
 
 # --- 3. APPROVAL FLOW ACTIONS ---

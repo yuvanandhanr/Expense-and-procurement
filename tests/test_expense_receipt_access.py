@@ -87,7 +87,7 @@ async def test_owner_can_access_receipt_image(mock_owner, async_client: AsyncCli
         image_path="/uploads/receipts/test.png",
         file_name="receipt.png",
         expense_report=report,
-        file_data=None
+        file_data="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
     )
 
     mocker.patch('src.api.expenses.ExpenseRepository.get_receipt_by_id', return_value=receipt)
@@ -161,7 +161,8 @@ async def test_manager_and_cfo_can_access_receipt_image(mock_manager, mock_cfo, 
         verified_amount=Decimal("450.00"),
         image_path="/uploads/receipts/flight.pdf",
         file_name="flight.pdf",
-        expense_report=report
+        expense_report=report,
+        file_data="JVBERi0xLjQKJcTl8uXrp/Og0MTGCjEgMCBvYmoKPDwKL1R5cGUgL0NhdGFsb2cKL1BhZ2VzIDIgMCBSCj4+CmVuZG9iagoyIDAgb2JqCjw8Ci9UeXBlIC9QYWdlcwovS2lkcyBbMyAwIFJdCi9Db3VudCAxCj4+CmVuZG9iagozIDAgb2JqCjw8Ci9UeXBlIC9QYWdlCi9QYXJlbnQgMiAwIFIKL01lZGlhQm94IFswIDAgNjEyIDc5Ml0KPj4KZW5kb2JqCnhyZWYKMCA0CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAxNSAwMDAwMCBuIAowMDAwMDAwMDY4IDAwMDAwIG4gCjAwMDAwMDAxMTUgMDAwMDAgbiAKdHJhaWxlcgo8PAovU2l6ZSA0Ci9Sb290IDEgMCBSCj4+CnN0YXJ0eHJlZgoyMDEKJSVFT0YK"
     )
     mocker.patch('src.api.expenses.ExpenseRepository.get_receipt_by_id', return_value=receipt)
 

@@ -24,25 +24,28 @@ class UserRepository(BaseRepository[User]):
 
     async def get_by_email(self, email: str) -> Optional[User]:
         """
-        Retrieves a user by their email address.
+        Retrieves a user by their email address, eagerly loading roles.
         """
-        query = select(User).where(User.email == email)
+        from sqlalchemy.orm import selectinload
+        query = select(User).options(selectinload(User.roles)).where(User.email == email)
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
     async def get_by_supabase_uid(self, uid: uuid.UUID) -> Optional[User]:
         """
-        Retrieves a user by their Supabase UUID reference.
+        Retrieves a user by their Supabase UUID reference, eagerly loading roles.
         """
-        query = select(User).where(User.supabase_uid == uid)
+        from sqlalchemy.orm import selectinload
+        query = select(User).options(selectinload(User.roles)).where(User.supabase_uid == uid)
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
     async def get_by_google_id(self, google_id: str) -> Optional[User]:
         """
-        Retrieves a user by their Google OAuth sub ID.
+        Retrieves a user by their Google OAuth sub ID, eagerly loading roles.
         """
-        query = select(User).where(User.google_id == google_id)
+        from sqlalchemy.orm import selectinload
+        query = select(User).options(selectinload(User.roles)).where(User.google_id == google_id)
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 

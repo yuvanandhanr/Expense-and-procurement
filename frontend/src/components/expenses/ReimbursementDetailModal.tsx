@@ -1,7 +1,8 @@
-import React, { useState } from "react";
-import { Building, Briefcase, FileText, Eye, Download, ExternalLink, Paperclip } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Building, Briefcase, FileText, Eye, Download, ExternalLink, Paperclip, Loader2, AlertCircle } from "lucide-react";
 import { Dialog, StatusBadge, Button } from "../ui";
 import { formatDate, resolveImageUrl, isPdfReceipt, downloadReceiptFile } from "../../utils/helpers";
+import { api } from "../../services/api";
 
 interface ReimbursementDetailModalProps {
   isOpen: boolean;
@@ -11,6 +12,174 @@ interface ReimbursementDetailModalProps {
   onAction: (action: "approve" | "reject" | "return") => void;
   loading?: boolean;
 }
+
+interface ReceiptPreviewModalViewerProps {
+  previewReceipt: { url: string; isPdf: boolean; fileName: string; receiptId: number };
+  onClose: () => void;
+}
+
+export const ReceiptPreviewModalViewer: React.FC<ReceiptPreviewModalViewerProps> = ({ previewReceipt, onClose }) => {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    let createdUrl: string | null = null;
+    setLoading(true);
+    setError(null);
+
+    // Fetch original receipt as authenticated blob
+    api
+      .get(`/expenses/receipts/${previewReceipt.receiptId}/image`, {
+        responseType: "blob",
+      })
+      .then((res) => {
+        if (!active) return;
+        createdUrl = window.URL.createObjectURL(res.data);
+        setBlobUrl(createdUrl);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (!active) return;
+        console.warn("Direct blob load failed, using fallback URL:", err);
+        setBlobUrl(previewReceipt.url);
+        setLoading(false);
+      });
+
+    return () => {
+      active = false;
+      if (createdUrl) {
+        window.URL.revokeObjectURL(createdUrl);
+      }
+    };
+  }, [previewReceipt.receiptId, previewReceipt.url]);
+
+  const viewUrl = blobUrl || previewReceipt.url;
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative max-w-4xl w-full max-h-[95vh] bg-card p-4 rounded-2xl shadow-2xl flex flex-col border border-border"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Modal Top Bar */}
+        <div className="flex items-center justify-between pb-3 border-b border-border mb-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <FileText className="w-5 h-5 text-blue-500 shrink-0" />
+            <span className="font-bold text-sm truncate text-foreground">{previewReceipt.fileName}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => window.open(viewUrl, "_blank")}
+              className="flex items-center gap-1.5 text-xs h-8 px-3"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              Open in New Tab
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => downloadReceiptFile(previewReceipt.receiptId, previewReceipt.fileName)}
+              className="flex items-center gap-1.5 text-xs h-8 px-3"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Download
+            </Button>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors ml-1 font-bold text-lg"
+              title="Close Preview"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Preview Body */}
+        <div className="flex-1 overflow-auto rounded-xl bg-muted/10 flex flex-col items-center justify-center p-2 min-h-[60vh]">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-16">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+              <span className="text-xs text-muted-foreground font-medium">Loading original receipt file...</span>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center gap-3 p-8 text-center">
+              <AlertCircle className="w-10 h-10 text-rose-500" />
+              <p className="text-sm font-bold text-foreground">Unable to preview receipt</p>
+              <p className="text-xs text-muted-foreground max-w-sm">{error}</p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-2 text-xs"
+                onClick={() => downloadReceiptFile(previewReceipt.receiptId, previewReceipt.fileName)}
+              >
+                <Download className="w-3.5 h-3.5 mr-1" />
+                Download Receipt File
+              </Button>
+            </div>
+          ) : previewReceipt.isPdf ? (
+            <div className="w-full h-[75vh] flex flex-col">
+              <object
+                data={viewUrl}
+                type="application/pdf"
+                className="w-full flex-1 rounded-xl border border-border bg-white"
+              >
+                <iframe
+                  src={viewUrl}
+                  className="w-full flex-1 rounded-xl border-0 bg-white"
+                  title={previewReceipt.fileName}
+                >
+                  <div className="p-6 text-center text-xs text-muted-foreground">
+                    PDF preview not supported in this frame.{" "}
+                    <button
+                      type="button"
+                      onClick={() => window.open(viewUrl, "_blank")}
+                      className="text-blue-500 hover:underline font-semibold"
+                    >
+                      Open in New Tab
+                    </button>
+                  </div>
+                </iframe>
+              </object>
+              <div className="text-center text-xs text-muted-foreground pt-2">
+                Having trouble viewing this PDF?{" "}
+                <button
+                  type="button"
+                  onClick={() => window.open(viewUrl, "_blank")}
+                  className="text-blue-500 hover:underline font-semibold"
+                >
+                  Open in New Tab
+                </button>{" "}
+                or{" "}
+                <button
+                  type="button"
+                  onClick={() => downloadReceiptFile(previewReceipt.receiptId, previewReceipt.fileName)}
+                  className="text-blue-500 hover:underline font-semibold"
+                >
+                  Download
+                </button>
+                .
+              </div>
+            </div>
+          ) : (
+            <img
+              src={viewUrl}
+              className="max-w-full max-h-[75vh] object-contain rounded-xl shadow-sm"
+              alt={previewReceipt.fileName}
+              onError={() => setError("Image file could not be rendered")}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> = ({
   isOpen,
@@ -294,73 +463,10 @@ export const ReimbursementDetailModal: React.FC<ReimbursementDetailModalProps> =
 
     {/* Receipt Preview Overlay */}
     {previewReceipt && (
-      <div 
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" 
-        onClick={() => setPreviewReceipt(null)}
-      >
-        <div className="relative max-w-4xl w-full max-h-[95vh] bg-card p-4 rounded-2xl shadow-2xl flex flex-col border border-border" onClick={e => e.stopPropagation()}>
-           {/* Modal Top Bar */}
-           <div className="flex items-center justify-between pb-3 border-b border-border mb-3">
-             <div className="flex items-center gap-2 min-w-0">
-               <FileText className="w-5 h-5 text-blue-500 shrink-0" />
-               <span className="font-bold text-sm truncate text-foreground">{previewReceipt.fileName}</span>
-             </div>
-             <div className="flex items-center gap-2">
-               <Button 
-                 size="sm" 
-                 variant="outline" 
-                 onClick={() => window.open(previewReceipt.url, "_blank")}
-                 className="flex items-center gap-1.5 text-xs h-8 px-3"
-               >
-                 <ExternalLink className="w-3.5 h-3.5" />
-                 Open in New Tab
-               </Button>
-               <Button 
-                 size="sm" 
-                 variant="outline" 
-                 onClick={() => downloadReceiptFile(previewReceipt.receiptId, previewReceipt.fileName)}
-                 className="flex items-center gap-1.5 text-xs h-8 px-3"
-               >
-                 <Download className="w-3.5 h-3.5" />
-                 Download
-               </Button>
-               <button 
-                 onClick={() => setPreviewReceipt(null)} 
-                 className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors ml-1 font-bold text-lg"
-                 title="Close Preview"
-               >
-                 ✕
-               </button>
-             </div>
-           </div>
-
-           {/* Preview Body */}
-           <div className="flex-1 overflow-auto rounded-xl bg-muted/10 flex flex-col items-center justify-center p-2 min-h-[60vh]">
-             {previewReceipt.isPdf ? (
-               <div className="w-full h-[75vh] flex flex-col">
-                 <iframe 
-                   src={previewReceipt.url} 
-                   className="w-full flex-1 rounded-xl border border-border bg-white" 
-                   title={previewReceipt.fileName} 
-                 />
-                 <div className="text-center text-xs text-muted-foreground pt-2">
-                   Having trouble viewing this PDF? <button type="button" onClick={() => window.open(previewReceipt.url, "_blank")} className="text-blue-500 hover:underline font-semibold">Open in New Tab</button> or <button type="button" onClick={() => downloadReceiptFile(previewReceipt.receiptId, previewReceipt.fileName)} className="text-blue-500 hover:underline font-semibold">Download</button>.
-                 </div>
-               </div>
-             ) : (
-               <img 
-                 src={previewReceipt.url} 
-                 className="max-w-full max-h-[75vh] object-contain rounded-xl shadow-sm" 
-                 alt={previewReceipt.fileName} 
-                 onError={(e) => {
-                   (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5NDkzYjgiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cmVjdCB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHg9IjMiIHk9IjMiIHJ4PSIyIiByeT0iMiIvPjxjaXJjbGUgY3g9IjkuIiBjeT0iOSIgcj0iMiIvPjxwYXRoIGQ9Im0yMSAxNS0zLjA4Ni0zLjA4NmEtMiAyIDAgMCAwLTIuODI4IDBsLTUuNzg2IDUuNzg2Ii8+PC9zdmc+';
-                   (e.target as HTMLImageElement).className = "max-w-xs max-h-xs object-contain mx-auto opacity-50";
-                 }}
-               />
-             )}
-           </div>
-        </div>
-      </div>
+      <ReceiptPreviewModalViewer
+        previewReceipt={previewReceipt}
+        onClose={() => setPreviewReceipt(null)}
+      />
     )}
     </>
   );

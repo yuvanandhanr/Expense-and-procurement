@@ -44,7 +44,7 @@ ChartJS.register(
 );
 
 export const Analytics: React.FC = () => {
-  const { hasRole } = useAuth();
+  const { user, hasRole } = useAuth();
   const navigate = useNavigate();
   const [timeframe, setTimeframe] = useState<"monthly" | "yearly" | "all">("monthly");
   const [spendData, setSpendData] = useState<any>(null);
@@ -53,7 +53,17 @@ export const Analytics: React.FC = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const isCTO = hasRole("CTO");
+  const isAuthorizedAnalytics = hasRole("CFO") || hasRole("CEO") || hasRole("Finance") || hasRole("Finance Manager") || hasRole("Admin") || hasRole("Procurement");
+
+  useEffect(() => {
+    if (user && !isAuthorizedAnalytics && !isCTO) {
+      navigate("/expenses", { replace: true });
+    }
+  }, [user, isAuthorizedAnalytics, isCTO, navigate]);
+
   const fetchAnalyticsData = React.useCallback(async (isInitial = false) => {
+    if (!isAuthorizedAnalytics && !isCTO) return;
     if (isInitial) setLoading(true);
     try {
       const [spendRes, vendorRes, budgetRes, dashRes] = await Promise.all([
@@ -141,10 +151,17 @@ export const Analytics: React.FC = () => {
     ],
   };
 
-  const isCTO = hasRole("CTO");
   const isCFO = hasRole("CFO") || hasRole("CEO") || hasRole("Finance") || hasRole("Finance Manager");
 
-  const spendSummary = dashboardData?.spend_summary || {};
+  const cadence = spendData?.financial_cadence || dashboardData?.widgets?.financial_cadence || {};
+  const monthlyTotal = cadence.monthly_spend !== undefined ? cadence.monthly_spend : 0;
+  const yearlyTotal = cadence.yearly_spend !== undefined ? cadence.yearly_spend : 0;
+  const allTimeTotal = cadence.all_time_spend !== undefined ? cadence.all_time_spend : 0;
+  const momGrowth = cadence.mom_growth_percent !== undefined ? cadence.mom_growth_percent : 0;
+  const monthlyReimb = cadence.reimbursements?.monthly_amount !== undefined ? cadence.reimbursements.monthly_amount : 0;
+  const monthlyProc = cadence.procurement?.monthly_amount !== undefined ? cadence.procurement.monthly_amount : 0;
+  const yearlyReimb = cadence.reimbursements?.yearly_amount !== undefined ? cadence.reimbursements.yearly_amount : 0;
+  const yearlyProc = cadence.procurement?.yearly_amount !== undefined ? cadence.procurement.yearly_amount : 0;
   const lowStockCount = dashboardData?.low_stock_alerts?.length || 0;
 
   if (isCTO) {
@@ -288,7 +305,20 @@ export const Analytics: React.FC = () => {
     );
   }
 
-  // --- CFO & Finance / Executive Analytics Dashboard ---
+  // CFO & Finance / Executive Analytics Dashboard
+  const totalBudgetAllocated = budgetData?.length > 0
+    ? budgetData.reduce((acc: number, b: any) => acc + (Number(b.allocated) || 0), 0)
+    : 500000;
+  const totalBudgetRemaining = budgetData?.length > 0
+    ? budgetData.reduce((acc: number, b: any) => acc + (Number(b.available) || 0), 0)
+    : Math.max(0, 500000 - Number(yearlyTotal || 0));
+  const totalBudgetUtilized = budgetData?.length > 0
+    ? budgetData.reduce((acc: number, b: any) => acc + (Number(b.utilized) || 0), 0)
+    : (totalBudgetAllocated - totalBudgetRemaining);
+  const budgetUtilizationPercent = totalBudgetAllocated > 0
+    ? Math.round((totalBudgetUtilized / totalBudgetAllocated) * 100)
+    : 0;
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-border/40">
@@ -297,48 +327,65 @@ export const Analytics: React.FC = () => {
             {isCFO ? "Enterprise Financial Intelligence" : "Financial & Spend Analytics"}
           </h1>
           <p className="text-xs md:text-sm text-muted-foreground mt-1">
-            Real-time telemetry, MTD vs YTD cadence analysis, departmental envelopes, and vendor allocations.
+            Company-wide expenditure run rate, MTD/YTD cadence, departmental envelopes, and budget allocations.
           </p>
         </div>
 
-        {/* Timeframe Cadence Switcher */}
-        <div className="inline-flex items-center gap-1 p-1 bg-muted/60 backdrop-blur-md rounded-2xl border border-border/60 shadow-apple-sm self-start md:self-auto">
+        {/* Quick Report Links & Timeframe Cadence Switcher */}
+        <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
           <button
-            onClick={() => setTimeframe("monthly")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              timeframe === "monthly"
-                ? "bg-background text-foreground shadow-apple-sm border border-border/60"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+            onClick={() => navigate("/reports")}
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border/60 transition-colors shadow-apple-sm flex items-center gap-1"
           >
-            This Month (MTD)
+            <span>Financial Reports</span>
+            <ChevronRight className="w-3 h-3" />
           </button>
           <button
-            onClick={() => setTimeframe("yearly")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              timeframe === "yearly"
-                ? "bg-background text-foreground shadow-apple-sm border border-border/60"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+            onClick={() => navigate("/reports/executive")}
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-colors shadow-apple-sm flex items-center gap-1"
           >
-            This Year (YTD)
+            <span>Executive Dossier</span>
+            <ArrowUpRight className="w-3 h-3" />
           </button>
-          <button
-            onClick={() => setTimeframe("all")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              timeframe === "all"
-                ? "bg-background text-foreground shadow-apple-sm border border-border/60"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            All-Time
-          </button>
+
+          <div className="inline-flex items-center gap-1 p-1 bg-muted/60 backdrop-blur-md rounded-2xl border border-border/60 shadow-apple-sm">
+            <button
+              onClick={() => setTimeframe("monthly")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                timeframe === "monthly"
+                  ? "bg-background text-foreground shadow-apple-sm border border-border/60"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              This Month (MTD)
+            </button>
+            <button
+              onClick={() => setTimeframe("yearly")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                timeframe === "yearly"
+                  ? "bg-background text-foreground shadow-apple-sm border border-border/60"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              This Year (YTD)
+            </button>
+            <button
+              onClick={() => setTimeframe("all")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                timeframe === "all"
+                  ? "bg-background text-foreground shadow-apple-sm border border-border/60"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              All-Time
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Primary KPI Grid: Monthly vs Yearly Delineation */}
+      {/* Primary KPI Grid: Company Expenditure & Budget Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Card 1: Monthly Spend (MTD) */}
+        {/* Card 1: Overall Company Spend (MTD / Timeframe) */}
         <div
           onClick={() => navigate("/expenses")}
           title="Click to view Monthly Expense & Procurement transactions"
@@ -347,35 +394,35 @@ export const Analytics: React.FC = () => {
           <div>
             <div className="flex justify-between items-center">
               <span className="text-xs font-bold text-blue-500 uppercase tracking-wider">
-                Monthly Spend (MTD)
+                {timeframe === "monthly" ? "Overall Monthly Spend (MTD)" : timeframe === "yearly" ? "Overall Yearly Spend (YTD)" : "Overall Company Spend"}
               </span>
               <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500 group-hover:scale-110 transition-transform">
                 <Calendar className="w-4 h-4" />
               </div>
             </div>
             <h3 className="text-2xl font-extrabold text-foreground group-hover:text-blue-500 transition-colors mt-2">
-              ₹{(spendSummary.monthly_total_spend || 0).toLocaleString()}
+              ₹{Number(timeframe === "monthly" ? monthlyTotal : timeframe === "yearly" ? yearlyTotal : allTimeTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </h3>
             <div className="flex items-center gap-1.5 mt-1.5">
-              {(spendSummary.mom_growth_pct || 0) >= 0 ? (
+              {momGrowth >= 0 ? (
                 <span className="inline-flex items-center text-[11px] font-bold text-rose-500">
-                  <TrendingUp className="w-3.5 h-3.5 mr-0.5" /> +{spendSummary.mom_growth_pct}% MoM
+                  <TrendingUp className="w-3.5 h-3.5 mr-0.5" /> +{momGrowth}% MoM
                 </span>
               ) : (
                 <span className="inline-flex items-center text-[11px] font-bold text-emerald-500">
-                  <TrendingDown className="w-3.5 h-3.5 mr-0.5" /> {spendSummary.mom_growth_pct}% MoM
+                  <TrendingDown className="w-3.5 h-3.5 mr-0.5" /> {momGrowth}% MoM
                 </span>
               )}
               <span className="text-[10px] text-muted-foreground">vs last month</span>
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-border/40 text-[10px] text-muted-foreground/80 flex items-center justify-between">
-            <span>Reimb: ₹{(spendSummary.monthly_reimbursements || 0).toLocaleString()}</span>
-            <span>PO: ₹{(spendSummary.monthly_procurement || 0).toLocaleString()}</span>
+            <span>Reimb: ₹{Number(timeframe === "monthly" ? monthlyReimb : timeframe === "yearly" ? yearlyReimb : (cadence.reimbursements?.all_time_amount || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span>PO: ₹{Number(timeframe === "monthly" ? monthlyProc : timeframe === "yearly" ? yearlyProc : (cadence.procurement?.all_time_amount || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
         </div>
 
-        {/* Card 2: Yearly Spend (YTD) */}
+        {/* Card 2: Overall Yearly Company Spend (YTD) */}
         <div
           onClick={() => navigate("/expenses")}
           title="Click to view Yearly Fiscal Spend"
@@ -384,50 +431,63 @@ export const Analytics: React.FC = () => {
           <div>
             <div className="flex justify-between items-center">
               <span className="text-xs font-bold text-emerald-500 uppercase tracking-wider">
-                Yearly Spend (YTD)
+                Overall Yearly Spend (YTD)
               </span>
               <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 group-hover:scale-110 transition-transform">
                 <Layers className="w-4 h-4" />
               </div>
             </div>
             <h3 className="text-2xl font-extrabold text-foreground group-hover:text-emerald-500 transition-colors mt-2">
-              ₹{(spendSummary.yearly_total_spend || spendData?.yearly_trends?.reduce((acc: number, y: any) => acc + y.spend, 0) || 124560).toLocaleString()}
+              ₹{Number(yearlyTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </h3>
             <p className="text-[11px] text-muted-foreground mt-1 font-medium">
-              Fiscal Year {new Date().getFullYear()} Cumulative
+              Fiscal Year {new Date().getFullYear()} Cumulative (All Departments)
             </p>
           </div>
           <div className="mt-3 pt-2 border-t border-border/40 text-[10px] text-muted-foreground/80 flex items-center justify-between">
-            <span>Procurement: ₹{(spendSummary.yearly_procurement || 0).toLocaleString()}</span>
-            <span className="font-bold flex items-center text-emerald-500">Expenses <ChevronRight className="w-3 h-3 ml-0.5" /></span>
+            <span>Procurement: ₹{Number(yearlyProc).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span className="font-bold flex items-center text-emerald-500">Expenses: ₹{Number(yearlyReimb).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
         </div>
 
-        {/* Card 3: Total Budget Allocation */}
+        {/* Card 3: Total Budget & Remaining Budget */}
         <div
-          onClick={() => navigate("/settings")}
+          onClick={() => {
+            const el = document.getElementById("budget-utilization-section");
+            if (el) el.scrollIntoView({ behavior: "smooth" });
+          }}
           title="Click to view Organization Budgets and Cost Centers"
           className="apple-card p-5 rounded-2xl cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-apple-md hover:border-primary/40 active:scale-[0.99] border border-border/80 flex flex-col justify-between group"
         >
           <div>
             <div className="flex justify-between items-center">
               <span className="text-xs font-bold text-primary uppercase tracking-wider">
-                Total Budget Envelope
+                Total & Remaining Budget
               </span>
               <div className="p-1.5 rounded-lg bg-primary/10 text-primary group-hover:scale-110 transition-transform">
                 <PieChart className="w-4 h-4" />
               </div>
             </div>
-            <h3 className="text-2xl font-extrabold text-foreground group-hover:text-primary transition-colors mt-2">
-              ₹{(budgetData?.reduce((acc: number, b: any) => acc + (b.allocated || 0), 0) || 500000).toLocaleString()}
-            </h3>
-            <p className="text-[11px] text-muted-foreground mt-1 font-medium">
-              Cap across all active cost centers
-            </p>
+            <div className="mt-2 space-y-1">
+              <div className="flex items-baseline justify-between">
+                <span className="text-[11px] text-muted-foreground font-medium">Total Envelope:</span>
+                <span className="text-base font-extrabold text-foreground">₹{totalBudgetAllocated.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-[11px] text-emerald-500 font-semibold">Remaining:</span>
+                <span className="text-base font-extrabold text-emerald-500">₹{totalBudgetRemaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+            <div className="w-full bg-muted/60 h-1.5 rounded-full overflow-hidden mt-2">
+              <div 
+                className="bg-primary h-full transition-all duration-500" 
+                style={{ width: `${Math.min(budgetUtilizationPercent, 100)}%` }} 
+              />
+            </div>
           </div>
           <div className="mt-3 pt-2 border-t border-border/40 text-[10px] text-muted-foreground/80 group-hover:text-primary flex items-center justify-between transition-colors">
-            <span>Departmental limits</span>
-            <span className="font-bold flex items-center">Budgets <ChevronRight className="w-3 h-3 ml-0.5" /></span>
+            <span>{budgetUtilizationPercent}% utilized (₹{totalBudgetUtilized.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })})</span>
+            <span className="font-bold flex items-center">Cost Centers <ChevronRight className="w-3 h-3 ml-0.5" /></span>
           </div>
         </div>
 
@@ -548,55 +608,67 @@ export const Analytics: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Annual Budget Utilisation Index</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {budgetData?.length > 0 ? budgetData.map((b: any, idx: number) => {
-              const rate = b.percentage || 0;
-              return (
-                <div key={idx} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs font-semibold">
-                    <span className="font-bold text-primary">{b.budget_code}</span>
-                    <span className="text-muted-foreground">
-                      ₹{b.utilized?.toLocaleString()} / ₹{b.allocated?.toLocaleString()} ({rate.toFixed(0)}%)
-                    </span>
-                  </div>
-                  <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden border border-border">
-                    <div
-                      className={`h-full transition-all duration-500 ${
-                        rate > 85 ? "bg-rose-500" : rate > 60 ? "bg-amber-500" : "bg-emerald-500"
-                      }`}
-                      style={{ width: `${Math.min(rate, 100)}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            }) : (
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-xs font-semibold">
-                    <span className="font-bold text-primary">IT-OPS-2026</span>
-                    <span className="text-muted-foreground">₹64,000 / ₹100,000 (64%)</span>
-                  </div>
-                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden border border-border">
-                    <div className="h-full bg-amber-500 w-[64%]" />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-xs font-semibold">
-                    <span className="font-bold text-primary">ENG-DEV-2026</span>
-                    <span className="text-muted-foreground">₹120,000 / ₹250,000 (48%)</span>
-                  </div>
-                  <div className="w-full h-2 bg-muted rounded-full border border-border">
-                    <div className="h-full bg-emerald-500 w-[48%]" />
-                  </div>
-                </div>
+        <div id="budget-utilization-section">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Annual Budget Utilisation & Remaining Envelopes</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">Allocated vs utilized vs remaining balance across departmental cost centers</p>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {budgetData?.length > 0 ? budgetData.map((b: any, idx: number) => {
+                const rate = b.percentage || 0;
+                return (
+                  <div key={idx} className="space-y-1.5 p-2 rounded-xl bg-card/60 border border-border/40">
+                    <div className="flex items-center justify-between text-xs font-semibold">
+                      <div>
+                        <span className="font-bold text-primary">{b.budget_code}</span>
+                        {b.name && <span className="text-[11px] text-muted-foreground ml-2 font-normal">({b.name})</span>}
+                      </div>
+                      <span className="text-muted-foreground text-[11px]">
+                        ₹{b.utilized?.toLocaleString()} / ₹{b.allocated?.toLocaleString()} ({rate.toFixed(1)}%)
+                      </span>
+                    </div>
+                    <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden border border-border">
+                      <div
+                        className={`h-full transition-all duration-500 ${
+                          rate > 85 ? "bg-rose-500" : rate > 60 ? "bg-amber-500" : "bg-emerald-500"
+                        }`}
+                        style={{ width: `${Math.min(rate, 100)}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <span>Utilized: ₹{Number(b.utilized || 0).toLocaleString()}</span>
+                      <span className="font-semibold text-emerald-500">Remaining: ₹{Number(b.available !== undefined ? b.available : (b.allocated - b.utilized)).toLocaleString()}</span>
+                    </div>
+                  </div>
+                );
+              }) : (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs font-semibold">
+                      <span className="font-bold text-primary">IT-OPS-2026</span>
+                      <span className="text-muted-foreground">₹64,000 / ₹100,000 (64%)</span>
+                    </div>
+                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden border border-border">
+                      <div className="h-full bg-amber-500 w-[64%]" />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs font-semibold">
+                      <span className="font-bold text-primary">ENG-DEV-2026</span>
+                      <span className="text-muted-foreground">₹120,000 / ₹250,000 (48%)</span>
+                    </div>
+                    <div className="w-full h-2 bg-muted rounded-full border border-border">
+                      <div className="h-full bg-emerald-500 w-[48%]" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

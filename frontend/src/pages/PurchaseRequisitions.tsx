@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { PurchaseRequisition } from "../types";
 import { Button, Input, Card, CardHeader, CardTitle, CardContent, Badge, StatusBadge, Skeleton, Dialog, HeroTimestamp, EmptyState } from "../components/ui";
-import { ClipboardList, Plus, Eye, Send, Check, X, Ban } from "lucide-react";
+import { ClipboardList, Plus, Eye, Send, Check, X, Ban, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { formatDate, getErrorMessage, isValidText } from "../utils/helpers";
 import { useAuth } from "../hooks/useAuth";
@@ -13,9 +13,16 @@ export const PurchaseRequisitions: React.FC = () => {
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingDraftId, setEditingDraftId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState("All");
   const [selectedPr, setSelectedPr] = useState<PurchaseRequisition | null>(null);
   const [comment, setComment] = useState("");
+
+  // Role permissions
+  const userRoleNames = (user?.roles || []).map((r: any) => (typeof r === "string" ? r : r.role_name));
+  const isAdminUser = userRoleNames.some(r => ["Admin", "SuperAdmin"].includes(r));
+  const isOwnerOrAdmin = (pr: PurchaseRequisition) =>
+    pr.requestor_id === user?.user_id || pr.requested_by === user?.user_id || isAdminUser;
 
   // Form states
   const [title, setTitle] = useState("");
@@ -45,6 +52,33 @@ export const PurchaseRequisitions: React.FC = () => {
     fetchPRs();
   }, []);
 
+  const handleOpenCreate = () => {
+    setEditingDraftId(null);
+    setTitle("");
+    setSpecification("");
+    setJustification("");
+    setIsCreateOpen(true);
+  };
+
+  const handleEditDraft = (pr: PurchaseRequisition) => {
+    setEditingDraftId(pr.pr_id);
+    setTitle(pr.title || "");
+    const spec = pr.items && pr.items.length > 0 ? (pr.items[0] as any).specification || "" : "";
+    setSpecification(spec);
+    setJustification(pr.justification || "");
+    setIsCreateOpen(true);
+  };
+
+  const handleDeleteDraft = async (prId: number) => {
+    try {
+      await api.delete(`/pr/${prId}`);
+      toast.success("Draft requisition deleted successfully!");
+      fetchPRs();
+    } catch (err: any) {
+      toast.error(getErrorMessage(err, "Failed to delete draft requisition."));
+    }
+  };
+
   const handleCreate = async (e: React.FormEvent, isDraft: boolean = false) => {
     e.preventDefault();
     if (!title || !justification) {
@@ -59,41 +93,65 @@ export const PurchaseRequisitions: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const res = await api.post("/pr", {
-        title,
-        justification: justification,
-        department_id: user?.department_id || null,
-        department_name: user?.department_name || null,
-        employee_type: user?.employee_type || null,
-        items: [
-          {
-            category: "Standard",
-            item_name: title,
-            specification: specification,
-            quantity: 1,
-            unit_price: 0
-          }
-        ]
-      });
+      if (editingDraftId) {
+        await api.put(`/pr/${editingDraftId}`, {
+          title,
+          justification,
+          items: [
+            {
+              category: "Standard",
+              item_name: title,
+              specification: specification,
+              quantity: 1,
+              unit_price: 0
+            }
+          ]
+        });
 
-      if (!isDraft) {
-        // Auto-submit the PR to trigger the workflow
-        if (res.data && res.data.pr_id) {
-          await api.post(`/pr/${res.data.pr_id}/submit`);
+        if (!isDraft) {
+          await api.post(`/pr/${editingDraftId}/submit`);
+          toast.success("My Requisition updated and submitted successfully!");
+        } else {
+          toast.success("Draft requisition updated successfully!");
         }
-        toast.success("My Requisition created and submitted successfully!");
       } else {
-        toast.success("My Requisition saved as draft!");
+        const res = await api.post("/pr", {
+          title,
+          justification: justification,
+          department_id: user?.department_id || null,
+          department_name: user?.department_name || null,
+          employee_type: user?.employee_type || null,
+          items: [
+            {
+              category: "Standard",
+              item_name: title,
+              specification: specification,
+              quantity: 1,
+              unit_price: 0
+            }
+          ]
+        });
+
+        if (!isDraft) {
+          // Auto-submit the PR to trigger the workflow
+          if (res.data && res.data.pr_id) {
+            await api.post(`/pr/${res.data.pr_id}/submit`);
+          }
+          toast.success("My Requisition created and submitted successfully!");
+        } else {
+          toast.success("My Requisition saved as draft!");
+        }
       }
 
       setIsCreateOpen(false);
+      setEditingDraftId(null);
       // Reset form
       setTitle("");
       setSpecification("");
       setJustification("");
       fetchPRs();
     } catch (err: any) {
-      toast.error(getErrorMessage(err, "Failed to create PR."));
+      toast.error(getErrorMessage(err, editingDraftId ? "Failed to update PR." : "Failed to create PR."));
     } finally {
       setIsSubmitting(false);
     }
@@ -203,7 +261,7 @@ export const PurchaseRequisitions: React.FC = () => {
         </div>
         <div className="flex items-center space-x-4">
           <HeroTimestamp />
-          <Button onClick={() => setIsCreateOpen(true)} className="font-bold text-xs uppercase tracking-wider gap-1.5 shadow-apple-glow">
+          <Button onClick={handleOpenCreate} className="font-bold text-xs uppercase tracking-wider gap-1.5 shadow-apple-glow">
             <Plus className="w-4 h-4" /> New Requisition
           </Button>
         </div>
@@ -246,7 +304,7 @@ export const PurchaseRequisitions: React.FC = () => {
               title="No Requisitions found."
               description="You have not submitted any purchase requests yet."
               actionLabel="Create new requisition"
-              onAction={() => setIsCreateOpen(true)}
+              onAction={handleOpenCreate}
             />
           ) : (
             <div className="overflow-x-auto">
@@ -281,20 +339,57 @@ export const PurchaseRequisitions: React.FC = () => {
                       <td className="p-4 text-xs text-muted-foreground whitespace-nowrap">{formatDate(pr.created_at)}</td>
                       <td className="p-4 whitespace-nowrap">
                         {pr.status === "Draft" ? (
-                          <Button size="sm" variant="outline" onClick={() => handleSubmit(pr.pr_id)} className="gap-1.5">
-                            <Send className="w-3.5 h-3.5" /> Submit
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            {isOwnerOrAdmin(pr) && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded shrink-0"
+                                title="Delete Draft Requisition"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (window.confirm("Are you sure you want to delete this draft requisition?")) {
+                                    handleDeleteDraft(pr.pr_id);
+                                  }
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {isOwnerOrAdmin(pr) && (
+                              <Button
+                                size="sm"
+                                variant="primary"
+                                onClick={() => handleEditDraft(pr)}
+                                className="gap-1.5 shadow-apple-sm"
+                              >
+                                Edit Draft
+                              </Button>
+                            )}
+                          </div>
                         ) : (
-                          <Button
-                            size="sm"
-                            variant={["Approved", "Completed", "Rejected", "Cancelled"].includes(pr.status) ? "view" : "primary"}
-                            onClick={() => setSelectedPr(pr)}
-                            className="gap-1.5 shadow-apple-sm"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            {["Approved", "Completed", "Rejected", "Cancelled"].includes(pr.status) ? "View" : 
-                             (pr.requestor_id === user?.user_id ? "View Details" : "Review")}
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            {(pr.status === "Returned for Modification" || pr.status === "Returned for Correction") && isOwnerOrAdmin(pr) && (
+                              <Button
+                                size="sm"
+                                variant="primary"
+                                onClick={() => handleEditDraft(pr)}
+                                className="gap-1.5 shadow-apple-sm"
+                              >
+                                Edit Draft
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant={["Approved", "Completed", "Rejected", "Cancelled"].includes(pr.status) ? "view" : "primary"}
+                              onClick={() => setSelectedPr(pr)}
+                              className="gap-1.5 shadow-apple-sm"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              {["Approved", "Completed", "Rejected", "Cancelled"].includes(pr.status) ? "View" : 
+                               (pr.requestor_id === user?.user_id ? "View Details" : "Review")}
+                            </Button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -306,8 +401,18 @@ export const PurchaseRequisitions: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Creation Modal */}
-      <Dialog isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Create My Requisition">
+      {/* Creation / Edit Modal */}
+      <Dialog
+        isOpen={isCreateOpen}
+        onClose={() => {
+          setIsCreateOpen(false);
+          setEditingDraftId(null);
+          setTitle("");
+          setSpecification("");
+          setJustification("");
+        }}
+        title={editingDraftId ? "Edit Requisition Draft" : "Create My Requisition"}
+      >
         <form onSubmit={(e) => handleCreate(e, false)} className="space-y-4">
           <Input
             id="title"
@@ -336,12 +441,24 @@ export const PurchaseRequisitions: React.FC = () => {
             />
           </div>
           <div className="flex justify-end space-x-2 pt-3">
-            <Button variant="close" type="button"  onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+            <Button
+              variant="close"
+              type="button"
+              onClick={() => {
+                setIsCreateOpen(false);
+                setEditingDraftId(null);
+                setTitle("");
+                setSpecification("");
+                setJustification("");
+              }}
+            >
+              Cancel
+            </Button>
             <Button type="button" variant="secondary" disabled={isSubmitting} onClick={(e) => handleCreate(e, true)}>
-              {isSubmitting ? "Saving..." : "Save as Draft"}
+              {isSubmitting ? "Saving..." : (editingDraftId ? "Save Draft Changes" : "Save as Draft")}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Submitting..." : "Submit Requisition"}
+              {isSubmitting ? "Submitting..." : (editingDraftId ? "Save & Submit" : "Submit Requisition")}
             </Button>
           </div>
         </form>
@@ -373,17 +490,19 @@ export const PurchaseRequisitions: React.FC = () => {
             {/* Actionable Sections (Hidden in View Mode) */}
             {(!["Approved", "Completed", "Cancelled", "Rejected"].includes(selectedPr.status)) && (
               <>
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    {selectedPr.requestor_id === user?.user_id || selectedPr.requested_by === user?.user_id ? "Reason for Cancellation *" : "Comments / Decision Notes"}
-                  </label>
-                  <textarea
-                    placeholder={selectedPr.requestor_id === user?.user_id || selectedPr.requested_by === user?.user_id ? "Provide a reason for canceling this request..." : "Include details explaining your decision (required if rejecting)"}
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring min-h-[80px]"
-                  />
-                </div>
+                {!(selectedPr.requestor_id === user?.user_id || selectedPr.requested_by === user?.user_id) && (
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Comments / Decision Notes
+                    </label>
+                    <textarea
+                      placeholder="Include details explaining your decision (required if rejecting)"
+                      value={comment}
+                      onChange={(e) => setComment(e.target.value)}
+                      className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring min-h-[80px]"
+                    />
+                  </div>
+                )}
 
                 {/* Delivery Verification Section */}
                 {purchaseOrders.filter(po => po.pr_id === selectedPr.pr_id).map(po => (
@@ -495,11 +614,7 @@ export const PurchaseRequisitions: React.FC = () => {
             <div className="flex justify-end space-x-2 pt-3 border-t border-border mt-2">
               <Button variant="close" onClick={() => setSelectedPr(null)}>Close</Button>
               {(!["Approved", "Completed", "Cancelled", "Rejected"].includes(selectedPr.status)) && (
-                selectedPr.requestor_id === user?.user_id || selectedPr.requested_by === user?.user_id ? (
-                  <Button variant="danger" disabled={isSubmitting} onClick={() => handleAction("cancel")} className="gap-1.5 font-bold">
-                    <Ban className="w-4 h-4" /> Cancel Request
-                  </Button>
-                ) : (
+                !(selectedPr.requestor_id === user?.user_id || selectedPr.requested_by === user?.user_id) && (
                   <>
                     <Button variant="danger" disabled={isSubmitting} onClick={() => handleAction("reject")} className="gap-1.5 font-bold">
                       <X className="w-4 h-4" /> Reject

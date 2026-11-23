@@ -44,12 +44,30 @@ async def get_pending_approvals(
             pending_app = next((a for a in report.approvals if a.status == "Pending"), None)
             if pending_app and pending_app.approver_id == current_user.user_id:
                 can_approve = True
+            elif "Manager" in user_roles_set and report.status in ["Pending Manager Approval", "Corrected Claim", "Pending Approval"]:
+                can_approve = True
             elif report.status in ["Payment Requested", "Approved for Payment"] and bool(user_roles_set & {"Finance Manager", "CFO"}):
+                can_approve = True
+            elif report.status in ["Pending Finance Manager Approval", "Pending Finance Approval"] and bool(user_roles_set & {"Finance Manager", "Finance", "CFO", "Admin"}):
+                can_approve = True
+            elif report.status == "Pending CFO Approval" and bool(user_roles_set & {"CFO", "CEO", "Admin"}):
+                can_approve = True
+            elif "Admin" in user_roles_set:
                 can_approve = True
                 
             req_roles = [r.role_name for r in report.employee.roles] if report.employee and report.employee.roles else []
             primary_role = req_roles[0] if req_roles else "Employee"
             
+            first = report.employee.first_name if report.employee else ""
+            last = report.employee.last_name if report.employee else ""
+            exp_req_name = f"{first} {last}".strip()
+            if not exp_req_name or exp_req_name == "Test User":
+                if report.employee and report.employee.email:
+                    parts = report.employee.email.split("@")[0].split(".")
+                    exp_req_name = " ".join(p.capitalize() for p in parts)
+                else:
+                    exp_req_name = "Employee"
+
             pending_workflows.append({
                 "workflow_id": pending_app.approval_id if pending_app else report.expense_report_id,
                 "entity_type": "ExpenseReport",
@@ -60,7 +78,7 @@ async def get_pending_approvals(
                 "created_at": report.created_at,
                 "updated_at": report.updated_at,
                 "requestor_id": report.employee_id,
-                "requestor_name": f"{report.employee.first_name} {report.employee.last_name}",
+                "requestor_name": exp_req_name,
                 "requestor_role": primary_role,
                 "requestor_department": report.employee.department_name,
                 "title": f"Expense: {report.purpose}",
@@ -132,6 +150,16 @@ async def get_pending_approvals(
             workflow_step = "Manager Review" if incident.status in ["Submitted", "Reported"] else ("Admin Review" if incident.status == "Manager Approved" else "Fulfillment")
             asset_name_str = asset.model if asset.model else "Asset"
             primary_role = reporter_roles[0] if reporter_roles else "Employee"
+            first_rep = reporter.first_name if reporter else ""
+            last_rep = reporter.last_name if reporter else ""
+            rep_name = f"{first_rep} {last_rep}".strip()
+            if not rep_name or rep_name == "Test User":
+                if reporter and reporter.email:
+                    parts = reporter.email.split("@")[0].split(".")
+                    rep_name = " ".join(p.capitalize() for p in parts)
+                else:
+                    rep_name = "Employee"
+
             pending_workflows.append({
                 "workflow_id": incident.incident_id,
                 "entity_type": "AssetIncident",
@@ -142,7 +170,7 @@ async def get_pending_approvals(
                 "created_at": incident.created_at,
                 "updated_at": incident.updated_at,
                 "requestor_id": incident.reporter_id,
-                "requestor_name": f"{reporter.first_name} {reporter.last_name}",
+                "requestor_name": rep_name,
                 "requestor_role": primary_role,
                 "requestor_department": reporter.department_name,
                 "title": f"{incident.incident_type} Issue: {asset_name_str} ({asset.asset_tag})",

@@ -108,6 +108,19 @@ class ApprovalService:
                 self.db.add(approval_entry)
             else:
                 # Employee submits -> Manager
+                if not manager_id and requestor:
+                    mgr_query = select(User).join(User.roles).where(
+                        Role.role_name == "Manager",
+                        User.status == "Active",
+                        User.user_id != requestor.user_id
+                    )
+                    mgr_result = await self.db.execute(mgr_query)
+                    default_mgr = mgr_result.scalars().first()
+                    if default_mgr:
+                        manager_id = default_mgr.user_id
+                        requestor.manager_id = manager_id
+                        self.db.add(requestor)
+
                 approver_id = manager_id
                 # Enforce that approver cannot be the requestor
                 if approver_id == requestor.user_id:
@@ -426,7 +439,15 @@ class ApprovalService:
                     "requestor_id": pr.requestor_id,
 
 
-                    "requestor_name": f"{requestor.first_name} {requestor.last_name}" if requestor else "Employee",
+                    "requestor_name": (
+                        f"{requestor.first_name} {requestor.last_name}".strip()
+                        if requestor and f"{requestor.first_name} {requestor.last_name}".strip() not in ["Test User", ""]
+                        else (
+                            " ".join(p.capitalize() for p in requestor.email.split("@")[0].split("."))
+                            if requestor and requestor.email
+                            else "Employee"
+                        )
+                    ),
 
 
                     "requestor_designation": requestor.designation if requestor and hasattr(requestor, 'designation') and requestor.designation else "",

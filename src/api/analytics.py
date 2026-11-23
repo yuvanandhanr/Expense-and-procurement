@@ -1,24 +1,39 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.dependency import get_db_session
-from src.auth.dependencies import RoleChecker
+from src.auth.dependencies import RoleChecker, get_current_user
+from src.models.auth import User
 from src.services.dashboard_service import DashboardService
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
-# RBAC protection: Only CEO, CFO, Finance, Finance Manager, Admin, or Procurement roles can view analytics
+# RBAC protection: Only CEO, CFO, Finance, Finance Manager, Admin, or Procurement roles can view global analytics
 rbac_dependency = Depends(RoleChecker(["CEO", "CFO", "Finance", "Finance Manager", "Admin", "Procurement"]))
 
 
 @router.get("/spend", dependencies=[rbac_dependency])
-@router.get("/spending", dependencies=[rbac_dependency])
-async def get_spend_analytics(timeframe: str = "all", db: AsyncSession = Depends(get_db_session)):
-    """
-    Retrieves global spending analytics aggregated by department, vendor, category, month, and fiscal year.
-    """
+async def get_spend_legacy(timeframe: str = "all", db: AsyncSession = Depends(get_db_session)):
     dashboard_service = DashboardService(db)
-    data = await dashboard_service.get_spend_analytics(timeframe=timeframe)
-    return data
+    return await dashboard_service.get_spend_analytics(timeframe=timeframe)
+
+
+@router.get("/spending")
+async def get_spend_analytics(
+    timeframe: str = "all",
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Retrieves spending analytics. Elevated roles see global metrics; employees see only their own expense data.
+    """
+    user_roles = {role.role_name for role in current_user.roles if role.status}
+    is_elevated = bool(user_roles & {"CEO", "CFO", "Finance", "Finance Manager", "Admin", "Procurement"})
+
+    dashboard_service = DashboardService(db)
+    if is_elevated:
+        return await dashboard_service.get_spend_analytics(timeframe=timeframe)
+    else:
+        return await dashboard_service.get_employee_spend_analytics(user_id=current_user.user_id, timeframe=timeframe)
 
 
 

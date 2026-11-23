@@ -1,3 +1,5 @@
+import { api } from "../services/api";
+
 export const formatDate = (dateString?: string | null): string => {
   if (!dateString) return "N/A";
   const d = new Date(dateString);
@@ -75,13 +77,11 @@ export const resolveImageUrl = (rawUrl?: string | null, fallbackId?: number | nu
 };
 
 export const downloadReceiptFile = async (receiptId: number, fileName: string = "receipt"): Promise<void> => {
-  const url = resolveImageUrl("", receiptId) + (resolveImageUrl("", receiptId).includes("?") ? "&" : "?") + "download=true";
   try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to download (${response.statusText})`);
-    }
-    const blob = await response.blob();
+    const response = await api.get(`/expenses/receipts/${receiptId}/image?download=true`, {
+      responseType: "blob",
+    });
+    const blob = response.data;
     const blobUrl = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = blobUrl;
@@ -91,7 +91,8 @@ export const downloadReceiptFile = async (receiptId: number, fileName: string = 
     document.body.removeChild(link);
     window.URL.revokeObjectURL(blobUrl);
   } catch (err) {
-    window.open(url, "_blank");
+    const fallbackUrl = resolveImageUrl("", receiptId) + (resolveImageUrl("", receiptId).includes("?") ? "&" : "?") + "download=true";
+    window.open(fallbackUrl, "_blank");
   }
 };
 

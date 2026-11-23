@@ -265,3 +265,289 @@ async def test_it_replace_incident(
     assert response.json()["status"] == "Waiting for Procurement"
     assert response.json()["linked_pr_id"] == 99
 
+
+@pytest.mark.anyio
+async def test_report_incident_as_draft(
+    authenticate_employee,
+    async_client: AsyncClient,
+    override_db: AsyncMock,
+    mock_asset
+):
+    mock_incident = AssetIncident(
+        incident_id=5,
+        asset_id=10,
+        reporter_id=1,
+        description="Keyboard key stuck",
+        incident_type="Malfunctioning",
+        status="Draft",
+        incident_date=date.today(),
+        asset=mock_asset
+    )
+
+    mock_asset_result = MagicMock()
+    mock_asset_result.scalar_one_or_none.return_value = mock_asset
+
+    mock_incident_result = MagicMock()
+    mock_incident_result.scalar_one.return_value = mock_incident
+    mock_incident_result.scalar_one_or_none.return_value = mock_incident
+
+    override_db.execute = AsyncMock(side_effect=[mock_asset_result, mock_incident_result])
+
+    response = await async_client.post(
+        "/api/v1/asset-incidents",
+        json={
+            "asset_id": 10,
+            "description": "Keyboard key stuck",
+            "incident_type": "Malfunctioning",
+            "is_draft": True
+        }
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    data = response.json()
+    assert data["status"] == "Draft"
+
+
+@pytest.mark.anyio
+async def test_edit_draft_incident_with_submit(
+    authenticate_employee,
+    async_client: AsyncClient,
+    override_db: AsyncMock,
+    mock_asset
+):
+    mock_incident = AssetIncident(
+        incident_id=6,
+        asset_id=10,
+        reporter_id=1,
+        description="Draft issue",
+        incident_type="Damaged",
+        status="Draft",
+        incident_date=date.today(),
+        asset=mock_asset
+    )
+
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = mock_incident
+
+    override_db.execute = AsyncMock(return_value=mock_result)
+
+    async def mock_refresh(instance):
+        instance.status = "Reported"
+
+    override_db.refresh = AsyncMock(side_effect=mock_refresh)
+
+    response = await async_client.put(
+        "/api/v1/asset-incidents/6",
+        json={
+            "description": "Updated issue ready for review",
+            "is_draft": False
+        }
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert mock_incident.status == "Reported"
+
+
+@pytest.mark.anyio
+async def test_submit_draft_incident_endpoint(
+    authenticate_employee,
+    async_client: AsyncClient,
+    override_db: AsyncMock,
+    mock_asset
+):
+    mock_incident = AssetIncident(
+        incident_id=7,
+        asset_id=10,
+        reporter_id=1,
+        description="Draft issue",
+        incident_type="Damaged",
+        status="Draft",
+        incident_date=date.today(),
+        asset=mock_asset
+    )
+
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = mock_incident
+
+    override_db.execute = AsyncMock(return_value=mock_result)
+
+    async def mock_refresh(instance):
+        instance.status = "Reported"
+
+    override_db.refresh = AsyncMock(side_effect=mock_refresh)
+
+    response = await async_client.post("/api/v1/asset-incidents/7/submit")
+    assert response.status_code == status.HTTP_200_OK
+    assert mock_incident.status == "Reported"
+
+
+@pytest.mark.anyio
+async def test_cannot_edit_submitted_incident(
+    authenticate_employee,
+    async_client: AsyncClient,
+    override_db: AsyncMock,
+    mock_asset
+):
+    mock_incident = AssetIncident(
+        incident_id=8,
+        asset_id=10,
+        reporter_id=1,
+        description="Submitted issue",
+        incident_type="Damaged",
+        status="Reported",
+        incident_date=date.today(),
+        asset=mock_asset
+    )
+
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = mock_incident
+    override_db.execute = AsyncMock(return_value=mock_result)
+
+    response = await async_client.put(
+        "/api/v1/asset-incidents/8",
+        json={"description": "Attempt to edit"}
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Incident reports cannot be edited once submitted" in response.json()["detail"]
+
+
+@pytest.mark.anyio
+async def test_delete_draft_incident(
+    authenticate_employee,
+    async_client: AsyncClient,
+    override_db: AsyncMock
+):
+    mock_incident = AssetIncident(
+        incident_id=9,
+        asset_id=10,
+        reporter_id=1,
+        description="Draft to delete",
+        incident_type="Damaged",
+        status="Draft"
+    )
+
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = mock_incident
+    override_db.execute = AsyncMock(return_value=mock_result)
+
+    response = await async_client.delete("/api/v1/asset-incidents/9")
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    override_db.delete.assert_awaited_once_with(mock_incident)
+
+
+@pytest.mark.anyio
+async def test_cannot_delete_submitted_incident(
+    authenticate_employee,
+    async_client: AsyncClient,
+    override_db: AsyncMock
+):
+    mock_incident = AssetIncident(
+        incident_id=10,
+        asset_id=10,
+        reporter_id=1,
+        description="Reported incident",
+        incident_type="Damaged",
+        status="Reported"
+    )
+
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = mock_incident
+    override_db.execute = AsyncMock(return_value=mock_result)
+
+    response = await async_client.delete("/api/v1/asset-incidents/10")
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Only draft incident reports can be deleted" in response.json()["detail"]
+
+
+@pytest.mark.anyio
+async def test_non_owner_cannot_delete_draft_incident(
+    authenticate_employee,
+    async_client: AsyncClient,
+    override_db: AsyncMock
+):
+    mock_incident = AssetIncident(
+        incident_id=11,
+        asset_id=10,
+        reporter_id=999,  # Different user
+        description="Other user draft",
+        incident_type="Damaged",
+        status="Draft"
+    )
+
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = mock_incident
+    override_db.execute = AsyncMock(return_value=mock_result)
+
+    response = await async_client.delete("/api/v1/asset-incidents/11")
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.anyio
+async def test_non_owner_cannot_view_draft_incident(
+    authenticate_employee,
+    async_client: AsyncClient,
+    override_db: AsyncMock
+):
+    mock_incident = AssetIncident(
+        incident_id=12,
+        asset_id=10,
+        reporter_id=999,  # Different user
+        description="Other user draft",
+        incident_type="Damaged",
+        status="Draft"
+    )
+
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = mock_incident
+    override_db.execute = AsyncMock(return_value=mock_result)
+
+    response = await async_client.get("/api/v1/asset-incidents/12")
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert "Draft incident reports are only visible to the owner" in response.json()["detail"]
+
+
+@pytest.mark.anyio
+async def test_list_incidents_filters_other_users_drafts(
+    authenticate_employee,
+    async_client: AsyncClient,
+    override_db: AsyncMock
+):
+    my_draft = AssetIncident(
+        incident_id=13,
+        asset_id=10,
+        reporter_id=1,  # current user
+        description="My draft",
+        incident_type="Damaged",
+        status="Draft"
+    )
+    other_draft = AssetIncident(
+        incident_id=14,
+        asset_id=10,
+        reporter_id=999,  # other user
+        description="Other draft",
+        incident_type="Damaged",
+        status="Draft"
+    )
+    other_reported = AssetIncident(
+        incident_id=15,
+        asset_id=10,
+        reporter_id=999,
+        description="Other reported",
+        incident_type="Damaged",
+        status="Reported"
+    )
+
+    mock_result = MagicMock()
+    mock_result.scalars.return_value.all.return_value = [my_draft, other_draft, other_reported]
+    override_db.execute = AsyncMock(return_value=mock_result)
+
+    response = await async_client.get("/api/v1/asset-incidents")
+    assert response.status_code == status.HTTP_200_OK
+    items = response.json()
+    incident_ids = [item["incident_id"] for item in items]
+    assert 13 in incident_ids
+    assert 14 not in incident_ids  # other user's draft excluded
+    assert 15 in incident_ids
+
+
+
