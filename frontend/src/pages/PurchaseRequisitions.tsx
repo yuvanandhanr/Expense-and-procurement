@@ -4,7 +4,7 @@ import { PurchaseRequisition } from "../types";
 import { Button, Input, Card, CardHeader, CardTitle, CardContent, Badge, StatusBadge, Skeleton, Dialog, HeroTimestamp, EmptyState } from "../components/ui";
 import { ClipboardList, Plus, Eye, Send, Check, X, Ban, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
-import { formatDate, getErrorMessage, isValidText } from "../utils/helpers";
+import { formatDate, getErrorMessage, isValidText, canViewAmount } from "../utils/helpers";
 import { useAuth } from "../hooks/useAuth";
 
 export const PurchaseRequisitions: React.FC = () => {
@@ -29,7 +29,7 @@ export const PurchaseRequisitions: React.FC = () => {
   const [specification, setSpecification] = useState("");
   const [justification, setJustification] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [physicalInspectionDone, setPhysicalInspectionDone] = useState(false);
+  const [physicalInspectionDone, setPhysicalInspectionDone] = useState(true);
   const [allocateAssetId, setAllocateAssetId] = useState("");
 
   const fetchPRs = async () => {
@@ -238,7 +238,7 @@ export const PurchaseRequisitions: React.FC = () => {
     }).length,
     Approved: prs.filter((pr) => pr.status === "Approved" || pr.status === "Completed").length,
     Rejected: prs.filter((pr) => pr.status === "Rejected" || pr.status === "Cancelled").length,
-    "Return for Correction": prs.filter((pr) => pr.status === "Returned for Correction").length,
+    "Return for Correction": prs.filter((pr) => pr.status === "Returned for Correction" || pr.status === "Returned for Modification" || pr.status === "Returned").length,
   };
 
   const filteredPrs = prs.filter((pr) => {
@@ -247,7 +247,7 @@ export const PurchaseRequisitions: React.FC = () => {
       const s = pr.status.toLowerCase();
       return s.includes("pending") || s === "submitted" || s === "under review";
     }
-    if (statusFilter === "Return for Correction") return pr.status === "Returned for Correction";
+    if (statusFilter === "Return for Correction") return pr.status === "Returned for Correction" || pr.status === "Returned for Modification" || pr.status === "Returned";
     return pr.status.toLowerCase() === statusFilter.toLowerCase();
   });
 
@@ -314,7 +314,7 @@ export const PurchaseRequisitions: React.FC = () => {
                     <th className="p-4 whitespace-nowrap">PR Number</th>
                     <th className="p-4 whitespace-nowrap">Requestor Name</th>
                     <th className="p-4">Title</th>
-                    <th className="p-4 whitespace-nowrap">Estimated Cost</th>
+                    {canViewAmount(user) && <th className="p-4 whitespace-nowrap">Estimated Cost</th>}
                     <th className="p-4 whitespace-nowrap">Priority</th>
                     <th className="p-4 whitespace-nowrap">Status</th>
                     <th className="p-4 whitespace-nowrap">Date Created</th>
@@ -327,7 +327,9 @@ export const PurchaseRequisitions: React.FC = () => {
                       <td className="p-4 font-bold text-xs tracking-wider text-primary whitespace-nowrap">{pr.pr_number}</td>
                       <td className="p-4 whitespace-nowrap">{pr.requestor_name || "Unknown"}</td>
                       <td className="p-4 font-semibold">{pr.title}</td>
-                      <td className="p-4 font-bold whitespace-nowrap">{pr.total_estimated_amount > 0 ? `₹${pr.total_estimated_amount?.toLocaleString()}` : "TBD"}</td>
+                      {canViewAmount(user) && (
+                        <td className="p-4 font-bold whitespace-nowrap">{pr.total_estimated_amount > 0 ? `₹${pr.total_estimated_amount?.toLocaleString()}` : "TBD"}</td>
+                      )}
                       <td className="p-4 whitespace-nowrap">
                         <Badge variant={pr.priority === "High" ? "error" : pr.priority === "Medium" ? "warning" : "neutral"}>
                           {pr.priority || "Standard"}
@@ -580,16 +582,16 @@ export const PurchaseRequisitions: React.FC = () => {
                     <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs space-y-1">
                       <span className="font-bold text-amber-600 block">Inventory Assessment Rule:</span>
                       <p className="text-muted-foreground">
-                        If available stock &gt; 5, allocate an existing asset to close this requisition. If stock &le; 5 or unavailable, you can push the requirement to Finance Manager to start vendor RFQ procurement.
+                        If available stock &gt; 4 (Case A), allocate an existing asset to assign it directly to the employee and complete this requisition. If stock &le; 4 or unavailable (Case B), prompt Admin whether to forward the procurement request to the Finance Manager.
                       </p>
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase">Option A: Allocate from Available Inventory (Stock &gt; 0)</label>
+                      <label className="text-xs font-semibold text-muted-foreground uppercase">Case A: Direct Inventory Allocation (Stock &gt; 4)</label>
                       <div className="flex gap-2">
                         <Input 
                           id="allocate-asset-id"
-                          placeholder="Enter Available Asset ID..." 
+                          placeholder="Enter Available Asset ID (optional)..." 
                           value={allocateAssetId}
                           onChange={(e) => setAllocateAssetId(e.target.value)}
                         />
@@ -600,10 +602,10 @@ export const PurchaseRequisitions: React.FC = () => {
                     </div>
 
                     <div className="pt-3 border-t border-border space-y-2">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase">Option B: Low Stock / No Stock (Stock &le; 5)</label>
-                      <p className="text-xs text-muted-foreground">Push this requirement to the Finance Manager to initiate RFQ and vendor quotation bidding.</p>
+                      <label className="text-xs font-semibold text-muted-foreground uppercase">Case B: Low / Unavailable Stock (Stock &le; 4)</label>
+                      <p className="text-xs text-muted-foreground">Forward procurement request to the Finance Manager to initiate RFQ and vendor quotation bidding.</p>
                       <Button onClick={() => handleAdminAction("procure")} variant="warning" className="w-full font-bold" disabled={isSubmitting}>
-                        Push to Finance Manager (Start RFQ Procurement)
+                        Forward to Finance Manager (Procurement)
                       </Button>
                     </div>
                   </div>

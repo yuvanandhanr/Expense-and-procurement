@@ -15,7 +15,9 @@ class PORepository(BaseRepository[PurchaseOrder]):
             select(self.model)
             .options(
                 selectinload(self.model.items),
-                selectinload(self.model.approvals)
+                selectinload(self.model.approvals),
+                selectinload(self.model.vendor),
+                selectinload(self.model.pr)
             )
             .offset(skip)
             .limit(limit)
@@ -29,7 +31,9 @@ class PORepository(BaseRepository[PurchaseOrder]):
             .where(self.model.po_id == entity_id)
             .options(
                 selectinload(self.model.items),
-                selectinload(self.model.approvals)
+                selectinload(self.model.approvals),
+                selectinload(self.model.vendor),
+                selectinload(self.model.pr)
             )
         )
         result = await self.session.execute(query)
@@ -46,7 +50,9 @@ class PORepository(BaseRepository[PurchaseOrder]):
             .where(self.model.vendor_id == vendor_id)
             .options(
                 selectinload(self.model.items),
-                selectinload(self.model.approvals)
+                selectinload(self.model.approvals),
+                selectinload(self.model.vendor),
+                selectinload(self.model.pr)
             )
         )
         result = await self.session.execute(query)
@@ -60,7 +66,9 @@ class PORepository(BaseRepository[PurchaseOrder]):
             .where(PurchaseRequisition.requestor_id == requestor_id)
             .options(
                 selectinload(self.model.items),
-                selectinload(self.model.approvals)
+                selectinload(self.model.approvals),
+                selectinload(self.model.vendor),
+                selectinload(self.model.pr)
             )
         )
         result = await self.session.execute(query)

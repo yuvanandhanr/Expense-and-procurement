@@ -19,6 +19,7 @@ from src.models.expense import ExpenseReport, Receipt
 from src.services.ocr import OCRService
 from src.api.auth import get_current_user
 from src.models.auth import User
+from src.auth.authorization import is_amount_visible
 from src.services.approval_service import ApprovalService
 
 router = APIRouter(prefix="/expenses", tags=["Employee Expenses"])
@@ -128,10 +129,17 @@ def _remove_uploaded_file(image_path: str) -> None:
         logger.exception("Unable to remove receipt file during cleanup")
 
 
-def _present_report(report: ExpenseReport) -> ExpenseReport:
+def _present_report(report: ExpenseReport, current_user: Optional[User] = None) -> ExpenseReport:
     """Keep pre-constraint legacy data from breaking read responses before migration runs."""
     if not report.justification or not report.justification.strip():
         report.justification = "Legacy report: description unavailable"
+    if current_user and not is_amount_visible(current_user):
+        report.total_amount = Decimal("0.00")
+        if getattr(report, "receipts", None):
+            for r in report.receipts:
+                r.verified_amount = Decimal("0.00")
+                r.tax = Decimal("0.00")
+                r.ocr_amount = Decimal("0.00")
     return report
 
 @router.get("", response_model=List[ExpenseReportResponse])
@@ -185,7 +193,7 @@ async def list_expenses(
             seen.add(r.expense_report_id)
             reports.append(r)
         
-    accessible_reports = [_present_report(report) for report in reports]
+    accessible_reports = [_present_report(report, current_user) for report in reports]
     
     # Priority sort: Items requiring approval come first, sorted by creation time (newest first)
     def _sort_key(report: ExpenseReport):
@@ -236,7 +244,7 @@ async def get_expense_report(
 ):
     repo = ExpenseRepository(db)
     report = await _get_accessible_report(repo, report_id, current_user)
-    return _present_report(report)
+    return _present_report(report, current_user)
 
 @router.post("/{report_id}/receipts/upload", response_model=List[ReceiptResponse])
 async def upload_receipts(

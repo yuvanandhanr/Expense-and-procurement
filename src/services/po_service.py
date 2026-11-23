@@ -30,6 +30,15 @@ class POService:
         return f"PO-{date_str}-{rand_str}"
 
     async def create_po(self, data: POCreate, user_id: int) -> PurchaseOrder:
+        # Prevent duplicate PO generation
+        if data.rfq_id:
+            from sqlalchemy import select
+            existing_po = (await self.db.execute(
+                select(PurchaseOrder).where(PurchaseOrder.rfq_id == data.rfq_id)
+            )).scalars().first()
+            if existing_po:
+                return existing_po
+
         # Check Contract status if provided
         # Let's see if any active contract exists
         # Business Rule: Expired contracts cannot generate Purchase Orders!

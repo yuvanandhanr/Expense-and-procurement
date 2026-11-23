@@ -3,6 +3,7 @@ from typing import List, Optional
 from datetime import timezone, datetime
 from decimal import Decimal
 from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.rfq import RequestForQuotation, RFQItem, RFQVendor
 from src.models.quotation import VendorQuotation, QuotationItem, QuotationComparison
@@ -60,9 +61,19 @@ class RFQService:
             )
             await self.rfq_item_repo.create(item)
 
-        # Invite vendors if provided
-        for vendor_id in (data.invited_vendor_ids or []):
-            await self.invite_vendor(rfq.rfq_id, vendor_id)
+        # Send the RFQ to all registered/eligible vendors
+        invited_ids = list(data.invited_vendor_ids or [])
+        if not invited_ids:
+            from src.models.vendor import Vendor
+            query_vendors = select(Vendor.vendor_id).where(Vendor.status == "Active", Vendor.blacklist_status == False)
+            active_vendors = (await self.db.execute(query_vendors)).scalars().all()
+            invited_ids = list(active_vendors)
+
+        for vendor_id in invited_ids:
+            try:
+                await self.invite_vendor(rfq.rfq_id, vendor_id)
+            except Exception:
+                pass
 
         return await self.rfq_repo.get_by_id(rfq.rfq_id)
 
@@ -254,34 +265,50 @@ class RFQService:
                 quote.status = "Rejected"
             await self.quote_repo.update(quote)
 
-        # Auto-generate Purchase Order
+        # Auto-generate Purchase Order with duplicate prevention
         from src.services.po_service import POService
         from src.schemas.purchase_order import POCreate, POItemCreate
+        from src.models.purchase_order import PurchaseOrder
         po_service = POService(self.db)
         
-        po_items = []
-        for item in selected_quote.items:
-            po_items.append(POItemCreate(
-                item_name=item.rfq_item.item_name if item.rfq_item else "Item",
-                specification=item.rfq_item.specification if item.rfq_item else None,
-                quantity=item.rfq_item.quantity if item.rfq_item else 1,
-                unit_price=item.unit_price
-            ))
-            
-        pr_dept_id = None
-        if rfq.pr_id:
-            pr = await self.pr_repo.get_by_id(rfq.pr_id)
-            if pr:
-                pr_dept_id = pr.department_id
-
-        po_data = POCreate(
-            vendor_id=selected_vendor_id,
-            rfq_id=rfq_id,
-            pr_id=rfq.pr_id,
-            department_id=pr_dept_id,
-            currency=selected_quote.currency,
-            items=po_items
+        existing_po_stmt = select(PurchaseOrder).where(
+            (PurchaseOrder.rfq_id == rfq_id) | 
+            (PurchaseOrder.pr_id == rfq.pr_id if rfq.pr_id else False)
         )
-        await po_service.create_po(po_data, user_id)
+        existing_po_res = await self.db.execute(existing_po_stmt)
+        existing_po = existing_po_res.scalars().first()
+
+        if not existing_po:
+            po_items = []
+            for item in selected_quote.items:
+                po_items.append(POItemCreate(
+                    item_name=item.rfq_item.item_name if item.rfq_item else "Item",
+                    specification=item.rfq_item.specification if item.rfq_item else None,
+                    quantity=item.rfq_item.quantity if item.rfq_item else 1,
+                    unit_price=item.unit_price
+                ))
+                
+            pr_dept_id = None
+            if rfq.pr_id:
+                pr = await self.pr_repo.get_by_id(rfq.pr_id)
+                if pr:
+                    pr_dept_id = pr.department_id
+
+            po_data = POCreate(
+                vendor_id=selected_vendor_id,
+                rfq_id=rfq_id,
+                pr_id=rfq.pr_id,
+                department_id=pr_dept_id,
+                currency=selected_quote.currency,
+                items=po_items
+            )
+            created_po = await po_service.create_po(po_data, user_id)
+            # Mark Issued so winning vendor and finance manager can view and fulfill immediately
+            created_po.status = "Issued"
+            await self.db.commit()
+        else:
+            existing_po.vendor_id = selected_vendor_id
+            existing_po.status = "Issued"
+            await self.db.commit()
 
         return await self.comparison_repo.get_by_id(comp.comparison_id)

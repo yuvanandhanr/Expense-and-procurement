@@ -258,7 +258,7 @@ export const MyAssets: React.FC = () => {
                   <table className="w-full text-left text-sm border-collapse">
                     <thead>
                       <tr className="border-b border-border bg-accent/40 text-xs font-bold text-muted-foreground uppercase">
-                        <th className="p-4">Asset Tag</th>
+                        <th className="p-4">Asset UID / Tag</th>
                         <th className="p-4">Asset Name</th>
                         <th className="p-4">Category</th>
                         <th className="p-4">Serial Number</th>
@@ -269,10 +269,10 @@ export const MyAssets: React.FC = () => {
                     <tbody className="divide-y divide-border">
                       {assets.map((a: any) => (
                         <tr key={a.asset_id} className="hover:bg-accent/20">
-                          <td className="p-4 font-bold text-xs tracking-wider text-primary">{a.serial_number || a.asset_code}</td>
+                          <td className="p-4 font-bold text-xs tracking-wider text-primary">{a.asset_tag || a.asset_code}</td>
                           <td className="p-4 font-semibold">{a.asset_name}</td>
                           <td className="p-4 text-xs text-muted-foreground">{a.category}</td>
-                          <td className="p-4 font-mono text-xs text-muted-foreground">{a.serial_number || a.asset_code || "N/A"}</td>
+                          <td className="p-4 font-mono text-xs text-muted-foreground">{a.serial_number || "N/A"}</td>
                           <td className="p-4">
                             <Badge variant={a.status === "Assigned" ? "success" : a.status === "Under Maintenance" ? "warning" : "neutral"}>
                               {a.status}

@@ -26,6 +26,16 @@ export const isValidText = (text?: string | null): boolean => {
   return /[a-zA-Z0-9]/.test(text);
 };
 
+export const canViewAmount = (user: any): boolean => {
+  if (!user) return false;
+  const roles: string[] = (user.roles || []).map((r: any) => 
+    typeof r === 'string' ? r : (r.role_name || r.name || '')
+  );
+  // Only Admin and Finance Manager can view amounts.
+  // Explicitly hidden from: Employee, Manager, Vendor, CFO, CEO.
+  return roles.some(r => r === 'Admin' || r === 'Finance Manager' || r === 'SuperAdmin');
+};
+
 export const isPdfReceipt = (receipt?: any, url?: string | null): boolean => {
   if (receipt?.is_pdf) return true;
   const fileName = (receipt?.file_name || "").toLowerCase();

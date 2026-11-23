@@ -37,6 +37,22 @@ class PurchaseOrder(Base):
     items: Mapped[List["PurchaseOrderItem"]] = relationship("PurchaseOrderItem", back_populates="po", cascade="all, delete-orphan")
     approvals: Mapped[List["POApproval"]] = relationship("POApproval", back_populates="po", cascade="all, delete-orphan")
 
+    @property
+    def pr_number(self) -> Optional[str]:
+        return self.pr.pr_number if self.pr else (f"PR-{self.pr_id}" if self.pr_id else None)
+
+    @property
+    def requisition_ref(self) -> Optional[str]:
+        return self.pr.pr_number if self.pr else (f"PR-{self.pr_id}" if self.pr_id else None)
+
+    @property
+    def vendor_name(self) -> Optional[str]:
+        return self.vendor.vendor_name if self.vendor else None
+
+    @property
+    def vendor_code(self) -> Optional[str]:
+        return self.vendor.vendor_code if self.vendor else None
+
 
 class PurchaseOrderItem(Base):
     __tablename__ = "purchase_order_items"

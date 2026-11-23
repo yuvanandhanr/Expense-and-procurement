@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../services/api";
 import { Card, CardHeader, CardTitle, CardContent, Skeleton, Badge, HeroTimestamp, StatusBadge, Button } from "../components/ui";
-import { formatDate } from "../utils/helpers";
+import { formatDate, canViewAmount } from "../utils/helpers";
 import { Bar, Doughnut, Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -47,7 +47,7 @@ export const Dashboard: React.FC = () => {
   const [timeframe, setTimeframe] = useState<"monthly" | "yearly" | "all">("monthly");
 
   const isApprover = hasRole("Manager") || hasRole("Finance") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin") || hasRole("CEO");
-  const isFinanceOrAdmin = hasRole("Finance") || hasRole("Finance Manager") || hasRole("CFO") || hasRole("Admin") || hasRole("CEO");
+  const isFinanceOrAdmin = canViewAmount(user);
 
   const fetchAllLiveData = useCallback(async (isInitial = false) => {
     if (isInitial) setLoading(true);
@@ -343,7 +343,7 @@ export const Dashboard: React.FC = () => {
               <div className="flex items-center gap-1.5">
                 <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
                 <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                  <IndianRupee className="w-4 h-4" />
+                  {isFinanceOrAdmin ? <IndianRupee className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
                 </div>
               </div>
             </div>
@@ -504,7 +504,9 @@ export const Dashboard: React.FC = () => {
                         <tr key={idx} className="hover:bg-muted/30 transition-colors">
                           <td className="py-3.5 px-5 font-bold text-primary whitespace-nowrap">{req.pr_number || req.id}</td>
                           <td className="py-3.5 px-5 font-medium">{req.title}</td>
-                          <td className="py-3.5 px-5 text-right font-mono font-semibold whitespace-nowrap">₹{(Number(req.total_estimated_amount) || Number(req.amount) || 0).toLocaleString()}</td>
+                          <td className="py-3.5 px-5 text-right font-mono font-semibold whitespace-nowrap">
+                            {isFinanceOrAdmin ? `₹${(Number(req.total_estimated_amount) || Number(req.amount) || 0).toLocaleString()}` : "—"}
+                          </td>
                           <td className="py-3.5 px-5 text-center whitespace-nowrap">
                             <StatusBadge status={req.status} />
                           </td>
@@ -551,7 +553,9 @@ export const Dashboard: React.FC = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-mono font-bold text-xs text-foreground">₹{(Number(exp.total_amount) || Number(exp.amount) || 0).toFixed(2)}</p>
+                        <p className="font-mono font-bold text-xs text-foreground">
+                          {isFinanceOrAdmin ? `₹${(Number(exp.total_amount) || Number(exp.amount) || 0).toFixed(2)}` : "—"}
+                        </p>
                         <div className="mt-1">
                           <StatusBadge status={exp.status} />
                         </div>

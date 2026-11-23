@@ -48,6 +48,8 @@ class RFQSchema(BaseModel):
     rfq_id: int
     rfq_number: str
     pr_id: Optional[int] = None
+    pr_number: Optional[str] = None
+    requisition_ref: Optional[str] = None
     title: str
     description: Optional[str] = None
     pr_description: Optional[str] = None

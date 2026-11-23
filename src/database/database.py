@@ -13,11 +13,11 @@ engine_kwargs = {
 
 if "sqlite" not in settings.DATABASE_URL.lower():
     engine_kwargs.update({
-        "pool_size": 20,            # Maintain up to 20 connections in pool
-        "max_overflow": 10,         # Allow temporary overflow up to 10 additional connections
-        "pool_timeout": 30,         # Timeout after 30s if all connections busy
+        "pool_size": 2,             # Conservative pool size for 15-connection Supabase pooler limit
+        "max_overflow": 1,          # Maximum 3 connections per instance
+        "pool_timeout": 30,         # Wait up to 30s before timing out
         "pool_pre_ping": True,      # Verify connection is alive before lease
-        "pool_recycle": 300,        # Recycle connection after 5 minutes
+        "pool_recycle": 60,         # Recycle connections every 60 seconds
     })
 
 # Initialize asynchronous engine targeting PostgreSQL (Supabase/local) or SQLite

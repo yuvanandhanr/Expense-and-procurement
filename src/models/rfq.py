@@ -43,6 +43,14 @@ class RequestForQuotation(Base):
     def pr_priority(self) -> Optional[str]:
         return self.pr.priority if self.pr else None
 
+    @property
+    def pr_number(self) -> Optional[str]:
+        return self.pr.pr_number if self.pr else (f"PR-{self.pr_id}" if self.pr_id else None)
+
+    @property
+    def requisition_ref(self) -> Optional[str]:
+        return self.pr.pr_number if self.pr else (f"PR-{self.pr_id}" if self.pr_id else None)
+
 
 class RFQItem(Base):
     __tablename__ = "rfq_items"

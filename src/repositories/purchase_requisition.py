@@ -107,6 +107,13 @@ class PRRepository(BaseRepository[PurchaseRequisition]):
         if "Procurement" in user_role_names:
             conditions.append(self.model.status.in_(["Approved", "Assigned to Procurement", "Procurement In Progress", "Completed"]))
 
+        # Vendor visibility: All published requisitions (approved / in procurement / published)
+        if any(r in user_role_names for r in ["Vendor Portal", "Vendor"]):
+            conditions.append(self.model.status.in_([
+                "Approved", "Pending RFQ", "Procurement Initiated", "In RFQ", 
+                "Published", "RFQ Created", "Quotation Received", "Assigned to Procurement", "Completed"
+            ]))
+
         # If manager, can see direct reports
         if "Manager" in user_role_names:
             manager_cond = (UserModel.manager_id == user.user_id) & (self.model.status != "Draft")

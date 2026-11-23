@@ -4,8 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # pyrefly: ignore [missing-import]
 from src.database.dependency import get_db_session
 from src.auth.dependencies import get_current_user, PermissionChecker
+from src.auth.authorization import is_amount_visible
 from src.models.auth import User
-from src.schemas.purchase_requisition import PRCreate, PRUpdate, PRSchema, PRAllocateInventoryRequest
+from src.schemas.purchase_requisition import PRCreate, PRUpdate, PRSchema, PRAllocateInventoryRequest, PRInventoryCheckResponse
+from src.schemas.approval import PRApproveRequest, PRRejectRequest, PRReturnRequest
 from src.services.pr_service import PRService
 
 router = APIRouter(prefix="/pr", tags=["Purchase Requisitions"])
@@ -45,6 +47,14 @@ async def check_pr_access(pr, current_user: User, db: AsyncSession) -> None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Procurement can only access fully approved requisitions."
+        )
+
+    if any(r in user_roles for r in ["Vendor Portal", "Vendor"]):
+        if pr.status in ("Approved", "Pending RFQ", "Procurement Initiated", "In RFQ", "Published", "RFQ Created", "Quotation Received", "Assigned to Procurement", "Completed"):
+            return
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vendors can only access published and approved requisitions."
         )
 
     from src.models.approval import ApprovalWorkflow, ApprovalStep, ApprovalHistory
@@ -95,8 +105,17 @@ async def list_prs(
 ):
     service = PRService(db)
     prs = await service.pr_repo.list_accessible_prs(current_user)
-        
-    return [pr for pr in prs if not (pr.status == "Draft" and pr.requestor_id != current_user.user_id)]
+    visible_prs = [pr for pr in prs if not (pr.status == "Draft" and pr.requestor_id != current_user.user_id)]
+    
+    # Hide monetary amounts if user is not Admin or Finance Manager
+    if not is_amount_visible(current_user):
+        for pr in visible_prs:
+            pr.total_estimated_amount = None
+            if getattr(pr, "items", None):
+                for item in pr.items:
+                    item.unit_price = None
+                    item.total_price = None
+    return visible_prs
 
 
 @router.get("/{id}", response_model=PRSchema)
@@ -111,6 +130,14 @@ async def get_pr(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Purchase Requisition not found")
 
     await check_pr_access(pr, current_user, db)
+    
+    # Hide monetary amounts if user is not Admin or Finance Manager
+    if not is_amount_visible(current_user):
+        pr.total_estimated_amount = None
+        if getattr(pr, "items", None):
+            for item in pr.items:
+                item.unit_price = None
+                item.total_price = None
     return pr
 
 
@@ -215,10 +242,30 @@ async def clone_pr(
     return await service.clone_pr(id, current_user.user_id)
 
 
+@router.get("/{id}/inventory-check", response_model=PRInventoryCheckResponse)
+async def check_pr_inventory(
+    id: int,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Checks asset inventory availability for requested items:
+    Case A: Stock > 4 (Direct allocation)
+    Case B: Stock <= 4 (Procurement request prompt for Finance Manager)
+    """
+    service = PRService(db)
+    pr = await service.pr_repo.get_by_id(id)
+    if not pr:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
+        
+    await check_pr_access(pr, current_user, db)
+    return await service.check_inventory(id)
+
+
 @router.post("/{id}/allocate-inventory", response_model=PRSchema)
 async def allocate_inventory(
     id: int,
-    data: PRAllocateInventoryRequest,
+    data: Optional[PRAllocateInventoryRequest] = None,
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
@@ -228,7 +275,8 @@ async def allocate_inventory(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PR not found")
         
     await check_pr_access(pr, current_user, db)
-    return await service.allocate_inventory(id, data.asset_id, current_user.user_id)
+    asset_id = data.asset_id if data else None
+    return await service.allocate_inventory(id, asset_id, current_user.user_id)
 
 
 @router.post("/{id}/initiate-procurement", response_model=PRSchema)
@@ -244,3 +292,55 @@ async def initiate_procurement(
         
     await check_pr_access(pr, current_user, db)
     return await service.initiate_procurement(id, current_user.user_id)
+
+
+@router.post("/{id}/approve", response_model=PRSchema)
+async def approve_pr_alias(
+    id: int,
+    data: PRApproveRequest,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    from src.services.approval_service import ApprovalService
+    from src.api.approvals import verify_approver_role
+    service = ApprovalService(db)
+    active_step = await service.get_active_step(id)
+    await verify_approver_role(active_step, current_user, db)
+    return await service.approve_step(
+        id,
+        current_user.user_id,
+        data.comments,
+        getattr(data, "physical_inspection_done", False),
+        getattr(data, "initiate_procurement", None),
+        getattr(data, "allocate_asset_id", None)
+    )
+
+
+@router.post("/{id}/reject", response_model=PRSchema)
+async def reject_pr_alias(
+    id: int,
+    data: PRRejectRequest,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    from src.services.approval_service import ApprovalService
+    from src.api.approvals import verify_approver_role
+    service = ApprovalService(db)
+    active_step = await service.get_active_step(id)
+    await verify_approver_role(active_step, current_user, db)
+    return await service.reject_step(id, current_user.user_id, data.comments)
+
+
+@router.post("/{id}/return", response_model=PRSchema)
+async def return_pr_alias(
+    id: int,
+    data: PRReturnRequest,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    from src.services.approval_service import ApprovalService
+    from src.api.approvals import verify_approver_role
+    service = ApprovalService(db)
+    active_step = await service.get_active_step(id)
+    await verify_approver_role(active_step, current_user, db)
+    return await service.return_step(id, current_user.user_id, data.comments)

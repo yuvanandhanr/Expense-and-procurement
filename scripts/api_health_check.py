@@ -2,7 +2,7 @@ import urllib.request
 import urllib.error
 import json
 
-BASE_URL = "http://127.0.0.1:8081"
+BASE_URL = "http://127.0.0.1:8000"
 
 def print_result(method, url, status_code, ok):
     icon = "✅" if ok else "❌"
