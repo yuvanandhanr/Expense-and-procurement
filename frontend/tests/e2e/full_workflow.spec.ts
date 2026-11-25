@@ -9,7 +9,7 @@ test.describe('Procure-to-Pay (P2P) Workflow', () => {
     // 1. Employee Login -> Create PR
     await page.goto('/login');
     await page.getByRole('button', { name: 'Rachel Foster' }).click();
-    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /My Dashboard|Good day/i })).toBeVisible({ timeout: 10000 });
     
     await page.getByRole('link', { name: 'My Requisitions' }).click();
     
@@ -17,8 +17,8 @@ test.describe('Procure-to-Pay (P2P) Workflow', () => {
     await page.getByRole('button', { name: 'New Requisition', exact: true }).click();
     const uniqueId = Date.now();
     const prTitle = `Q3 Office Server Upgrades ${uniqueId}`;
-    await page.getByLabel('Requisition Title').fill(prTitle);
-    await page.getByLabel('Estimated Cost (USD)').fill('10000');
+    await page.getByPlaceholder('e.g. MacBook Pro M3').fill(prTitle);
+    await page.getByPlaceholder('Provide context for approval and actual problem being solved...').fill('Server upgrades for infrastructure.');
     await page.getByRole('button', { name: 'Submit Requisition' }).click();
     
     // Wait for the PR to appear in the table
@@ -34,20 +34,21 @@ test.describe('Procure-to-Pay (P2P) Workflow', () => {
     await page.getByRole('button', { name: 'Alex Rivera' }).click();
     
     // Wait for login
-    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /My Dashboard|Good day/i })).toBeVisible({ timeout: 10000 });
     
-    await page.getByRole('link', { name: 'My Requisitions' }).click();
+    await page.getByRole('link', { name: 'Pending Approvals' }).click();
+    await page.getByRole('button', { name: 'Requisitions' }).click();
     
     const prRow = page.locator('tr', { hasText: prTitle }).first();
     await expect(prRow).toBeVisible({ timeout: 15000 });
-    await prRow.getByRole('button').first().click();
+    await prRow.getByRole('button', { name: /Review & Action|Review/i }).first().click();
     // Wait for modal to render
-    await expect(page.getByRole('heading', { name: /Review PR/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Review.*PR|Approve/i })).toBeVisible();
     
     // Evaluate click to bypass any Playwright pointer-event interception issues with the custom dialog
     const [response] = await Promise.all([
       page.waitForResponse(res => res.url().includes('/approve'), { timeout: 10000 }).catch(() => null),
-      page.getByRole('button', { name: 'Approve', exact: true }).click({ force: true })
+      page.getByRole('button', { name: /Confirm & Forward|Approve & Forward|Approve Requisition|Confirm Approval/i }).first().click({ force: true })
     ]);
     
     if (response) {
@@ -62,6 +63,7 @@ test.describe('Procure-to-Pay (P2P) Workflow', () => {
     // 3. Admin/Finance -> Convert PR to PO (Admin for this test)
     await page.goto('/login');
     await page.getByRole('button', { name: 'Alex Rivera' }).click();
+    await expect(page.getByRole('heading', { name: /My Dashboard|Good day/i })).toBeVisible({ timeout: 10000 });
     
     // In our system, converting to PO might be automatic on PR approval, or there might be a Purchase Orders page.
     // Let's assume PO is auto-generated or go to POs
@@ -74,36 +76,34 @@ test.describe('Procure-to-Pay (P2P) Workflow', () => {
     }
     
     // 4. Vendor Portal -> Upload vendor_invoice
-    await page.getByRole('link', { name: 'Vendor Invoices' }).click();
+    await page.getByRole('link', { name: /Vendor Invoices|Vendor Payments/i }).click();
+    await expect(page.getByRole('heading', { name: 'Vendor Invoices (3-Way Match)' })).toBeVisible({ timeout: 10000 });
     
     // We upload invoice using OCR dataset helper
     const invoiceDoc = getRandomTestImage('vendor_invoice');
     const invoicePath = getImagePath(invoiceDoc.file);
     console.log(`Testing Invoice OCR with ${invoiceDoc.file} - Expected Total: ${invoiceDoc.grand_total}`);
 
-    const invoiceFileInput = page.locator('input[type="file"]').first();
-    // Some implementations use a visible button that opens file chooser, others hide the input.
-    if (await invoiceFileInput.isVisible() || await invoiceFileInput.isHidden()) {
-      // In Invoices.tsx, the ID is invoice-upload
-      await page.locator('input#invoice-upload').setInputFiles(invoicePath);
-    }
+    await page.getByRole('button', { name: /Upload Invoice/i }).click();
+    await page.locator('input#invoice-upload').setInputFiles(invoicePath);
+    await page.getByRole('button', { name: /Submit Invoice/i }).click();
     
     // Wait for OCR
-    await expect(page.getByText(/upload.*OCR/i)).toBeVisible({ timeout: 60000 });
+    await expect(page.getByText(/Invoice uploaded/i)).toBeVisible({ timeout: 60000 });
     
     // Verify Invoice OCR (Total Amount, Invoice Number)
     // The invoice table should show the new invoice
     // Invoice number
     await expect(page.getByText(/INV-/).first()).toBeVisible();
     
-    // Format expected amount:
-    const expectedInvAmount = Number(invoiceDoc.grand_total).toLocaleString('en-US');
-    const exactInvFound = await page.getByText(`$${expectedInvAmount}`).first().isVisible();
+    // Format expected amount (support both ₹ and $):
+    const expectedInvAmount = Number(invoiceDoc.grand_total).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const exactInvFound = await page.getByText(new RegExp(expectedInvAmount.replace(/,/g, '[,]'))).first().isVisible();
     if (!exactInvFound) {
       console.log(`Note: OCR didn't extract exact amount ${expectedInvAmount}. This is expected.`);
-      await expect(page.locator('.border', { hasText: /OCR|Extracted/i }).first()).toBeVisible();
+      await expect(page.getByRole('button', { name: /Review 3-Way Match/i }).first()).toBeVisible();
     } else {
-      await expect(page.getByText(`$${expectedInvAmount}`).first()).toBeVisible();
+      await expect(page.getByText(new RegExp(expectedInvAmount.replace(/,/g, '[,]'))).first()).toBeVisible();
     }
 
     // 5. Admin -> Upload procurement_grn
@@ -126,8 +126,8 @@ test.describe('Procure-to-Pay (P2P) Workflow', () => {
     }
 
     // 6. Verify Procurement Dashboard aggregates correctly
-    await page.getByRole('link', { name: 'Dashboard', exact: true }).click();
-    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible();
+    await page.getByRole('link', { name: /My Dashboard|Dashboard/i }).first().click();
+    await expect(page.getByRole('heading', { name: /My Dashboard|Good day/i })).toBeVisible();
     
     // We expect 3-Way Match discrepancy/match status to be updated, or generally data integrity
     await expect(page.getByText('Pending', { exact: false }).first()).toBeVisible();

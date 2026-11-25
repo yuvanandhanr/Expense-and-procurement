@@ -610,7 +610,7 @@ export const Approvals: React.FC = () => {
           setAdminResolution("");
           setAdminComments("");
         }}
-        title={`${actionType === "approve" ? "Approve" : actionType === "reject" ? "Reject" : actionType === "return" ? "Return for Correction" : actionType === "complete_repair" ? "Complete Repair" : actionType === "assign_replacement" ? "Assign Replacement" : "Trigger Procurement"} ${selectedWorkflow?.entity_type} #${selectedWorkflow?.entity_id}`}
+        title={`${actionType === "approve" ? "Review & Approve" : actionType === "reject" ? "Reject" : actionType === "return" ? "Return for Correction" : actionType === "complete_repair" ? "Complete Repair" : actionType === "assign_replacement" ? "Assign Replacement" : "Trigger Procurement"} ${selectedWorkflow?.entity_type === "PurchaseRequisition" ? "PR" : selectedWorkflow?.entity_type} #${selectedWorkflow?.entity_id}`}
       >
         <div className="space-y-4">
           

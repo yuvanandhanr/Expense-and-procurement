@@ -56,7 +56,7 @@ export const Assets: React.FC = () => {
   // Add Asset State
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
   const [editingAssetId, setEditingAssetId] = useState<number | null>(null);
-  const [newAsset, setNewAsset] = useState({ asset_tag: "", name: "", main_category: "", sub_category: "", cost: "", status: "Unassigned" });
+  const [newAsset, setNewAsset] = useState({ asset_tag: "", name: "", main_category: "", sub_category: "", cost: "", status: "Available" });
 
   const MAIN_CATEGORIES = [
     "All",
@@ -147,7 +147,7 @@ export const Assets: React.FC = () => {
   };
 
   const openAddModal = () => {
-    setNewAsset({ asset_tag: "", name: "", main_category: "", sub_category: "", cost: "", status: "Unassigned" });
+    setNewAsset({ asset_tag: "", name: "", main_category: "", sub_category: "", cost: "", status: "Available" });
     setEditingAssetId(null);
     setIsAssetModalOpen(true);
   }
@@ -174,7 +174,7 @@ export const Assets: React.FC = () => {
       main_category: mainCat,
       sub_category: subCat,
       cost: asset.cost?.toString() || "", 
-      status: asset.status || "Unassigned" 
+      status: (asset.status === "Unassigned" ? "Available" : asset.status) || "Available" 
     });
     setEditingAssetId(asset.asset_id);
     setIsAssetModalOpen(true);
@@ -454,12 +454,12 @@ export const Assets: React.FC = () => {
                             <Badge 
                               variant={
                                 ["Damaged", "Reported", "Under Maintenance", "Disposed", "Lost", "Out of Service"].includes(a.status) ? "error" : 
-                                a.status === "Active" || a.status === "Unassigned" ? "success" : 
+                                a.status === "Active" || a.status === "Unassigned" || a.status === "Available" ? "success" : 
                                 a.status === "Assigned" ? "warning" : 
                                 "neutral"
                               }
                             >
-                              {a.status}
+                              {(a.status === "Unassigned" || a.status === "Available") ? "Available" : a.status}
                             </Badge>
                           </td>
                           {isAdmin && (
@@ -538,8 +538,8 @@ export const Assets: React.FC = () => {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Status</label>
-            <Select value={newAsset.status} onChange={e => setNewAsset({ ...newAsset, status: e.target.value })}>
-              <option value="Unassigned">Unassigned</option>
+            <Select value={newAsset.status === "Unassigned" ? "Available" : newAsset.status} onChange={e => setNewAsset({ ...newAsset, status: e.target.value })}>
+              <option value="Available">Available</option>
               <option value="Out of Service">Out of Service</option>
               <option value="Retired">Retired</option>
             </Select>

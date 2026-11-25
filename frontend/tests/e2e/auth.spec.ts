@@ -13,7 +13,7 @@ test.describe('Authentication Flow', () => {
     await employeeLoginBtn.click();
 
     // Wait for successful redirection to Dashboard
-    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /My Dashboard|Good day/i })).toBeVisible({ timeout: 10000 });
 
     // Verify the URL is not /login
     expect(page.url()).not.toContain('/login');
@@ -25,6 +25,6 @@ test.describe('Authentication Flow', () => {
     const adminLoginBtn = page.getByRole('button', { name: 'Alex Rivera' });
     await adminLoginBtn.click();
 
-    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /My Dashboard|Good day/i })).toBeVisible({ timeout: 10000 });
   });
 });

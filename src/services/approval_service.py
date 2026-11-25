@@ -333,6 +333,11 @@ class ApprovalService:
                     can_approve = True
                 elif active_step.approver_id is None and active_step.approver_role_id in user_role_ids:
                     can_approve = True
+                elif is_admin:
+                    can_approve = True
+
+            if pr.requestor_id == user.user_id:
+                can_approve = False
 
             wf_hist = history_by_wf.get(workflow.workflow_id, [])
 
@@ -344,9 +349,10 @@ class ApprovalService:
 
 
             
-
-
-            should_include = can_approve or user_was_past_approver or is_manager_of_requestor
+            if pr.requestor_id == user.user_id:
+                should_include = False
+            else:
+                should_include = can_approve or user_was_past_approver or is_manager_of_requestor or is_admin
 
 
             

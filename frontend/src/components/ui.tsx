@@ -207,6 +207,18 @@ export const StatusBadge: React.FC<{ status: string; className?: string; pulse?:
     );
   }
 
+  // Available / Unassigned -> display as Available in green
+  if (s === "available" || s === "unassigned") {
+    return (
+      <span
+        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-tight whitespace-nowrap bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 shadow-apple-sm ${className}`}
+      >
+        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+        <span>Available</span>
+      </span>
+    );
+  }
+
   // Approved / Completed / Active / Paid / Verified / Closed
   if (s === "approved" || s === "completed" || s === "active" || s === "paid" || s === "success" || s === "verified" || s === "closed") {
     return (

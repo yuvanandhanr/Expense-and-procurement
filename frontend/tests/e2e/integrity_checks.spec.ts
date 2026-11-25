@@ -5,7 +5,7 @@ test.describe('Data Integrity Checks', () => {
     // Log in as Admin for full access to these modules
     await page.goto('/login');
     await page.getByRole('button', { name: 'Alex Rivera' }).click();
-    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /My Dashboard|Good day/i })).toBeVisible({ timeout: 10000 });
   });
 
   test('Navigate Global Search and verify propagation without duplicates', async ({ page }) => {

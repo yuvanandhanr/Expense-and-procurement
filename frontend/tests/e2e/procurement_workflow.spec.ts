@@ -5,7 +5,7 @@ test.describe('Procurement Workflow', () => {
     // Log in as Employee
     await page.goto('/login');
     await page.getByRole('button', { name: 'Rachel Foster' }).click();
-    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /My Dashboard|Good day/i })).toBeVisible({ timeout: 10000 });
 
     // Navigate to PRs
     await page.getByRole('link', { name: 'My Requisitions' }).click();
@@ -15,11 +15,12 @@ test.describe('Procurement Workflow', () => {
     await page.getByRole('button', { name: 'New Requisition', exact: true }).click();
     
     // Fill form
-    await page.getByLabel('Requisition Title').fill('MacBook Pro M3 Replacement');
-    await page.getByLabel('Estimated Cost (USD)').fill('1500');
+    const prTitle = `MacBook Pro M3 Replacement ${Date.now()}`;
+    await page.getByPlaceholder('e.g. MacBook Pro M3').fill(prTitle);
+    await page.getByPlaceholder('Provide context for approval and actual problem being solved...').fill('Replacement laptop for development work.');
     await page.getByRole('button', { name: 'Submit Requisition' }).click();
 
     // Verify it appears
-    await expect(page.getByText('MacBook Pro M3 Replacement').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(prTitle).first()).toBeVisible({ timeout: 10000 });
   });
 });

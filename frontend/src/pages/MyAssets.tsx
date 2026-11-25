@@ -185,12 +185,11 @@ export const MyAssets: React.FC = () => {
     return s === "resolved / completed" || s === "completed" || s === "closed" || s === "resolved";
   };
 
-  const userFilteredIncidents = incidents.filter((i: any) => {
-    if (i.status === "Draft" && user && i.reporter_id && i.reporter_id !== user.user_id) {
-      return false;
-    }
-    return true;
-  });
+  // Strict personal filtering: Every user on My Assets sees only their own reported incidents
+  const userFilteredIncidents = incidents.filter((i: any) => !user || Number(i.reporter_id) === Number(user.user_id));
+
+  // Strict personal filtering: Every user on My Assets sees only their own assigned assets
+  const userFilteredAssets = assets.filter((a: any) => !user || !a.assigned_employee_id || Number(a.assigned_employee_id) === Number(user.user_id));
 
   const subTabCounts: Record<string, number> = {
     All: userFilteredIncidents.length,
@@ -251,7 +250,7 @@ export const MyAssets: React.FC = () => {
                   <Skeleton className="h-8 w-full" />
                   <Skeleton className="h-8 w-full" />
                 </div>
-              ) : assets.length === 0 ? (
+              ) : userFilteredAssets.length === 0 ? (
                 <EmptyState title="No assets assigned to you yet." description="Assets assigned to you by administrators will appear here." />
               ) : (
                 <div className="overflow-x-auto">
@@ -267,7 +266,7 @@ export const MyAssets: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {assets.map((a: any) => (
+                      {userFilteredAssets.map((a: any) => (
                         <tr key={a.asset_id} className="hover:bg-accent/20">
                           <td className="p-4 font-bold text-xs tracking-wider text-primary">{a.asset_tag || a.asset_code}</td>
                           <td className="p-4 font-semibold">{a.asset_name}</td>

@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 
 export interface OCRGroundTruth {
     file: string;
@@ -14,7 +15,8 @@ export interface OCRGroundTruth {
     ref_no: string;
 }
 
-const OCR_DATASET_PATH = process.env.OCR_DATASET_PATH || 'C:\\Yuvan\\Expense and procurement\\document_ocr_dataset_v2';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const OCR_DATASET_PATH = process.env.OCR_DATASET_PATH || path.resolve(__dirname, '../../../test-dataset');
 const GROUND_TRUTH_FILE = path.join(OCR_DATASET_PATH, 'ground_truth.csv');
 
 let cachedGroundTruth: OCRGroundTruth[] | null = null;
@@ -58,5 +60,18 @@ export function getRandomTestImage(category: 'reimbursement' | 'vendor_invoice' 
 }
 
 export function getImagePath(fileRelativePath: string): string {
-    return path.join(OCR_DATASET_PATH, 'images', fileRelativePath);
+    const withImages = path.join(OCR_DATASET_PATH, 'images', fileRelativePath);
+    const sourcePath = fs.existsSync(withImages) ? withImages : path.join(OCR_DATASET_PATH, fileRelativePath);
+
+    // Create a copy with unique trailing bytes to prevent duplicate content_hash rejection in repeated test runs
+    const tempDir = path.join(OCR_DATASET_PATH, '.temp');
+    if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+    }
+    const ext = path.extname(sourcePath);
+    const basename = path.basename(sourcePath, ext);
+    const uniquePath = path.join(tempDir, `${basename}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}${ext}`);
+    fs.copyFileSync(sourcePath, uniquePath);
+    fs.appendFileSync(uniquePath, Buffer.from(`\n# test_run_${Date.now()}_${Math.random()}`));
+    return uniquePath;
 }

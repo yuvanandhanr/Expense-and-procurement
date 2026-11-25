@@ -128,6 +128,8 @@ Desktop.ini
 # Local application configurations and logs
 logs/
 *.log
+uploads/
+.temp/
 
 # Node.js / frontend dependencies and build artifacts
 node_modules/

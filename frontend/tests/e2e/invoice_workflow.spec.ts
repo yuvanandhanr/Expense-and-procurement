@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 
 test.describe('Vendor Invoice OCR and Data Integrity Workflow', () => {
-  const datasetPath = process.env.OCR_DATASET_PATH || 'C:\\Yuvan\\Expense and procurement\\document_ocr_dataset_v2';
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const datasetPath = process.env.OCR_DATASET_PATH || path.resolve(__dirname, '../../test-dataset');
   
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
@@ -17,7 +19,7 @@ test.describe('Vendor Invoice OCR and Data Integrity Workflow', () => {
     // 1. Admin/Finance Login
     await page.goto('/');
     await page.getByRole('button', { name: 'Alex Rivera' }).click();
-    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /My Dashboard|Good day/i })).toBeVisible({ timeout: 10000 });
     
     // Check initial dashboard invoice count/amount if possible
     
@@ -49,7 +51,7 @@ test.describe('Vendor Invoice OCR and Data Integrity Workflow', () => {
     
     // 3. Verify in Invoices Page
     const invoicesResponsePromise = page.waitForResponse(response => response.url().includes('/api/v1/invoices') && response.status() === 200);
-    await page.getByRole('link', { name: 'Vendor Invoices' }).click();
+    await page.getByRole('link', { name: /Vendor Invoices|Vendor Payments/i }).click();
     await expect(page.getByRole('heading', { name: 'Vendor Invoices (3-Way Match)' })).toBeVisible();
     await invoicesResponsePromise;
     
@@ -58,13 +60,13 @@ test.describe('Vendor Invoice OCR and Data Integrity Workflow', () => {
     
     // 4. Check Data Integrity
     // E.g., The OCR extracted amount should match what is shown in the dashboard or invoice list
-    const amountStr = `$${Number(invoice.grand_total).toLocaleString('en-US')}`;
+    const amountNum = Number(invoice.grand_total).toLocaleString('en-US');
     const row = page.locator('table tbody tr').filter({ hasText: invoice.invoice_number });
-    await expect(row.getByText(amountStr)).toBeVisible();
+    await expect(row.getByText(new RegExp(amountNum))).toBeVisible();
     
     // Verify Dashboard Data Integrity
-    await page.getByRole('link', { name: 'Dashboard', exact: true }).click();
-    await expect(page.getByRole('heading', { name: /Good day/i })).toBeVisible();
+    await page.getByRole('link', { name: /Dashboard|My Dashboard/i }).first().click();
+    await expect(page.getByRole('heading', { name: /My Dashboard|Good day/i })).toBeVisible();
     
     // Ensure the dashboard reflects the updated data (you could check for specific numbers or charts)
     // For now we just ensure no errors and it loads correctly

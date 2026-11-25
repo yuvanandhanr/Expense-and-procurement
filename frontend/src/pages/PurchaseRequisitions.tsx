@@ -229,19 +229,22 @@ export const PurchaseRequisitions: React.FC = () => {
     return <StatusBadge status={status} />;
   };
 
+  // Strict personal filtering: Every user on My Requisitions sees only their own requests
+  const userFilteredPrs = prs.filter((pr: any) => !user || Number(pr.requestor_id) === Number(user.user_id));
+
   const subTabCounts: Record<string, number> = {
-    All: prs.length,
-    Draft: prs.filter((pr) => pr.status === "Draft").length,
-    Submitted: prs.filter((pr) => {
+    All: userFilteredPrs.length,
+    Draft: userFilteredPrs.filter((pr) => pr.status === "Draft").length,
+    Submitted: userFilteredPrs.filter((pr) => {
       const s = pr.status.toLowerCase();
       return s.includes("pending") || s === "submitted" || s === "under review";
     }).length,
-    Approved: prs.filter((pr) => pr.status === "Approved" || pr.status === "Completed").length,
-    Rejected: prs.filter((pr) => pr.status === "Rejected" || pr.status === "Cancelled").length,
-    "Return for Correction": prs.filter((pr) => pr.status === "Returned for Correction" || pr.status === "Returned for Modification" || pr.status === "Returned").length,
+    Approved: userFilteredPrs.filter((pr) => pr.status === "Approved" || pr.status === "Completed").length,
+    Rejected: userFilteredPrs.filter((pr) => pr.status === "Rejected" || pr.status === "Cancelled").length,
+    "Return for Correction": userFilteredPrs.filter((pr) => pr.status === "Returned for Correction" || pr.status === "Returned for Modification" || pr.status === "Returned").length,
   };
 
-  const filteredPrs = prs.filter((pr) => {
+  const filteredPrs = userFilteredPrs.filter((pr) => {
     if (statusFilter === "All") return true;
     if (statusFilter === "Submitted") {
       const s = pr.status.toLowerCase();

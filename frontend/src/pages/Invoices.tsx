@@ -70,13 +70,15 @@ export const Invoices: React.FC = () => {
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPO || !uploadFile) {
-      toast.error("Please select a PO and choose a file.");
+    if (!uploadFile) {
+      toast.error("Please choose an invoice file.");
       return;
     }
 
     const formData = new FormData();
-    formData.append("po_id", selectedPO);
+    if (selectedPO) {
+      formData.append("po_id", selectedPO);
+    }
     formData.append("file", uploadFile);
 
     setIsSubmitting(true);
@@ -221,6 +223,7 @@ export const Invoices: React.FC = () => {
           <div>
             <label className="block text-sm font-medium mb-1">Invoice Document</label>
             <input
+              id="invoice-upload"
               type="file"
               accept="image/*,.pdf"
               className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"

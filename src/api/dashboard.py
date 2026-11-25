@@ -43,7 +43,7 @@ async def get_dashboard(
     # inject debug
     data["debug_active_roles"] = active_roles
 
-    # Mask amounts for non-Finance / non-Admin roles
+    # Mask company-wide financial metrics for non-management roles
     if not is_amount_visible(current_user):
         widgets = data.get("widgets", {})
         if "financial_cadence" in widgets:
@@ -51,18 +51,6 @@ async def get_dashboard(
         for k in ["department_spend", "department_monthly_spend", "department_yearly_spend", "budget_utilization", "monthly_procurement", "employee_reimbursements", "vendor_invoices", "procurement_metrics"]:
             if k in widgets:
                 widgets[k] = [] if isinstance(widgets[k], list) else {}
-        if "my_requisitions" in widgets and isinstance(widgets["my_requisitions"], list):
-            for pr in widgets["my_requisitions"]:
-                if isinstance(pr, dict):
-                    pr["total_estimated_amount"] = None
-        if "recent_expenses" in widgets and isinstance(widgets["recent_expenses"], list):
-            for exp in widgets["recent_expenses"]:
-                if isinstance(exp, dict):
-                    exp["amount"] = None
-                    exp["total_amount"] = None
-        if "my_reimbursements" in widgets and isinstance(widgets["my_reimbursements"], dict):
-            widgets["my_reimbursements"]["total_amount"] = 0
-            widgets["my_reimbursements"]["total_reimbursed"] = 0
         if "purchase_orders" in widgets and isinstance(widgets["purchase_orders"], dict):
             widgets["purchase_orders"]["total_spend"] = 0
 

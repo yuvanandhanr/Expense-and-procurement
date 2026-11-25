@@ -109,6 +109,7 @@ async def list_prs(
     
     # Hide monetary amounts if user is not Admin or Finance Manager
     if not is_amount_visible(current_user):
+        db.expunge_all()
         for pr in visible_prs:
             pr.total_estimated_amount = None
             if getattr(pr, "items", None):
@@ -133,6 +134,7 @@ async def get_pr(
     
     # Hide monetary amounts if user is not Admin or Finance Manager
     if not is_amount_visible(current_user):
+        db.expunge(pr)
         pr.total_estimated_amount = None
         if getattr(pr, "items", None):
             for item in pr.items:

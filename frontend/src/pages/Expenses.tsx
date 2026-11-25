@@ -235,6 +235,7 @@ const Expenses: React.FC = () => {
       try {
         const res = await api.post("/expenses", payload);
         const reportId = res.data.expense_report_id;
+        queryClient.setQueryData(["expenses"], (old: any) => [res.data, ...(old || [])]);
         if (isDraft) {
           toast.success("Reimbursement saved as draft!");
           setSelectedReportId(null);
@@ -244,7 +245,7 @@ const Expenses: React.FC = () => {
         }
         setIsCreateOpen(false);
         setNewReport({ purpose: "", submission_date: new Date().toISOString().slice(0, 10), department_id: "", cost_center_id: "", project_code: "", currency: "INR", justification: "" });
-        queryClient.invalidateQueries({ queryKey: ["expenses"] });
+        await queryClient.invalidateQueries({ queryKey: ["expenses"] });
       } catch (err: any) {
         toast.error(err.response?.data?.detail || "Failed to process expense report");
       }
@@ -293,17 +294,19 @@ const Expenses: React.FC = () => {
   const isManager = hasRole("Manager");
   const isFinance = hasRole("Finance") || hasRole("Finance Manager");
   const isManagerOrAdmin = hasRole("Admin") || isManager || isFinance || hasRole("CFO");
-  const isOwner = (report: any) => user?.user_id === report.employee_id;
+  const isOwner = (report: any) => !user?.user_id || !report?.employee_id || Number(user.user_id) === Number(report.employee_id);
+
+  // Strict personal filtering: Every user on My Reimbursements sees only their own requests & claims
+  const userFilteredExpenses = expenses.filter((r: any) => !user || Number(r.employee_id) === Number(user.user_id));
 
   // Summary Metrics
-  const summary = expenses.reduce((acc, r) => {
+  const summary = userFilteredExpenses.reduce((acc, r) => {
     acc[r.status] = (acc[r.status] || 0) + 1;
     if (r.status === "Approved" || r.status === "Payment Requested" || r.status === "Finance Verified") {
       acc.totalReimbursed += Number(r.total_amount || 0);
     }
     return acc;
   }, { totalReimbursed: 0 } as Record<string, number>);
-
 
   const getStatusBadge = (status: string) => {
     return <StatusBadge status={status} />;
@@ -313,10 +316,6 @@ const Expenses: React.FC = () => {
     const s = (status || "").toLowerCase();
     return s.includes("pending") || s === "submitted" || s === "corrected claim" || s === "payment requested" || s === "finance verified";
   };
-
-  const userFilteredExpenses = !isManagerOrAdmin
-    ? expenses.filter((r: any) => !user || r.employee_id === user.user_id)
-    : expenses;
 
   const subTabCounts: Record<string, number> = {
     All: userFilteredExpenses.length,
@@ -367,16 +366,14 @@ const Expenses: React.FC = () => {
                 setSearchParams(nextParams, { replace: true });
               }
             }}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
-              (statusFilter === status || (status === "Pending" && statusFilter === "Submitted"))
-                ? "bg-primary text-primary-foreground shadow-sm font-bold"
-                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-            }`}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${(statusFilter === status || (status === "Pending" && statusFilter === "Submitted"))
+              ? "bg-primary text-primary-foreground shadow-sm font-bold"
+              : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              }`}
           >
             <span>{status}</span>
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-              (statusFilter === status || (status === "Pending" && statusFilter === "Submitted")) ? "bg-primary-foreground/20 text-primary-foreground font-bold" : "bg-muted text-muted-foreground"
-            }`}>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${(statusFilter === status || (status === "Pending" && statusFilter === "Submitted")) ? "bg-primary-foreground/20 text-primary-foreground font-bold" : "bg-muted text-muted-foreground"
+              }`}>
               {subTabCounts[status]}
             </span>
           </button>
@@ -447,8 +444,8 @@ const Expenses: React.FC = () => {
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         )}
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant={["Approved", "Rejected"].includes(report.status) ? "view" : "primary"}
                           onClick={() => setSelectedReportId(report.expense_report_id)}
                           className="gap-1.5"
@@ -533,7 +530,7 @@ const Expenses: React.FC = () => {
             ></textarea>
           </div>
           <div className="flex justify-end space-x-2 pt-3 border-t border-border mt-2">
-            <Button variant="close" type="button"  onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+            <Button variant="close" type="button" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
             <Button type="button" variant="secondary" onClick={(e) => handleCreateSubmit(e, true)} disabled={!newReport.purpose.trim() || !newReport.justification.trim()}>Save as Draft</Button>
             <Button type="submit" disabled={!newReport.purpose.trim() || !newReport.justification.trim()}>Save & Add Receipts</Button>
           </div>
@@ -554,7 +551,7 @@ const Expenses: React.FC = () => {
               onClose={() => setSelectedReportId(null)}
               receiptDetails={report}
               isPendingForUser={false} // Only read-only for employees here
-              onAction={() => {}}
+              onAction={() => { }}
             />
           );
         }
@@ -585,7 +582,7 @@ const Expenses: React.FC = () => {
               {/* Header Section */}
               <div className="flex items-center justify-between px-2">
                 <div className="flex items-center gap-4">
-                  <Badge 
+                  <Badge
                     variant={
                       report.status === 'Approved' ? 'success' :
                         (report.status.includes('Rejected') || report.status.includes('Returned')) ? 'error' :
@@ -620,15 +617,15 @@ const Expenses: React.FC = () => {
                   } else if (routesToFinanceManager) {
                     steps = ["Draft", "Submitted", "Finance Manager", "Payment", "Closed"];
                   }
-                    
+
                   let currentIndex = 0;
                   if (report.status === "Draft") currentIndex = 0;
                   else if (report.status === "Corrected Claim") currentIndex = 1;
                   else if (report.status === "Pending Manager Approval") currentIndex = steps.indexOf("Manager") !== -1 ? steps.indexOf("Manager") : 1;
                   else if (report.status === "Pending Finance Approval" || report.status === "Pending Finance Manager Approval" || report.status === "Pending CFO Approval") {
-                      if (steps.includes("CFO")) currentIndex = steps.indexOf("CFO");
-                      else if (steps.includes("Finance Manager")) currentIndex = steps.indexOf("Finance Manager");
-                      else currentIndex = steps.indexOf("Finance");
+                    if (steps.includes("CFO")) currentIndex = steps.indexOf("CFO");
+                    else if (steps.includes("Finance Manager")) currentIndex = steps.indexOf("Finance Manager");
+                    else currentIndex = steps.indexOf("Finance");
                   }
                   else if (report.status === "Payment Requested") currentIndex = steps.indexOf("Payment");
                   else if (report.status === "Approved" || report.status === "Approved") currentIndex = steps.indexOf("Closed");
@@ -638,7 +635,7 @@ const Expenses: React.FC = () => {
                     const isCompleted = i < currentIndex;
                     const isRejected = report.status.includes("Reject") || report.status.includes("Return");
                     const isActive = i === currentIndex;
-                    
+
                     // Progressive blue shades for completed steps
                     const blueShades = [
                       "bg-blue-200 text-blue-800",
@@ -781,351 +778,351 @@ const Expenses: React.FC = () => {
               )}
 
 
-            {/* Receipts List */}
-            <div className="mt-6 space-y-3">
-              <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
-                <FileText className="w-4 h-4 text-primary" />
-                Attached Receipts ({report.receipts?.length || 0})
-              </h3>
+              {/* Receipts List */}
+              <div className="mt-6 space-y-3">
+                <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-primary" />
+                  Attached Receipts ({report.receipts?.length || 0})
+                </h3>
 
-              <div className="space-y-3">
-                {report.receipts?.length === 0 && (
-                  <div className="p-8 text-center text-muted-foreground border rounded-lg bg-muted/10">
-                    No receipts added yet. Upload receipts to build your report.
-                  </div>
-                )}
-                {report.receipts?.map(receipt => {
-                  const lowConfidence = receipt.ocr_confidence && receipt.ocr_confidence < 50;
-                  const needsVerification = Number(receipt.verified_amount) === 0;
-                  const alert = lowConfidence || needsVerification;
+                <div className="space-y-3">
+                  {report.receipts?.length === 0 && (
+                    <div className="p-8 text-center text-muted-foreground border rounded-lg bg-muted/10">
+                      No receipts added yet. Upload receipts to build your report.
+                    </div>
+                  )}
+                  {report.receipts?.map(receipt => {
+                    const lowConfidence = receipt.ocr_confidence && receipt.ocr_confidence < 50;
+                    const needsVerification = Number(receipt.verified_amount) === 0;
+                    const alert = lowConfidence || needsVerification;
 
-                  const rawUrl = receipt.file_url || receipt.image_path;
-                  const imgUrl = resolveImageUrl(rawUrl, receipt.receipt_id);
-                  const isPdf = isPdfReceipt(receipt, imgUrl);
-                  const fileName = receipt.file_name || (isPdf ? `receipt_${receipt.receipt_id}.pdf` : `receipt_${receipt.receipt_id}.png`);
+                    const rawUrl = receipt.file_url || receipt.image_path;
+                    const imgUrl = resolveImageUrl(rawUrl, receipt.receipt_id);
+                    const isPdf = isPdfReceipt(receipt, imgUrl);
+                    const fileName = receipt.file_name || (isPdf ? `receipt_${receipt.receipt_id}.pdf` : `receipt_${receipt.receipt_id}.png`);
 
-                  return (
-                    <div key={receipt.receipt_id} className={`flex flex-col md:flex-row gap-4 p-4 rounded-2xl border transition-all duration-200 shadow-apple-sm ${alert && (report.status === "Draft" || report.status === "Returned for Correction") ? 'border-amber-500/40 bg-amber-500/10' : 'apple-card'}`}>
-                      {/* Apple Thumbnail Preview */}
-                      <div
-                        className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/60 rounded-xl border border-border flex items-center justify-center overflow-hidden shrink-0 group relative shadow-inner cursor-pointer"
-                        onClick={() => {
-                          if (imgUrl) setPreviewReceipt({ url: imgUrl, isPdf, fileName, receiptId: receipt.receipt_id });
-                        }}
-                        title="Click to preview receipt"
-                      >
-                        {imgUrl ? (
-                          <>
-                            {isPdf ? (
-                              <div className="flex flex-col items-center justify-center gap-1 text-red-500">
-                                <FileText className="w-8 h-8" />
-                                <span className="text-[9px] font-bold">PDF</span>
+                    return (
+                      <div key={receipt.receipt_id} className={`flex flex-col md:flex-row gap-4 p-4 rounded-2xl border transition-all duration-200 shadow-apple-sm ${alert && (report.status === "Draft" || report.status === "Returned for Correction") ? 'border-amber-500/40 bg-amber-500/10' : 'apple-card'}`}>
+                        {/* Apple Thumbnail Preview */}
+                        <div
+                          className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/60 rounded-xl border border-border flex items-center justify-center overflow-hidden shrink-0 group relative shadow-inner cursor-pointer"
+                          onClick={() => {
+                            if (imgUrl) setPreviewReceipt({ url: imgUrl, isPdf, fileName, receiptId: receipt.receipt_id });
+                          }}
+                          title="Click to preview receipt"
+                        >
+                          {imgUrl ? (
+                            <>
+                              {isPdf ? (
+                                <div className="flex flex-col items-center justify-center gap-1 text-red-500">
+                                  <FileText className="w-8 h-8" />
+                                  <span className="text-[9px] font-bold">PDF</span>
+                                </div>
+                              ) : (
+                                <img
+                                  src={imgUrl}
+                                  alt={fileName}
+                                  className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity"
+                                  onError={(e) => {
+                                    (e.target as HTMLElement).style.display = 'none';
+                                    const parent = (e.target as HTMLElement).parentElement;
+                                    if (parent && !parent.querySelector('.thumbnail-fallback')) {
+                                      const fallback = document.createElement('div');
+                                      fallback.className = 'thumbnail-fallback w-full h-full flex flex-col items-center justify-center p-1 text-center text-muted-foreground text-[9px] font-semibold bg-muted/30';
+                                      fallback.innerHTML = '<span class="text-xs">📄</span><span class="truncate max-w-full">' + (fileName || 'Receipt') + '</span>';
+                                      parent.appendChild(fallback);
+                                    }
+                                  }}
+                                />
+                              )}
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <Eye className="w-5 h-5 text-white" />
                               </div>
-                            ) : (
-                              <img
-                                src={imgUrl}
-                                alt={fileName}
-                                className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity"
-                                onError={(e) => {
-                                  (e.target as HTMLElement).style.display = 'none';
-                                  const parent = (e.target as HTMLElement).parentElement;
-                                  if (parent && !parent.querySelector('.thumbnail-fallback')) {
-                                    const fallback = document.createElement('div');
-                                    fallback.className = 'thumbnail-fallback w-full h-full flex flex-col items-center justify-center p-1 text-center text-muted-foreground text-[9px] font-semibold bg-muted/30';
-                                    fallback.innerHTML = '<span class="text-xs">📄</span><span class="truncate max-w-full">' + (fileName || 'Receipt') + '</span>';
-                                    parent.appendChild(fallback);
-                                  }
-                                }}
-                              />
-                            )}
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <Eye className="w-5 h-5 text-white" />
-                            </div>
-                          </>
-                        ) : (
-                          <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-muted-foreground/50" />
-                        )}
-                      </div>
+                            </>
+                          ) : (
+                            <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-muted-foreground/50" />
+                          )}
+                        </div>
 
-                      {/* Details */}
-                      <div className="flex-1 flex flex-col justify-center min-w-0">
-                        <div className="flex items-center gap-1.5 text-xs text-blue-600 font-bold truncate mb-0.5">
-                          <Paperclip className="w-3.5 h-3.5 shrink-0" />
-                          <span className="truncate">{fileName}</span>
-                        </div>
-                        <div className="font-bold flex items-center gap-2 text-sm text-foreground truncate">
-                          {receipt.merchant_name || 'QuickBite Restaurant'}
-                          {alert && report.status === "Draft" && <span title="Low OCR confidence, please verify amount"><AlertCircle className="w-4 h-4 text-amber-500 shrink-0" /></span>}
-                        </div>
-                        <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
-                          <span>Date: <strong className="text-foreground">{receipt.receipt_date || 'N/A'}</strong></span>
-                          <span>Category: <strong className="text-foreground">{receipt.category || 'Uncategorized'}</strong></span>
-                          <span className="flex items-center gap-1 bg-muted/50 px-2 py-0.5 rounded">
-                            OCR Confidence: <span className={lowConfidence ? "text-amber-600 font-semibold" : "text-green-600 font-medium"}>{receipt.ocr_confidence}%</span>
-                          </span>
-                        </div>
-                        {report.status !== "Draft" && (
-                          <div className="text-[11px] text-muted-foreground mt-1.5 font-medium">
-                            OCR Extracted: ₹{Number(receipt.ocr_amount).toFixed(2)}
+                        {/* Details */}
+                        <div className="flex-1 flex flex-col justify-center min-w-0">
+                          <div className="flex items-center gap-1.5 text-xs text-blue-600 font-bold truncate mb-0.5">
+                            <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">{fileName}</span>
                           </div>
-                        )}
-                      </div>
-
-                      {/* Amount & Actions */}
-                      <div className="flex items-center justify-end shrink-0 md:min-w-[200px] gap-2">
-                        {editingReceiptId === receipt.receipt_id ? (
-                          <div className="flex items-center gap-1.5 bg-muted/80 p-1.5 rounded-xl border border-border">
-                            <div className="relative">
-                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-bold">₹</span>
-                              <Input
-                                type="number"
-                                className="w-24 pl-6 pr-2 text-right font-bold h-8 text-xs bg-background rounded-lg"
-                                value={editAmount}
-                                onChange={e => setEditAmount(e.target.value)}
-                                autoFocus
-                              />
+                          <div className="font-bold flex items-center gap-2 text-sm text-foreground truncate">
+                            {receipt.merchant_name || 'QuickBite Restaurant'}
+                            {alert && report.status === "Draft" && <span title="Low OCR confidence, please verify amount"><AlertCircle className="w-4 h-4 text-amber-500 shrink-0" /></span>}
+                          </div>
+                          <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                            <span>Date: <strong className="text-foreground">{receipt.receipt_date || 'N/A'}</strong></span>
+                            <span>Category: <strong className="text-foreground">{receipt.category || 'Uncategorized'}</strong></span>
+                            <span className="flex items-center gap-1 bg-muted/50 px-2 py-0.5 rounded">
+                              OCR Confidence: <span className={lowConfidence ? "text-amber-600 font-semibold" : "text-green-600 font-medium"}>{receipt.ocr_confidence}%</span>
+                            </span>
+                          </div>
+                          {report.status !== "Draft" && (
+                            <div className="text-[11px] text-muted-foreground mt-1.5 font-medium">
+                              OCR Extracted: ₹{Number(receipt.ocr_amount).toFixed(2)}
                             </div>
-                            <Button size="sm" variant="primary" onClick={() => saveAmount(report.expense_report_id, receipt.receipt_id)} className="h-8 px-2.5 rounded-lg"><CheckCircle className="w-4 h-4" /></Button>
-                            <Button size="sm" variant="ghost" onClick={() => setEditingReceiptId(null)} className="h-8 px-2 rounded-lg text-rose-500"><XCircle className="w-4 h-4" /></Button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <div
-                              className={`flex flex-col items-end cursor-pointer rounded-xl px-3 py-1.5 transition-colors border ${alert && (report.status === "Draft" || report.status === "Returned for Correction") ? "border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20" : "border-transparent hover:bg-muted/60"}`}
-                              onClick={() => { if (report.status === "Draft" || (report.status === "Returned for Correction" && isOwner(report))) handleEditAmount(receipt); }}
-                              title={report.status === "Draft" || (report.status === "Returned for Correction" && isOwner(report)) ? "Click to correct amount" : ""}
-                            >
-                              <span className="text-xl font-extrabold text-foreground tracking-tight">
-                                ₹{Number(receipt.verified_amount).toFixed(2)}
-                              </span>
-                              {(report.status === "Draft" || (report.status === "Returned for Correction" && isOwner(report))) && (
-                                <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider mt-0.5">
-                                  {alert ? "Verify Amount" : "Click to Edit"}
+                          )}
+                        </div>
+
+                        {/* Amount & Actions */}
+                        <div className="flex items-center justify-end shrink-0 md:min-w-[200px] gap-2">
+                          {editingReceiptId === receipt.receipt_id ? (
+                            <div className="flex items-center gap-1.5 bg-muted/80 p-1.5 rounded-xl border border-border">
+                              <div className="relative">
+                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-bold">₹</span>
+                                <Input
+                                  type="number"
+                                  className="w-24 pl-6 pr-2 text-right font-bold h-8 text-xs bg-background rounded-lg"
+                                  value={editAmount}
+                                  onChange={e => setEditAmount(e.target.value)}
+                                  autoFocus
+                                />
+                              </div>
+                              <Button size="sm" variant="primary" onClick={() => saveAmount(report.expense_report_id, receipt.receipt_id)} className="h-8 px-2.5 rounded-lg"><CheckCircle className="w-4 h-4" /></Button>
+                              <Button size="sm" variant="ghost" onClick={() => setEditingReceiptId(null)} className="h-8 px-2 rounded-lg text-rose-500"><XCircle className="w-4 h-4" /></Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <div
+                                className={`flex flex-col items-end cursor-pointer rounded-xl px-3 py-1.5 transition-colors border ${alert && (report.status === "Draft" || report.status === "Returned for Correction") ? "border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20" : "border-transparent hover:bg-muted/60"}`}
+                                onClick={() => { if (report.status === "Draft" || (report.status === "Returned for Correction" && isOwner(report))) handleEditAmount(receipt); }}
+                                title={report.status === "Draft" || (report.status === "Returned for Correction" && isOwner(report)) ? "Click to correct amount" : ""}
+                              >
+                                <span className="text-xl font-extrabold text-foreground tracking-tight">
+                                  ₹{Number(receipt.verified_amount).toFixed(2)}
                                 </span>
+                                {(report.status === "Draft" || (report.status === "Returned for Correction" && isOwner(report))) && (
+                                  <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider mt-0.5">
+                                    {alert ? "Verify Amount" : "Click to Edit"}
+                                  </span>
+                                )}
+                              </div>
+
+                              {imgUrl && (
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground rounded"
+                                    title="Preview Receipt"
+                                    onClick={() => setPreviewReceipt({ url: imgUrl, isPdf, fileName, receiptId: receipt.receipt_id })}
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground rounded"
+                                    title="Open in New Tab"
+                                    onClick={() => window.open(imgUrl, "_blank")}
+                                  >
+                                    <ExternalLink className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground rounded"
+                                    title="Download Receipt"
+                                    onClick={() => downloadReceiptFile(receipt.receipt_id, fileName)}
+                                  >
+                                    <Download className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              )}
+
+                              {report.status === "Draft" && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded"
+                                  title="Delete Receipt / OCR"
+                                  onClick={() => {
+                                    if (window.confirm("Are you sure you want to delete this receipt?")) {
+                                      deleteReceiptMutation.mutate({ reportId: report.expense_report_id, receiptId: receipt.receipt_id });
+                                    }
+                                  }}
+                                  disabled={deleteReceiptMutation.isPending}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
                               )}
                             </div>
-
-                            {imgUrl && (
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground rounded"
-                                  title="Preview Receipt"
-                                  onClick={() => setPreviewReceipt({ url: imgUrl, isPdf, fileName, receiptId: receipt.receipt_id })}
-                                >
-                                  <Eye className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground rounded"
-                                  title="Open in New Tab"
-                                  onClick={() => window.open(imgUrl, "_blank")}
-                                >
-                                  <ExternalLink className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground rounded"
-                                  title="Download Receipt"
-                                  onClick={() => downloadReceiptFile(receipt.receipt_id, fileName)}
-                                >
-                                  <Download className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            )}
-
-                            {report.status === "Draft" && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded"
-                                title="Delete Receipt / OCR"
-                                onClick={() => {
-                                  if (window.confirm("Are you sure you want to delete this receipt?")) {
-                                    deleteReceiptMutation.mutate({ reportId: report.expense_report_id, receiptId: receipt.receipt_id });
-                                  }
-                                }}
-                                disabled={deleteReceiptMutation.isPending}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
-        </Dialog>
-      );
-    })()}
+          </Dialog>
+        );
+      })()}
 
 
-{/* Review & Submit Modal */ }
-<Dialog isOpen={isReviewOpen} onClose={() => setIsReviewOpen(false)} title="Review and Submit Claim">
-  {selectedReportId && (() => {
-    const report = expenses.find(r => r.expense_report_id === selectedReportId);
-    if (!report) return null;
+      {/* Review & Submit Modal */}
+      <Dialog isOpen={isReviewOpen} onClose={() => setIsReviewOpen(false)} title="Review and Submit Claim">
+        {selectedReportId && (() => {
+          const report = expenses.find(r => r.expense_report_id === selectedReportId);
+          if (!report) return null;
 
-    const unverified = report.receipts?.filter(r => Number(r.verified_amount) === 0).length || 0;
+          const unverified = report.receipts?.filter(r => Number(r.verified_amount) === 0).length || 0;
 
-    return (
-      <div className="space-y-6">
-        <div className="bg-muted/30 p-4 rounded-xl border">
-          <h3 className="font-bold text-lg mb-2">{report.purpose}</h3>
-          <div className="flex justify-between items-center text-sm border-t border-border pt-3 mt-3">
-            <span className="text-muted-foreground">Total Receipts:</span>
-            <span className="font-medium">{report.receipts?.length || 0}</span>
-          </div>
-          <div className="flex justify-between items-center text-sm mt-2">
-            <span className="text-muted-foreground">Calculated Claim Total:</span>
-            <span className="text-xl font-bold text-primary">₹{Number(report.total_amount).toFixed(2)}</span>
-          </div>
-        </div>
+          return (
+            <div className="space-y-6">
+              <div className="bg-muted/30 p-4 rounded-xl border">
+                <h3 className="font-bold text-lg mb-2">{report.purpose}</h3>
+                <div className="flex justify-between items-center text-sm border-t border-border pt-3 mt-3">
+                  <span className="text-muted-foreground">Total Receipts:</span>
+                  <span className="font-medium">{report.receipts?.length || 0}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm mt-2">
+                  <span className="text-muted-foreground">Calculated Claim Total:</span>
+                  <span className="text-xl font-bold text-primary">₹{Number(report.total_amount).toFixed(2)}</span>
+                </div>
+              </div>
 
-        {unverified > 0 && (
-          <div className="bg-rose-50 text-rose-700 p-3 rounded-lg border border-rose-200 flex items-start gap-2">
-            <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
-            <div>
-              <strong>Action Required:</strong> You have {unverified} receipt(s) with an unverified or ₹0.00 amount. Please review and correct the amounts before submission.
+              {unverified > 0 && (
+                <div className="bg-rose-50 text-rose-700 p-3 rounded-lg border border-rose-200 flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
+                  <div>
+                    <strong>Action Required:</strong> You have {unverified} receipt(s) with an unverified or ₹0.00 amount. Please review and correct the amounts before submission.
+                  </div>
+                </div>
+              )}
+
+              <label className="flex items-start gap-3 p-4 border rounded-xl cursor-pointer hover:bg-muted/50 transition-colors">
+                <input
+                  type="checkbox"
+                  className="mt-1 w-4 h-4 text-primary rounded border-border focus:ring-primary"
+                  checked={declarationChecked}
+                  onChange={e => setDeclarationChecked(e.target.checked)}
+                />
+                <span className="text-sm leading-relaxed text-muted-foreground">
+                  <strong>Employee Declaration:</strong> I certify that these expenses were incurred for legitimate business purposes in accordance with company policy, and I have not previously claimed or been reimbursed for these expenses.
+                </span>
+              </label>
+
+              <div className="flex justify-end gap-3 pt-3 mt-2 border-t border-border">
+                <Button variant="ghost" onClick={() => setIsReviewOpen(false)}>Back to Editing</Button>
+                <Button
+                  onClick={() => submitReportMutation.mutate(report.expense_report_id)}
+                  disabled={!declarationChecked || unverified > 0 || submitReportMutation.isPending}
+                  className="font-bold shadow-md"
+                >
+                  Confirm & Submit
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
+      </Dialog>
 
-        <label className="flex items-start gap-3 p-4 border rounded-xl cursor-pointer hover:bg-muted/50 transition-colors">
-          <input
-            type="checkbox"
-            className="mt-1 w-4 h-4 text-primary rounded border-border focus:ring-primary"
-            checked={declarationChecked}
-            onChange={e => setDeclarationChecked(e.target.checked)}
+      {/* Manager Action Modal */}
+      <Dialog isOpen={managerAction.isOpen} onClose={() => setManagerAction({ isOpen: false, action: null, reportId: null })} title={managerAction.action === 'return' ? "Return to Employee" : "Reject Expense Claim"}>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Please provide a justification for this action. This will be visible to the employee.</p>
+          <textarea
+            className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background dark:bg-black dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
+            rows={4}
+            placeholder="Enter your justification..."
+            value={managerComments}
+            onChange={e => setManagerComments(e.target.value)}
           />
-          <span className="text-sm leading-relaxed text-muted-foreground">
-            <strong>Employee Declaration:</strong> I certify that these expenses were incurred for legitimate business purposes in accordance with company policy, and I have not previously claimed or been reimbursed for these expenses.
-          </span>
-        </label>
-
-        <div className="flex justify-end gap-3 pt-3 mt-2 border-t border-border">
-          <Button variant="ghost" onClick={() => setIsReviewOpen(false)}>Back to Editing</Button>
-          <Button
-            onClick={() => submitReportMutation.mutate(report.expense_report_id)}
-            disabled={!declarationChecked || unverified > 0 || submitReportMutation.isPending}
-            className="font-bold shadow-md"
-          >
-            Confirm & Submit
-          </Button>
+          <div className="flex justify-end gap-2 pt-3 mt-2 border-t border-border">
+            <Button variant="close" onClick={() => setManagerAction({ isOpen: false, action: null, reportId: null })}>Cancel</Button>
+            <Button
+              disabled={!managerComments.trim() || managerActionMutation.isPending}
+              onClick={() => {
+                if (!isValidText(managerComments)) {
+                  toast.error("Please enter a valid justification (letters or numbers required).");
+                  return;
+                }
+                if (managerAction.reportId && managerAction.action) {
+                  managerActionMutation.mutate({ reportId: managerAction.reportId, action: managerAction.action, comments: managerComments });
+                  setManagerAction({ isOpen: false, action: null, reportId: null });
+                  setManagerComments("");
+                }
+              }}
+              className={managerAction.action === 'reject' ? "bg-red-600 hover:bg-red-700 text-white" : ""}
+            >
+              {managerAction.action === 'return' ? "Return" : "Reject"}
+            </Button>
+          </div>
         </div>
-      </div>
-    );
-  })()}
-</Dialog>
+      </Dialog>
 
-{/* Manager Action Modal */ }
-<Dialog isOpen={managerAction.isOpen} onClose={() => setManagerAction({ isOpen: false, action: null, reportId: null })} title={managerAction.action === 'return' ? "Return to Employee" : "Reject Expense Claim"}>
-  <div className="space-y-4">
-    <p className="text-sm text-muted-foreground">Please provide a justification for this action. This will be visible to the employee.</p>
-    <textarea
-      className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background dark:bg-black dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
-      rows={4}
-      placeholder="Enter your justification..."
-      value={managerComments}
-      onChange={e => setManagerComments(e.target.value)}
-    />
-    <div className="flex justify-end gap-2 pt-3 mt-2 border-t border-border">
-      <Button variant="close" onClick={() => setManagerAction({ isOpen: false, action: null, reportId: null })}>Cancel</Button>
-      <Button
-        disabled={!managerComments.trim() || managerActionMutation.isPending}
-        onClick={() => {
-          if (!isValidText(managerComments)) {
-            toast.error("Please enter a valid justification (letters or numbers required).");
-            return;
+      {/* Edit Details Modal */}
+      <Dialog isOpen={isEditDetailsOpen} onClose={() => setIsEditDetailsOpen(false)} title="Edit Report Details">
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          if (selectedReportId) {
+            const payload: any = {
+              purpose: editDetails.purpose,
+              justification: editDetails.justification,
+              project_code: editDetails.project_code || null
+            };
+            if (editDetails.department_id) payload.department_id = parseInt(editDetails.department_id);
+            else payload.department_id = null;
+            if (editDetails.cost_center_id) payload.cost_center_id = parseInt(editDetails.cost_center_id);
+            else payload.cost_center_id = null;
+
+            updateReportMutation.mutate({ reportId: selectedReportId, payload });
           }
-          if (managerAction.reportId && managerAction.action) {
-            managerActionMutation.mutate({ reportId: managerAction.reportId, action: managerAction.action, comments: managerComments });
-            setManagerAction({ isOpen: false, action: null, reportId: null });
-            setManagerComments("");
-          }
-        }}
-        className={managerAction.action === 'reject' ? "bg-red-600 hover:bg-red-700 text-white" : ""}
-      >
-        {managerAction.action === 'return' ? "Return" : "Reject"}
-      </Button>
-    </div>
-  </div>
-</Dialog>
-
-{/* Edit Details Modal */ }
-<Dialog isOpen={isEditDetailsOpen} onClose={() => setIsEditDetailsOpen(false)} title="Edit Report Details">
-  <form onSubmit={(e) => {
-    e.preventDefault();
-    if (selectedReportId) {
-      const payload: any = {
-        purpose: editDetails.purpose,
-        justification: editDetails.justification,
-        project_code: editDetails.project_code || null
-      };
-      if (editDetails.department_id) payload.department_id = parseInt(editDetails.department_id);
-      else payload.department_id = null;
-      if (editDetails.cost_center_id) payload.cost_center_id = parseInt(editDetails.cost_center_id);
-      else payload.cost_center_id = null;
-
-      updateReportMutation.mutate({ reportId: selectedReportId, payload });
-    }
-  }} className="space-y-4">
-    <Input
-      label="Business Purpose *"
-      value={editDetails.purpose}
-      onChange={e => setEditDetails({ ...editDetails, purpose: e.target.value.replace(/[^a-zA-Z0-9\s.,-]/g, '') })}
-      required
-    />
-    <div className="grid grid-cols-2 gap-4">
-      <Select
-        label="Department"
-        value={editDetails.department_id}
-        onChange={e => setEditDetails({ ...editDetails, department_id: e.target.value })}
-        options={[
-          { label: "None", value: "" },
-          ...departments.map((d: any) => ({ label: d.department_name, value: d.department_id.toString() }))
-        ]}
-      />
-      <Select
-        label="Cost Center"
-        value={editDetails.cost_center_id}
-        onChange={e => setEditDetails({ ...editDetails, cost_center_id: e.target.value })}
-        options={[
-          { label: "None", value: "" },
-          ...costCenters.map((cc: any) => ({ label: cc.cost_center_name, value: cc.cost_center_id.toString() }))
-        ]}
-      />
-    </div>
-    <Input
-      label="Project Code"
-      value={editDetails.project_code}
-      onChange={e => setEditDetails({ ...editDetails, project_code: e.target.value.replace(/[^a-zA-Z0-9\s-]/g, '') })}
-    />
-    <div>
-      <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-        Description / Justification <span className="text-red-500">*</span>
-      </label>
-      <textarea
-        className="w-full px-3 py-2 text-sm rounded-lg bg-background dark:bg-black dark:text-white border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200"
-        rows={3}
-        value={editDetails.justification}
-        onChange={e => setEditDetails({ ...editDetails, justification: e.target.value.replace(/[^a-zA-Z0-9\s.,!?-]/g, '') })}
-        required
-      ></textarea>
-    </div>
-    <div className="pt-3 mt-2 flex justify-end gap-2 border-t border-border">
-      <Button variant="close" type="button"  onClick={() => setIsEditDetailsOpen(false)}>Cancel</Button>
-      <Button type="submit" disabled={updateReportMutation.isPending || !editDetails.purpose.trim() || !editDetails.justification.trim()}>Save Changes</Button>
-    </div>
-  </form>
-</Dialog>
+        }} className="space-y-4">
+          <Input
+            label="Business Purpose *"
+            value={editDetails.purpose}
+            onChange={e => setEditDetails({ ...editDetails, purpose: e.target.value.replace(/[^a-zA-Z0-9\s.,-]/g, '') })}
+            required
+          />
+          <div className="grid grid-cols-2 gap-4">
+            <Select
+              label="Department"
+              value={editDetails.department_id}
+              onChange={e => setEditDetails({ ...editDetails, department_id: e.target.value })}
+              options={[
+                { label: "None", value: "" },
+                ...departments.map((d: any) => ({ label: d.department_name, value: d.department_id.toString() }))
+              ]}
+            />
+            <Select
+              label="Cost Center"
+              value={editDetails.cost_center_id}
+              onChange={e => setEditDetails({ ...editDetails, cost_center_id: e.target.value })}
+              options={[
+                { label: "None", value: "" },
+                ...costCenters.map((cc: any) => ({ label: cc.cost_center_name, value: cc.cost_center_id.toString() }))
+              ]}
+            />
+          </div>
+          <Input
+            label="Project Code"
+            value={editDetails.project_code}
+            onChange={e => setEditDetails({ ...editDetails, project_code: e.target.value.replace(/[^a-zA-Z0-9\s-]/g, '') })}
+          />
+          <div>
+            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+              Description / Justification <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              className="w-full px-3 py-2 text-sm rounded-lg bg-background dark:bg-black dark:text-white border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200"
+              rows={3}
+              value={editDetails.justification}
+              onChange={e => setEditDetails({ ...editDetails, justification: e.target.value.replace(/[^a-zA-Z0-9\s.,!?-]/g, '') })}
+              required
+            ></textarea>
+          </div>
+          <div className="pt-3 mt-2 flex justify-end gap-2 border-t border-border">
+            <Button variant="close" type="button" onClick={() => setIsEditDetailsOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={updateReportMutation.isPending || !editDetails.purpose.trim() || !editDetails.justification.trim()}>Save Changes</Button>
+          </div>
+        </form>
+      </Dialog>
       {previewReceipt && (
         <ReceiptPreviewModalViewer
           previewReceipt={previewReceipt}

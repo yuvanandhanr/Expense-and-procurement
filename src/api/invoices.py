@@ -11,6 +11,7 @@ from src.database.dependency import get_db_session
 from src.auth.dependencies import get_current_user
 from src.auth.authorization import is_amount_visible
 from src.models.auth import User, Role
+from src.models.vendor import Vendor
 from src.models.invoice import VendorInvoice, InvoiceDocument, InvoiceApproval
 from src.schemas.invoice import InvoiceSchema, InvoiceUpdate
 from src.services.ocr import OCRService
@@ -120,7 +121,9 @@ async def upload_invoice_batch(
         if not vendor_id_val:
             raise HTTPException(status_code=403, detail="Vendor profile not found.")
     else:
-        vendor_id_val = 1 # Fallback for internal employees
+        # Fallback to first available vendor for internal employee uploads
+        first_vendor_stmt = select(Vendor.vendor_id).order_by(Vendor.vendor_id.asc()).limit(1)
+        vendor_id_val = (await session.execute(first_vendor_stmt)).scalar_one_or_none()
 
     saved_invoices = []
     
@@ -234,24 +237,42 @@ async def upload_invoice(
     content = await file.read()
     
     # Process OCR
-    grand_total = OCRService.process_invoice_image(content)
+    ocr_result = OCRService.process_invoice_image(content)
+    if isinstance(ocr_result, dict):
+        grand_total = ocr_result.get("total", Decimal("0.00"))
+        cause = ocr_result.get("cause", "General Expense")
+        invoice_date_str = ocr_result.get("date")
+    else:
+        grand_total = ocr_result or Decimal("0.00")
+        cause = "General Expense"
+        invoice_date_str = None
+
+    from datetime import date
+    try:
+        if invoice_date_str:
+            invoice_date = date.fromisoformat(invoice_date_str)
+        else:
+            invoice_date = date.today()
+    except Exception:
+        invoice_date = date.today()
     
     # Generate mock vendor (or prompt user to select, but for now we default to a generic one or vendor_id 1)
     # Ideally, OCR could find vendor name too, but we keep it simple as requested.
     invoice_number = f"INV-{uuid.uuid4().hex[:6].upper()}"
     
+    first_vendor_stmt = select(Vendor.vendor_id).order_by(Vendor.vendor_id.asc()).limit(1)
+    default_vendor_id = (await session.execute(first_vendor_stmt)).scalar_one_or_none()
+
     # Create Invoice record
     invoice = VendorInvoice(
         invoice_number=invoice_number,
-        vendor_id=1, # Default vendor for demo purposes
-        invoice_date=None, # Will default to now in DB if nullable, wait it's not nullable!
+        vendor_id=default_vendor_id,
+        invoice_date=invoice_date,
+        cause=cause,
+        subtotal=grand_total,
+        grand_total=grand_total,
+        status="Pending Approval"
     )
-    # Actually invoice_date is not nullable in model, we must provide it.
-    from datetime import date
-    invoice.invoice_date = date.today()
-    invoice.subtotal = grand_total
-    invoice.grand_total = grand_total
-    invoice.status = "Pending Approval"
     
     session.add(invoice)
     await session.flush()

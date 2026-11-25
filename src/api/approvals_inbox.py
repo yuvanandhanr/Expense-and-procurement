@@ -194,13 +194,6 @@ async def get_pending_approvals(
                 "linked_pr_id": incident.linked_pr_id
             })
 
-    if not is_amount_visible(current_user):
-        for wf in pending_workflows:
-            if isinstance(wf, dict):
-                wf["amount"] = 0.0
-            elif hasattr(wf, "amount"):
-                wf.amount = 0.0
-
     return pending_workflows
 
 @router.delete("/{workflow_id}")
